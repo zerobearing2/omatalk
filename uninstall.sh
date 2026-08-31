@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Omatalk uninstaller: stops and removes the service, launcher, source, and
-# optionally models and config. Run from the repo root or anywhere.
+# optionally models and config. Safe to run via curl | bash (prompts read
+# the terminal, not the pipe).
 set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
@@ -18,7 +19,7 @@ rm -f "$HOME/.local/bin/omatalk" "$HOME/.local/bin/omatalkd"
 msg "Service stopped and removed; stray daemons killed; launcher removed"
 
 if [ -d "$OMATALK_HOME" ]; then
-  read -r -p "Remove $OMATALK_HOME (source, venv, ~340MB models)? [y/N] " answer
+  read -r -p "Remove $OMATALK_HOME (source, venv, ~340MB models)? [y/N] " answer < /dev/tty
   if [[ "$answer" =~ ^[Yy]$ ]]; then
     rm -rf "$OMATALK_HOME"
     msg "Removed $OMATALK_HOME"
@@ -28,7 +29,7 @@ if [ -d "$OMATALK_HOME" ]; then
 fi
 
 if [ -d "$HOME/.config/omatalk" ]; then
-  read -r -p "Remove config $HOME/.config/omatalk? [y/N] " answer
+  read -r -p "Remove config $HOME/.config/omatalk? [y/N] " answer < /dev/tty
   if [[ "$answer" =~ ^[Yy]$ ]]; then
     rm -rf "$HOME/.config/omatalk"
     msg "Removed config"

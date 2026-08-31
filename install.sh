@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Omatalk installer: system deps (omarchy-approved), venv, models,
-# systemd user service, PATH launcher, and the keybinding lines to paste.
+# Omatalk installer: system deps (omarchy-approved), latest release from the
+# site, venv, models, systemd user service, PATH launcher, keybinding line.
 set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
-OMATALK_REPO="${OMATALK_REPO:-https://github.com/zerobearing2/omatalk.git}"
+SITE_BASE="${SITE_BASE:-https://omatalk.dev}"
 MODEL_BASE="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
 MODEL_SHA256="7d5df8ecf7d4b1878015a32686053fd0eebe2bc377234608764cc0ef3636a6c5"
 VOICES_SHA256="bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
@@ -12,7 +12,7 @@ VOICES_SHA256="bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
 msg() { printf '\033[1;32m==>\033[0m %s\n' "$1"; }
 
 # 1. System dependencies. On Omarchy, check and install via the omarchy CLI.
-PKG_DEPS=(python git curl pipewire wl-clipboard uv)
+PKG_DEPS=(python curl pipewire wl-clipboard uv)
 if command -v omarchy >/dev/null 2>&1; then
   if omarchy pkg present "${PKG_DEPS[@]}"; then
     msg "System dependencies present: ${PKG_DEPS[*]}"
@@ -29,57 +29,15 @@ else
   done
 fi
 
-# 2. Source: latest GitHub release tarball, git clone fallback, or local
-# checkout when running from one (developers).
-if [ -f "$(dirname "$(readlink -f "$0")")/omatalk/daemon.py" ]; then
-  SRC="$(dirname "$(readlink -f "$0")")"
-  msg "Installing from local checkout: $SRC"
-  mkdir -p "$OMATALK_HOME"
-  rsync -a --delete --exclude .git --exclude .scratch "$SRC/" "$OMATALK_HOME/src/"
-elif [ "${OMATALK_SOURCE:-}" = "1" ]; then
-  msg "Source install requested; cloning $OMATALK_REPO"
-  if [ -d "$OMATALK_HOME/src/.git" ]; then
-    git -C "$OMATALK_HOME/src" pull --ff-only
-  else
-    git clone --depth 1 "$OMATALK_REPO" "$OMATALK_HOME/src"
-  fi
-else
-  base="${OMATALK_REPO%.git}"
-  slug="${base#https://github.com/}"
-  got_release=0
-  # Private repos need auth: use gh when available, plain curl for public.
-  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1 \
-      && gh release view --repo "$slug" >/dev/null 2>&1; then
-    msg "Installing latest release (via gh)"
-    mkdir -p "$OMATALK_HOME/src"
-    (cd "$OMATALK_HOME" && gh release download --repo "$slug" \
-      --pattern "omatalk-src.tar.gz*" --clobber)
-    (cd "$OMATALK_HOME" && sha256sum -c omatalk-src.tar.gz.sha256 --quiet)
-    got_release=1
-  elif curl -fsIL -o /dev/null "$base/releases/latest/download/omatalk-src.tar.gz.sha256"; then
-    msg "Installing latest release"
-    mkdir -p "$OMATALK_HOME/src"
-    curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" \
-      "$base/releases/latest/download/omatalk-src.tar.gz"
-    curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" \
-      "$base/releases/latest/download/omatalk-src.tar.gz.sha256"
-    (cd "$OMATALK_HOME" && sha256sum -c omatalk-src.tar.gz.sha256 --quiet)
-    got_release=1
-  fi
-  if [ "$got_release" = 1 ]; then
-    rm -rf "$OMATALK_HOME/src"
-    mkdir -p "$OMATALK_HOME/src"
-    tar -xzf "$OMATALK_HOME/omatalk-src.tar.gz" -C "$OMATALK_HOME/src" --strip-components=1
-    rm -f "$OMATALK_HOME/omatalk-src.tar.gz" "$OMATALK_HOME/omatalk-src.tar.gz.sha256"
-  else
-    msg "No release found; cloning $OMATALK_REPO"
-    if [ -d "$OMATALK_HOME/src/.git" ]; then
-      git -C "$OMATALK_HOME/src" pull --ff-only
-    else
-      git clone --depth 1 "$OMATALK_REPO" "$OMATALK_HOME/src"
-    fi
-  fi
-fi
+# 2. Source: always the latest release tarball, mirrored on the site by
+# the Pages workflow.
+msg "Downloading latest release from $SITE_BASE"
+mkdir -p "$OMATALK_HOME/src"
+curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" "$SITE_BASE/omatalk-src.tar.gz"
+curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" "$SITE_BASE/omatalk-src.tar.gz.sha256"
+(cd "$OMATALK_HOME" && sha256sum -c omatalk-src.tar.gz.sha256 --quiet)
+tar -xzf "$OMATALK_HOME/omatalk-src.tar.gz" -C "$OMATALK_HOME/src" --strip-components=1
+rm -f "$OMATALK_HOME/omatalk-src.tar.gz" "$OMATALK_HOME/omatalk-src.tar.gz.sha256"
 
 # 3. Python environment (uv; fast installs, kokoro-onnx bundles its own phonemizer).
 msg "Setting up Python environment with uv"

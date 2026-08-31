@@ -617,7 +617,7 @@
     <div class="eyebrow">install</div>
     <h2>One command<br>Omarchy OS</h2>
     <p class="prose" style="margin-top:14px;"><code class="inline-code">install.sh</code> checks system dependencies, pulls
-      the latest tagged release (falling back to <code class="inline-code">git clone</code> only if none exists), and builds
+      the latest tagged release from this site (checksum-verified), and builds
       a uv-managed venv. Then it downloads the ~340MB Kokoro-82M model (checksum-verified against the exact files the
       benchmark was run on) and installs the <code class="inline-code">omatalk.service</code> systemd user unit, warm and
       running before the command exits. It only <em>prints</em> the bindings.lua line; your keybindings stay

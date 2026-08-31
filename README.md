@@ -29,13 +29,8 @@ On an Omarchy machine:
 curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
 ```
 
-or from a clone of the repo: `./install.sh`.
-
-The script installs, in order of preference: the **latest GitHub release
-tarball** (checksum-verified, published by CI on every merge to `master`),
-a git clone fallback (also used for updates when a release isn't
-available — `OMATALK_SOURCE=1 ./install.sh` forces it), or the local
-checkout you're running it from. Then it:
+The script installs the **latest release tarball** (checksum-verified,
+served from the site by the Pages workflow). Then it:
 
 1. Checks system deps and installs any missing ones via `omarchy pkg add`
    (python, git, curl, pipewire, wl-clipboard, uv — stock Omarchy usually
@@ -60,7 +55,7 @@ Re-running the installer picks up the newest release.
 ## Uninstall
 
 ```sh
-./uninstall.sh
+curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
 ```
 
 Stops and removes the systemd service, the launcher, and the source; asks

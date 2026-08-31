@@ -6,7 +6,12 @@ on:
     paths:
       - public/**
       - install.sh
+      - uninstall.sh
       - .github/workflows/pages.yml
+  # Re-deploy after each release so the site mirrors the latest tarball.
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -20,6 +25,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -27,8 +33,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      - name: Publish install.sh alongside the site
-        run: cp install.sh public/install.sh
+      - name: Mirror installer scripts
+        run: cp install.sh uninstall.sh public/
+      - name: Mirror latest release tarball
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --repo "$GITHUB_REPOSITORY" \
+            --pattern "omatalk-src.tar.gz*" --clobber --dir public/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
