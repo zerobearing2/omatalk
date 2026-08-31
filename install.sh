@@ -40,8 +40,9 @@ tar -xzf "$OMATALK_HOME/omatalk-src.tar.gz" -C "$OMATALK_HOME/src" --strip-compo
 rm -f "$OMATALK_HOME/omatalk-src.tar.gz" "$OMATALK_HOME/omatalk-src.tar.gz.sha256"
 
 # 3. Python environment (uv; fast installs, kokoro-onnx bundles its own phonemizer).
+# --clear makes reinstalls and version upgrades work over an existing install.
 msg "Setting up Python environment with uv"
-uv venv --quiet "$OMATALK_HOME/venv"
+uv venv --quiet --clear "$OMATALK_HOME/venv"
 uv pip install --quiet --python "$OMATALK_HOME/venv/bin/python" "$OMATALK_HOME/src"
 
 # 4. Models (~340MB, skipped if already present). Checksums pin the exact
