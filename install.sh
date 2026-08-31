@@ -30,11 +30,14 @@ else
 fi
 
 # 2. Source: always the latest release tarball, mirrored on the site by
-# the Pages workflow.
+# the Pages workflow. The CDN may cache aggressively (observed 4h on the
+# tarball), so both files are cache-busted with one timestamp — they then
+# come straight from the current deploy as a matching pair.
 msg "Downloading latest release from $SITE_BASE"
+TS=$(date +%s)
 mkdir -p "$OMATALK_HOME/src"
-curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" "$SITE_BASE/omatalk-src.tar.gz"
-curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" "$SITE_BASE/omatalk-src.tar.gz.sha256"
+curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" "$SITE_BASE/omatalk-src.tar.gz?ts=$TS"
+curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" "$SITE_BASE/omatalk-src.tar.gz.sha256?ts=$TS"
 (cd "$OMATALK_HOME" && sha256sum -c omatalk-src.tar.gz.sha256 --quiet)
 tar -xzf "$OMATALK_HOME/omatalk-src.tar.gz" -C "$OMATALK_HOME/src" --strip-components=1
 rm -f "$OMATALK_HOME/omatalk-src.tar.gz" "$OMATALK_HOME/omatalk-src.tar.gz.sha256"
