@@ -145,6 +145,20 @@
     padding: 5px 12px;
   }
 
+  .gh-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--fg-dim);
+  }
+  .gh-link svg { width: 18px; height: 18px; fill: currentColor; }
+  .gh-link:hover, .gh-link:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
+
   .menu-btn {
     display: flex;
     flex-direction: column;
@@ -558,6 +572,9 @@
     font-size: 0.78rem;
     color: var(--muted);
   }
+  .foot-row a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border-strong); }
+  .foot-row a:hover, .foot-row a:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
+  .foot-credit { margin-top: 14px; gap: 16px 20px; }
 
   @media (prefers-reduced-motion: reduce) {
     * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
@@ -571,6 +588,9 @@
     <div class="wordmark"><span class="dot"></span>omatalk</div>
     <div class="topbar-right">
       <div class="for-omarchy">for Omarchy · Hyprland</div>
+      <a class="gh-link" href="https://github.com/zerobearing2/omatalk" target="_blank" rel="noopener" aria-label="Omatalk on GitHub">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.64 0 8.13c0 3.6 2.29 6.65 5.47 7.72.4.08.55-.17.55-.39 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.5-2.69-.96-.09-.23-.48-.96-.82-1.15-.28-.15-.68-.53-.01-.54.63-.01 1.08.58 1.23.83.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .22.15.48.55.39A8.13 8.13 0 0 0 16 8.13C16 3.64 12.42 0 8 0Z"/></svg>
+      </a>
       <button class="menu-btn" id="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Section menu">
         <span class="bar"></span><span class="bar"></span><span class="bar"></span>
       </button>
@@ -825,6 +845,10 @@
     <span>MIT License</span>
     <span>Built for the Omarchy</span>
     <span>No telemetry. No network calls at runtime.</span>
+  </div>
+  <div class="wrap foot-row foot-credit">
+    <span>&copy; 2026 <a href="https://zerobearing.com" target="_blank" rel="noopener">Dave Bradford</a></span>
+    <span><a href="https://github.com/zerobearing2/omatalk" target="_blank" rel="noopener">GitHub</a></span>
   </div>
 </footer>
 
