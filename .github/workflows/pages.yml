@@ -39,8 +39,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # A push-triggered deploy can race the Release workflow's asset
+          # upload. Tolerate that: the workflow_run deploy after Release
+          # completes re-mirrors the fresh tarball.
           gh release download --repo "$GITHUB_REPOSITORY" \
-            --pattern "omatalk-src.tar.gz*" --clobber --dir public/
+            --pattern "omatalk-src.tar.gz*" --clobber --dir public/ \
+            || echo "No release assets yet; workflow_run deploy will mirror them"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
