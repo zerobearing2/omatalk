@@ -20,18 +20,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Resolve version (auto-bump patch when already tagged)
+      - name: Resolve version (auto-bump patch to the first free tag)
         id: ver
         run: |
           # The tag is the version record; nothing is committed back to the
-          # branch, so pushes never race the bot.
+          # branch, so pushes never race the bot. Bump the patch until the
+          # tag is free — a single bump can land on an existing tag after a
+          # reset, wedging every future release.
           version=$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml | head -1)
-          if git ls-remote --tags origin "refs/tags/v$version" | grep -q "refs/tags/v$version"; then
-            major=$(echo "$version" | cut -d. -f1)
-            minor=$(echo "$version" | cut -d. -f2)
-            patch=$(echo "$version" | cut -d. -f3)
-            version="$major.$minor.$((patch + 1))"
-          fi
+          major=$(echo "$version" | cut -d. -f1)
+          minor=$(echo "$version" | cut -d. -f2)
+          patch=$(echo "$version" | cut -d. -f3)
+          while git ls-remote --tags origin "refs/tags/v$version" | grep -q "refs/tags/v$version"; do
+            patch=$((patch + 1))
+            version="$major.$minor.$patch"
+          done
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Pack source tarball
         run: |
