@@ -1,0 +1,5 @@
+#!/bin/sh
+log="$OMATALK_TEST_LOG"
+echo "start $$" >> "$log"
+echo "fail $$" >> "$log"
+exit 1

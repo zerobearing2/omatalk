@@ -16,3 +16,11 @@ Default five canonical triage role strings. See `docs/agents/triage-labels.md`.
 ### Domain docs
 
 Single-context: `CONTEXT.md` at root + `docs/adr/`. See `docs/agents/domain.md`.
+
+### Tests
+
+Run with uv (creates the dev env on demand):
+
+```sh
+uv run --group dev pytest tests/
+```

@@ -57,7 +57,10 @@
   }
 
   * { box-sizing: border-box; }
-  html { color-scheme: light dark; }
+  html { color-scheme: light dark; scroll-padding-top: 76px; }
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
   body {
     margin: 0;
     background: var(--ink);
@@ -104,6 +107,10 @@
   /* ---------- header ---------- */
   header.top {
     border-bottom: 1px solid var(--border);
+    background: var(--ink);
+    position: sticky;
+    top: 0;
+    z-index: 40;
   }
   .topbar {
     display: flex;
@@ -113,6 +120,7 @@
     max-width: 920px;
     margin: 0 auto;
   }
+  .topbar-right { display: flex; align-items: center; gap: 12px; position: relative; }
   .wordmark {
     font-family: "JetBrains Mono", monospace;
     font-weight: 700;
@@ -135,6 +143,62 @@
     border: 1px solid var(--border-strong);
     border-radius: 999px;
     padding: 5px 12px;
+  }
+
+  .menu-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: var(--surface);
+    cursor: pointer;
+  }
+  .menu-btn .bar {
+    display: block;
+    width: 15px;
+    height: 1.5px;
+    background: var(--fg-dim);
+    transition: transform 150ms ease, opacity 150ms ease;
+  }
+  .menu-btn:hover .bar { background: var(--accent); }
+  .menu-btn[aria-expanded="true"] .bar:nth-child(1) { transform: translateY(5.5px) rotate(45deg); }
+  .menu-btn[aria-expanded="true"] .bar:nth-child(2) { opacity: 0; }
+  .menu-btn[aria-expanded="true"] .bar:nth-child(3) { transform: translateY(-5.5px) rotate(-45deg); }
+
+  .site-nav {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 200px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    padding: 8px;
+    box-shadow: 0 24px 60px -30px rgba(0,0,0,0.5);
+    z-index: 30;
+  }
+  .site-nav[hidden] { display: none; }
+  .site-nav a {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85rem;
+    color: var(--fg-dim);
+    text-decoration: none;
+    padding: 9px 10px;
+    border-radius: 6px;
+  }
+  .site-nav a:hover, .site-nav a:focus-visible {
+    background: var(--ink-alt);
+    color: var(--fg);
+    outline: none;
   }
 
   /* ---------- hero ---------- */
@@ -169,22 +233,7 @@
   }
   .key.primary { border-color: var(--accent); color: var(--accent); }
   .key.pressed { transform: translateY(1px) scale(0.97); border-color: var(--accent); }
-  .keys .or { color: var(--muted); font-family: "JetBrains Mono", monospace; font-size: 0.8rem; }
 
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 30px;
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.78rem;
-    color: var(--muted);
-  }
-  .status-pill .led {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--accent-2);
-    animation: blink 2.4s ease-in-out infinite;
-  }
   @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
   /* ---------- demo terminal ---------- */
@@ -233,7 +282,19 @@
   }
   @keyframes caret { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 
-  canvas#wave { width: 100%; height: 84px; display: block; margin-top: 18px; }
+  .wave-ascii {
+    width: 100%;
+    height: 84px;
+    display: flex;
+    align-items: center;
+    margin-top: 18px;
+    font-size: clamp(1.4rem, 3vw, 1.9rem);
+    line-height: 1;
+    letter-spacing: 1px;
+    color: var(--accent);
+    white-space: pre;
+    overflow: hidden;
+  }
 
   .demo-foot {
     display: flex;
@@ -305,18 +366,9 @@
     border-radius: 12px;
     background: var(--surface);
     overflow-x: auto;
+    padding: 20px;
   }
-  .diagram pre {
-    margin: 0;
-    padding: 24px clamp(16px, 3vw, 28px);
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.82rem;
-    line-height: 1.55;
-    color: var(--fg-dim);
-    white-space: pre;
-  }
-  .diagram pre .hi { color: var(--accent); }
-  .diagram pre .hi2 { color: var(--accent-2); }
+  .diagram .mermaid { display: flex; justify-content: center; min-width: fit-content; }
 
   /* ---------- stack manifest ---------- */
   .manifest { margin-top: 34px; display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
@@ -348,41 +400,64 @@
     color: var(--muted);
     margin-bottom: 10px;
   }
-  .voice-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .voice-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    gap: 10px;
+  }
   .voice-btn {
-    display: inline-flex;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 8px;
     font-family: "JetBrains Mono", monospace;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     color: var(--fg-dim);
     background: var(--surface);
     border: 1px solid var(--border-strong);
-    border-radius: 8px;
-    padding: 8px 12px;
+    border-radius: 12px;
+    padding: 14px 8px 10px;
     cursor: pointer;
-    transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+    transition: border-color 120ms ease, color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
   }
-  .voice-btn:hover { border-color: var(--accent); color: var(--fg); }
+  .voice-btn:hover { border-color: var(--accent); color: var(--fg); transform: translateY(-2px); }
   .voice-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .voice-btn .icon {
-    width: 0; height: 0;
-    border-style: solid;
-    border-width: 5px 0 5px 8px;
-    border-color: transparent transparent transparent var(--muted);
-    flex: 0 0 auto;
+  .voice-avatar {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--ink-alt);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  .voice-btn.playing {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  .voice-avatar svg { display: block; }
+  .voice-avatar::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid var(--accent);
+    opacity: 0;
+    transform: scale(0.85);
+    transition: opacity 150ms ease, transform 150ms ease;
   }
-  .voice-btn.playing .icon {
-    border-color: transparent transparent transparent var(--accent);
-    animation: blink 1s ease-in-out infinite;
+  .voice-btn.playing { border-color: var(--accent); color: var(--accent); box-shadow: 0 8px 20px -12px color-mix(in srgb, var(--accent) 60%, transparent); }
+  .voice-btn.playing .voice-avatar::after {
+    opacity: 1;
+    transform: scale(1);
+    animation: pulse-ring 1.4s ease-out infinite;
   }
+  @keyframes pulse-ring {
+    0% { transform: scale(0.95); opacity: 0.9; }
+    100% { transform: scale(1.35); opacity: 0; }
+  }
+  .voice-name { line-height: 1.3; text-align: center; }
   .voice-tag {
-    font-size: 0.68rem;
+    font-size: 0.62rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--accent-2);
@@ -390,6 +465,69 @@
     border-radius: 4px;
     padding: 1px 5px;
   }
+
+  .inline-code {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.92em;
+    background: var(--ink-alt);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+  }
+
+  /* ---------- code card (config file, install commands) ---------- */
+  .code-card {
+    margin-top: 30px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .code-card .cc-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    padding: 10px 12px 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--ink-alt);
+  }
+  .code-card pre {
+    margin: 0;
+    padding: 18px 16px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: var(--fg-dim);
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-x: auto;
+  }
+  .code-card pre .k { color: var(--accent-2); }
+  .code-card pre .v { color: var(--accent); }
+
+  .copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: border-color 120ms ease, color 120ms ease;
+  }
+  .copy-btn:hover { border-color: var(--accent); color: var(--fg); }
+  .copy-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .copy-btn svg { width: 12px; height: 12px; flex: 0 0 auto; }
+  .copy-btn.copied { border-color: var(--accent); color: var(--accent); }
 
   footer {
     border-top: 1px solid var(--border);
@@ -415,7 +553,21 @@
 <header class="top">
   <div class="topbar">
     <div class="wordmark"><span class="dot"></span>omatalk</div>
-    <div class="for-omarchy">for Omarchy · Hyprland</div>
+    <div class="topbar-right">
+      <div class="for-omarchy">for Omarchy · Hyprland</div>
+      <button class="menu-btn" id="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Section menu">
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+      </button>
+      <nav class="site-nav" id="site-nav" hidden>
+        <a href="#why">Why</a>
+        <a href="#what">What it does</a>
+        <a href="#voices">Voices</a>
+        <a href="#config">Config</a>
+        <a href="#install">Install</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#stack">How it's built</a>
+      </nav>
+    </div>
   </div>
 </header>
 
@@ -429,12 +581,8 @@
 
     <div class="keys">
       <span class="key primary mono" id="key-primary">F8</span>
-      <span class="or">or</span>
-      <span class="key mono" id="key-alt">SUPER + CTRL + S</span>
     </div>
     <p class="sub" style="margin-top:12px; font-size:0.95rem;">F8 answers F9 — voxtype's dictation key speaks <em>to</em> the machine, F8 speaks back.</p>
-
-    <div class="status-pill"><span class="led"></span>MVP spec locked · daemon in active development</div>
 
     <div class="demo">
       <div class="demo-bar">
@@ -445,7 +593,7 @@
         <div class="demo-line" id="demo-text">
           The reverse of dictation<span class="sel">: instead of you talking to the machine, the machine reads back to you.</span><span class="cursor"></span>
         </div>
-        <canvas id="wave" width="800" height="84" aria-hidden="true"></canvas>
+        <div class="wave-ascii mono" id="wave" aria-hidden="true"></div>
         <div class="demo-foot">
           <span>state: <span id="state-label" class="mono">idle</span></span>
           <span class="mono">kokoro-82m · 24kHz · af_heart</span>
@@ -484,63 +632,120 @@
   <section id="voices">
     <div class="eyebrow">voices</div>
     <h2>Twenty-eight voices, one config line</h2>
-    <p class="prose" style="margin-top:14px;">Kokoro-82M ships packs across nine languages; Omatalk's MVP speaks
-      English only — American and British, eleven female and nine male US voices, four and four UK.
-      Set <code class="mono" style="background:var(--ink-alt);border:1px solid var(--border);border-radius:4px;padding:0.1em 0.4em;">voice = "…"</code>
-      in <code class="mono" style="background:var(--ink-alt);border:1px solid var(--border);border-radius:4px;padding:0.1em 0.4em;">config.toml</code>
-      to any name below — <code class="mono" style="background:var(--ink-alt);border:1px solid var(--border);border-radius:4px;padding:0.1em 0.4em;">af_heart</code> is the default. Every clip is the same line, rendered
+    <p class="prose" style="margin-top:14px;">Kokoro-82M ships packs across nine languages; Omatalk speaks
+      English only for now — American and British, eleven female and nine male US voices, four and four UK.
+      Set <code class="inline-code">voice = "…"</code>
+      in <code class="inline-code">config.toml</code>
+      to any name below — <code class="inline-code">af_heart</code> is the default. Every clip is the same line, rendered
       through the pipeline Omatalk actually runs: Kokoro-82M, ONNX Runtime, CPU.</p>
 
     <div class="voice-groups" id="voice-groups">
       <div class="voice-group">
         <div class="voice-group-label">American English · Female</div>
         <div class="voice-grid">
-          <button class="voice-btn" data-src="audio/voices/af_alloy.mp3"><span class="icon"></span>af_alloy</button>
-          <button class="voice-btn" data-src="audio/voices/af_aoede.mp3"><span class="icon"></span>af_aoede</button>
-          <button class="voice-btn" data-src="audio/voices/af_bella.mp3"><span class="icon"></span>af_bella</button>
-          <button class="voice-btn" data-src="audio/voices/af_heart.mp3"><span class="icon"></span>af_heart<span class="voice-tag">default</span></button>
-          <button class="voice-btn" data-src="audio/voices/af_jessica.mp3"><span class="icon"></span>af_jessica</button>
-          <button class="voice-btn" data-src="audio/voices/af_kore.mp3"><span class="icon"></span>af_kore</button>
-          <button class="voice-btn" data-src="audio/voices/af_nicole.mp3"><span class="icon"></span>af_nicole</button>
-          <button class="voice-btn" data-src="audio/voices/af_nova.mp3"><span class="icon"></span>af_nova</button>
-          <button class="voice-btn" data-src="audio/voices/af_river.mp3"><span class="icon"></span>af_river</button>
-          <button class="voice-btn" data-src="audio/voices/af_sarah.mp3"><span class="icon"></span>af_sarah</button>
-          <button class="voice-btn" data-src="audio/voices/af_sky.mp3"><span class="icon"></span>af_sky</button>
+          <button class="voice-btn" data-src="audio/voices/af_alloy.mp3"><span class="voice-avatar" data-seed="af_alloy"></span><span class="voice-name">af_alloy</span></button>
+          <button class="voice-btn" data-src="audio/voices/af_aoede.mp3"><span class="voice-avatar" data-seed="af_aoede"></span><span class="voice-name">af_aoede</span></button>
+          <button class="voice-btn" data-src="audio/voices/af_bella.mp3"><span class="voice-avatar" data-seed="af_bella"></span><span class="voice-name">af_bella</span></button>
+          <button class="voice-btn" data-src="audio/voices/af_heart.mp3"><span class="voice-avatar" data-seed="af_heart"></span><span class="voice-name">af_heart</span><span class="voice-tag">default</span></button>
+          <button class="voice-btn" data-src="audio/voices/af_jessica.mp3"><span class="voice-avatar" data-seed="af_jessica"></span><span class="voice-name">af_jessica</span></button>
+          <button class="voice-btn" data-src="audio/voices/af_kore.mp3"><span class="voice-avatar" data-seed="af_kore"></span><span class="voice-name">af_kore</span></button>
+          <button class="voice-btn" data-src="audio/voices/af_nicole.mp3"><span class="voice-avatar" data-seed="af_nicole"></span><span class="voice-name">af_nicole</span></button>
+          <button class="voice-btn" data-src="audio/voices/af_nova.mp3"><span class="voice-avatar" data-seed="af_nova"></span><span class="voice-name">af_nova</span></button>
+          <button class="voice-btn" data-src="audio/voices/af_river.mp3"><span class="voice-avatar" data-seed="af_river"></span><span class="voice-name">af_river</span></button>
+          <button class="voice-btn" data-src="audio/voices/af_sarah.mp3"><span class="voice-avatar" data-seed="af_sarah"></span><span class="voice-name">af_sarah</span></button>
+          <button class="voice-btn" data-src="audio/voices/af_sky.mp3"><span class="voice-avatar" data-seed="af_sky"></span><span class="voice-name">af_sky</span></button>
         </div>
       </div>
       <div class="voice-group">
         <div class="voice-group-label">American English · Male</div>
         <div class="voice-grid">
-          <button class="voice-btn" data-src="audio/voices/am_adam.mp3"><span class="icon"></span>am_adam</button>
-          <button class="voice-btn" data-src="audio/voices/am_echo.mp3"><span class="icon"></span>am_echo</button>
-          <button class="voice-btn" data-src="audio/voices/am_eric.mp3"><span class="icon"></span>am_eric</button>
-          <button class="voice-btn" data-src="audio/voices/am_fenrir.mp3"><span class="icon"></span>am_fenrir</button>
-          <button class="voice-btn" data-src="audio/voices/am_liam.mp3"><span class="icon"></span>am_liam</button>
-          <button class="voice-btn" data-src="audio/voices/am_michael.mp3"><span class="icon"></span>am_michael</button>
-          <button class="voice-btn" data-src="audio/voices/am_onyx.mp3"><span class="icon"></span>am_onyx</button>
-          <button class="voice-btn" data-src="audio/voices/am_puck.mp3"><span class="icon"></span>am_puck</button>
-          <button class="voice-btn" data-src="audio/voices/am_santa.mp3"><span class="icon"></span>am_santa</button>
+          <button class="voice-btn" data-src="audio/voices/am_adam.mp3"><span class="voice-avatar" data-seed="am_adam"></span><span class="voice-name">am_adam</span></button>
+          <button class="voice-btn" data-src="audio/voices/am_echo.mp3"><span class="voice-avatar" data-seed="am_echo"></span><span class="voice-name">am_echo</span></button>
+          <button class="voice-btn" data-src="audio/voices/am_eric.mp3"><span class="voice-avatar" data-seed="am_eric"></span><span class="voice-name">am_eric</span></button>
+          <button class="voice-btn" data-src="audio/voices/am_fenrir.mp3"><span class="voice-avatar" data-seed="am_fenrir"></span><span class="voice-name">am_fenrir</span></button>
+          <button class="voice-btn" data-src="audio/voices/am_liam.mp3"><span class="voice-avatar" data-seed="am_liam"></span><span class="voice-name">am_liam</span></button>
+          <button class="voice-btn" data-src="audio/voices/am_michael.mp3"><span class="voice-avatar" data-seed="am_michael"></span><span class="voice-name">am_michael</span></button>
+          <button class="voice-btn" data-src="audio/voices/am_onyx.mp3"><span class="voice-avatar" data-seed="am_onyx"></span><span class="voice-name">am_onyx</span></button>
+          <button class="voice-btn" data-src="audio/voices/am_puck.mp3"><span class="voice-avatar" data-seed="am_puck"></span><span class="voice-name">am_puck</span></button>
+          <button class="voice-btn" data-src="audio/voices/am_santa.mp3"><span class="voice-avatar" data-seed="am_santa"></span><span class="voice-name">am_santa</span></button>
         </div>
       </div>
       <div class="voice-group">
         <div class="voice-group-label">British English · Female</div>
         <div class="voice-grid">
-          <button class="voice-btn" data-src="audio/voices/bf_alice.mp3"><span class="icon"></span>bf_alice</button>
-          <button class="voice-btn" data-src="audio/voices/bf_emma.mp3"><span class="icon"></span>bf_emma</button>
-          <button class="voice-btn" data-src="audio/voices/bf_isabella.mp3"><span class="icon"></span>bf_isabella</button>
-          <button class="voice-btn" data-src="audio/voices/bf_lily.mp3"><span class="icon"></span>bf_lily</button>
+          <button class="voice-btn" data-src="audio/voices/bf_alice.mp3"><span class="voice-avatar" data-seed="bf_alice"></span><span class="voice-name">bf_alice</span></button>
+          <button class="voice-btn" data-src="audio/voices/bf_emma.mp3"><span class="voice-avatar" data-seed="bf_emma"></span><span class="voice-name">bf_emma</span></button>
+          <button class="voice-btn" data-src="audio/voices/bf_isabella.mp3"><span class="voice-avatar" data-seed="bf_isabella"></span><span class="voice-name">bf_isabella</span></button>
+          <button class="voice-btn" data-src="audio/voices/bf_lily.mp3"><span class="voice-avatar" data-seed="bf_lily"></span><span class="voice-name">bf_lily</span></button>
         </div>
       </div>
       <div class="voice-group">
         <div class="voice-group-label">British English · Male</div>
         <div class="voice-grid">
-          <button class="voice-btn" data-src="audio/voices/bm_daniel.mp3"><span class="icon"></span>bm_daniel</button>
-          <button class="voice-btn" data-src="audio/voices/bm_fable.mp3"><span class="icon"></span>bm_fable</button>
-          <button class="voice-btn" data-src="audio/voices/bm_george.mp3"><span class="icon"></span>bm_george</button>
-          <button class="voice-btn" data-src="audio/voices/bm_lewis.mp3"><span class="icon"></span>bm_lewis</button>
+          <button class="voice-btn" data-src="audio/voices/bm_daniel.mp3"><span class="voice-avatar" data-seed="bm_daniel"></span><span class="voice-name">bm_daniel</span></button>
+          <button class="voice-btn" data-src="audio/voices/bm_fable.mp3"><span class="voice-avatar" data-seed="bm_fable"></span><span class="voice-name">bm_fable</span></button>
+          <button class="voice-btn" data-src="audio/voices/bm_george.mp3"><span class="voice-avatar" data-seed="bm_george"></span><span class="voice-name">bm_george</span></button>
+          <button class="voice-btn" data-src="audio/voices/bm_lewis.mp3"><span class="voice-avatar" data-seed="bm_lewis"></span><span class="voice-name">bm_lewis</span></button>
         </div>
       </div>
     </div>
+  </section>
+
+  <section id="config">
+    <div class="eyebrow">config</div>
+    <h2>One file, two knobs</h2>
+    <p class="prose" style="margin-top:14px;">No flags, no dashboard. <code class="inline-code">~/.config/omatalk/config.toml</code> is
+      entirely optional — missing file, Omatalk just runs on defaults. Point <code class="inline-code">voice</code> at any name from
+      the list above, tune <code class="inline-code">speed</code>, save. That's the whole surface.</p>
+    <div class="code-card" style="max-width:40ch;">
+      <div class="cc-title">
+        ~/.config/omatalk/config.toml
+        <button class="copy-btn" type="button" data-copy="voice = &quot;af_heart&quot;&#10;speed = 1.0">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+          <span class="copy-label">copy</span>
+        </button>
+      </div>
+      <pre><span class="k">voice</span> = <span class="v">"af_heart"</span>
+<span class="k">speed</span> = <span class="v">1.0</span></pre>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="eyebrow">install</div>
+    <h2>One command on a fresh Omarchy machine</h2>
+    <p class="prose" style="margin-top:14px;"><code class="inline-code">install.sh</code> checks system dependencies, builds a
+      Python venv, downloads the ~340MB Kokoro-82M model (checksum-verified against the exact files the benchmark
+      was run on), and installs the <code class="inline-code">omatalk.service</code> systemd user unit — warm and
+      running before the command exits. It only <em>prints</em> the bindings.lua line; your keybindings stay
+      yours to edit.</p>
+
+    <div class="code-card">
+      <div class="cc-title">
+        install
+        <button class="copy-btn" type="button" data-copy="git clone https://github.com/dave/omatalk.git && cd omatalk && ./install.sh">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+          <span class="copy-label">copy</span>
+        </button>
+      </div>
+      <pre>git clone https://github.com/dave/omatalk.git && cd omatalk && ./install.sh</pre>
+    </div>
+
+    <p class="prose" style="margin-top:26px; max-width:66ch;">Re-run the same command any time to update — it pulls the
+      latest source, reinstalls, and restarts the service. Fresh model download is skipped once the files are present.</p>
+
+    <div class="code-card">
+      <div class="cc-title">
+        uninstall
+        <button class="copy-btn" type="button" data-copy="~/.local/share/omatalk/src/uninstall.sh">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+          <span class="copy-label">copy</span>
+        </button>
+      </div>
+      <pre>~/.local/share/omatalk/src/uninstall.sh</pre>
+    </div>
+    <p class="prose" style="margin-top:14px; max-width:66ch;">Stops and disables the service, kills any stray daemon, and
+      removes the launcher — then asks before deleting the models and your config. It won't touch the
+      <code class="inline-code">o.bind</code> line in <code class="inline-code">bindings.lua</code>; remove that yourself.</p>
   </section>
 
   <section id="architecture">
@@ -549,19 +754,17 @@
     <p class="prose" style="margin-top:14px;">One hotkey press is a one-shot client; the daemon holds the model warm from login
       so nothing pays a cold-load tax mid-sentence.</p>
     <div class="diagram">
-<pre>bindings.lua ──(<span class="hi">F8</span> / <span class="hi">SUPER+CTRL+S</span>)──▶ one-shot client
-                                               │
-                                               ▼
-                                    Unix socket (<span class="hi2">omatalk.sock</span>)
-                                               │
-                                               ▼
-┌─────────────────────── omatalk daemon (systemd --user) ─────────────────────┐
-│  capture:  wl-paste --primary → wl-paste (clipboard fallback)               │
-│  chunker:  text → sentences                                                 │
-│  engine:   <span class="hi">Kokoro-82M</span> · ONNX Runtime · CPU, warm session               │
-│  player:   stream PCM chunks → pw-play / PipeWire                           │
-│  state:    idle | speaking | error                                          │
-└───────────────────────────────────────────────────────────────────────────┘</pre>
+      <div class="mermaid">
+flowchart LR
+    K["bindings.lua<br/><b>F8</b>"] --> C["one-shot client"]
+    C -- "Unix socket<br/>omatalk.sock" --> CAP
+    subgraph D["omatalk daemon · systemd --user"]
+        direction LR
+        CAP["capture<br/>wl-paste --primary → wl-paste"] --> CH["chunker<br/>text → sentences"]
+        CH --> EN["engine<br/>Kokoro-82M · ONNX · CPU"]
+        EN --> PL["player<br/>pw-play → PipeWire"]
+    end
+      </div>
     </div>
   </section>
 
@@ -570,11 +773,11 @@
     <h2>No cloud in the loop</h2>
     <div class="manifest">
       <div class="row"><div class="name">Kokoro-82M</div><div class="why">ONNX Runtime, CPU. Chosen over Piper (fast but audibly robotic) and XTTS/Chatterbox (GPU-sized, restrictive licenses) — near top-of-class naturalness at ~300MB, faster than real time on a mid-range laptop CPU.</div></div>
-      <div class="row"><div class="name">Python daemon (uv)</div><div class="why">Keeps the model warm in memory so a hotkey press never pays a 10–30s cold-load tax. Talks over a Unix socket with a three-verb protocol: <code class="mono" style="background:none;border:none;padding:0;">speak</code> / <code class="mono" style="background:none;border:none;padding:0;">stop</code> / <code class="mono" style="background:none;border:none;padding:0;">status</code>.</div></div>
+      <div class="row"><div class="name">Python daemon (venv)</div><div class="why">Keeps the model warm in memory so a hotkey press never pays a 10–30s cold-load tax. Talks over a Unix socket with a three-verb protocol: <code class="mono" style="background:none;border:none;padding:0;">speak</code> / <code class="mono" style="background:none;border:none;padding:0;">stop</code> / <code class="mono" style="background:none;border:none;padding:0;">status</code>.</div></div>
       <div class="row"><div class="name">wl-paste --primary</div><div class="why">Reads the Wayland primary selection directly — no synthetic keystrokes, no clipboard mutation, no keyboard-injection daemon.</div></div>
       <div class="row"><div class="name">PipeWire</div><div class="why"><code class="mono" style="background:none;border:none;padding:0;">pw-play</code> streams PCM chunks into the existing audio graph as they're synthesized, layering over whatever else is playing.</div></div>
       <div class="row"><div class="name">systemd --user</div><div class="why">Starts the daemon at login and keeps it resident across the session; state and models live under <code class="mono" style="background:none;border:none;padding:0;">~/.local/share/omatalk/</code>.</div></div>
-      <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config, never touched by the installer. F8 and SUPER+CTRL+S both speak — F8 sits next to voxtype's F9 dictation key on purpose.</div></div>
+      <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config, never touched by the installer. F8 sits next to voxtype's F9 dictation key on purpose — F9 speaks you, F8 speaks back.</div></div>
     </div>
   </section>
 
@@ -588,24 +791,60 @@
   </div>
 </footer>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  if (typeof mermaid === "undefined") return;
+  var css = getComputedStyle(document.documentElement);
+  var tok = function (name) { return css.getPropertyValue(name).trim(); };
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: "base",
+    securityLevel: "strict",
+    fontFamily: '"JetBrains Mono", monospace',
+    themeVariables: {
+      fontFamily: '"JetBrains Mono", monospace',
+      background: tok("--surface"),
+      primaryColor: tok("--ink-alt"),
+      primaryTextColor: tok("--fg"),
+      primaryBorderColor: tok("--border-strong"),
+      lineColor: tok("--accent"),
+      secondaryColor: tok("--ink-alt"),
+      tertiaryColor: tok("--surface"),
+      clusterBkg: tok("--surface"),
+      clusterBorder: tok("--border-strong"),
+      edgeLabelBackground: tok("--surface"),
+      textColor: tok("--fg-dim")
+    }
+  });
+  mermaid.run({ querySelector: ".mermaid" });
+})();
+</script>
 <script>
 (function () {
   "use strict";
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  var canvas = document.getElementById("wave");
-  var ctx = canvas.getContext("2d");
-  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var wave = document.getElementById("wave");
+  var LEVELS = " ▁▂▃▄▅▆▇█";
+  var cellPx = 20; // approx advance width of one char at the wave's font-size
+  var cols = 40;
 
-  function resize() {
-    var rect = canvas.getBoundingClientRect();
-    canvas.width = Math.max(1, rect.width * dpr);
-    canvas.height = Math.max(1, rect.height * dpr);
+  function measure() {
+    var probe = document.createElement("span");
+    probe.className = "mono";
+    probe.style.visibility = "hidden";
+    probe.style.position = "absolute";
+    probe.style.fontSize = getComputedStyle(wave).fontSize;
+    probe.textContent = "█";
+    document.body.appendChild(probe);
+    cellPx = probe.getBoundingClientRect().width || cellPx;
+    document.body.removeChild(probe);
+    cols = Math.max(12, Math.floor(wave.getBoundingClientRect().width / cellPx));
   }
-  window.addEventListener("resize", resize);
-  resize();
-
-  var accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#ec7a4c";
+  window.addEventListener("resize", measure);
+  measure();
 
   // state machine: idle -> pressed -> speaking -> idle (loops)
   var STATES = ["idle", "pressed", "speaking"];
@@ -633,35 +872,23 @@
   }
 
   function draw(now) {
-    var w = canvas.width, h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-    var mid = h / 2;
-    var bars = 64;
-    var gap = w / bars;
     var speaking = state === "speaking";
-    var energy = speaking ? 1 : 0.14;
+    var energy = speaking ? 1 : 0.1;
     var seed = now / 1000;
-
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = Math.max(2, gap * 0.34) * dpr / dpr;
-
-    for (var i = 0; i < bars; i++) {
-      var x = i * gap + gap / 2;
+    var out = "";
+    for (var i = 0; i < cols; i++) {
       var n = Math.sin(seed * 3.1 + i * 0.6) * 0.5 + Math.sin(seed * 5.3 + i * 0.21) * 0.3 + Math.sin(i * 1.7) * 0.2;
-      var amp = Math.abs(n) * energy;
-      var barH = Math.max(2 * dpr, amp * (h * 0.42));
-      ctx.beginPath();
-      ctx.moveTo(x, mid - barH);
-      ctx.lineTo(x, mid + barH);
-      ctx.globalAlpha = 0.55 + 0.45 * amp;
-      ctx.stroke();
+      var amp = Math.min(1, Math.abs(n) * energy + 0.03);
+      var idx = Math.round(amp * (LEVELS.length - 1));
+      out += LEVELS[idx];
     }
-    ctx.globalAlpha = 1;
+    wave.textContent = out;
   }
 
+  var lastDraw = 0;
   function frame(now) {
     cycle();
-    draw(now);
+    if (now - lastDraw > 90) { draw(now); lastDraw = now; }
     if (!reduceMotion) requestAnimationFrame(frame);
   }
 
@@ -675,6 +902,39 @@
 
 (function () {
   "use strict";
+  var css = getComputedStyle(document.documentElement);
+  var accent = css.getPropertyValue("--accent").trim();
+  var accent2 = css.getPropertyValue("--accent-2").trim();
+
+  function hash(s) {
+    var h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return Math.abs(h);
+  }
+
+  function avatarSvg(seed) {
+    var h = hash(seed);
+    var female = /^(a|b)f_/.test(seed);
+    var color = female ? accent : accent2;
+    var bars = 5;
+    var w = 44, hgt = 44, gap = 4;
+    var barW = (w - gap * (bars - 1)) / bars;
+    var rects = "";
+    for (var i = 0; i < bars; i++) {
+      var v = (h >> (i * 5)) % 100 / 100; // 0..1
+      var barH = 8 + v * 26;
+      var x = i * (barW + gap);
+      var y = (hgt - barH) / 2;
+      rects += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + barW.toFixed(1) +
+        '" height="' + barH.toFixed(1) + '" rx="' + (barW / 2).toFixed(1) + '" fill="' + color + '" opacity="' + (0.55 + v * 0.45).toFixed(2) + '"/>';
+    }
+    return '<svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">' + rects + '</svg>';
+  }
+
+  document.querySelectorAll(".voice-avatar").forEach(function (el) {
+    el.innerHTML = avatarSvg(el.dataset.seed);
+  });
+
   var player = new Audio();
   var active = null;
 
@@ -694,6 +954,72 @@
       player.play();
       btn.classList.add("playing");
       active = btn;
+    });
+  });
+})();
+
+(function () {
+  "use strict";
+  var btn = document.getElementById("menu-btn");
+  var nav = document.getElementById("site-nav");
+
+  function close() {
+    nav.hidden = true;
+    btn.setAttribute("aria-expanded", "false");
+  }
+  function open() {
+    nav.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+  }
+
+  btn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    if (nav.hidden) open(); else close();
+  });
+  nav.addEventListener("click", function (e) {
+    if (e.target.tagName === "A") close();
+  });
+  document.addEventListener("click", function (e) {
+    if (!nav.hidden && !nav.contains(e.target) && e.target !== btn) close();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !nav.hidden) { close(); btn.focus(); }
+  });
+})();
+
+(function () {
+  "use strict";
+
+  function fallbackCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  document.querySelectorAll(".copy-btn").forEach(function (btn) {
+    var label = btn.querySelector(".copy-label");
+    btn.addEventListener("click", function () {
+      var text = btn.dataset.copy;
+      var done = function () {
+        btn.classList.add("copied");
+        var prev = label.textContent;
+        label.textContent = "copied";
+        setTimeout(function () {
+          btn.classList.remove("copied");
+          label.textContent = prev;
+        }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+      } else {
+        fallbackCopy(text);
+        done();
+      }
     });
   });
 })();

@@ -17,8 +17,10 @@ selected text becomes voice. Fully local — no network calls at runtime.
    Selection is empty.
 4. Daemon streams the text sentence-by-sentence through Kokoro-82M (ONNX,
    CPU) and plays audio via PipeWire (`pw-play`) as chunks are synthesized.
-5. User presses the Speak Key again → **Interrupt**: current Utterance is cut
-   off immediately and the new press's Utterance begins.
+5. User presses the Speak Key again → **Interrupt**: if the Selection is
+   unchanged or empty, speech stops; if the Selection changed, the current
+   Utterance is cut off and the new one begins. (The Wayland primary
+   selection is sticky after deselect, so unchanged text means silence.)
 
 ## Decisions (all confirmed)
 
@@ -30,11 +32,11 @@ selected text becomes voice. Fully local — no network calls at runtime.
 | 4 | Interrupt semantics | Cut off immediately; speak new only when the Selection changed, otherwise stop |
 | 5 | Engine | Kokoro-82M, ONNX Runtime, CPU (see [ADR-0001](./adr/0001-kokoro-onnx-cpu.md)) |
 | 6 | Process shape | Persistent daemon, systemd user service, model warm from login |
-| 7 | Language | Python daemon (uv), shell glue; Rust is a later optimization (see [ADR-0002](./adr/0002-python-daemon.md)) |
+| 7 | Language | Python daemon (uv-managed env, uv via `omarchy pkg add` if missing), shell glue; Rust is a later optimization (see [ADR-0002](./adr/0002-python-daemon.md)) |
 | 8 | Feedback | notify-send for start/errors now; Quickshell widget designed-for, not built |
 | 9 | Language/voice | English only; one configurable voice (`af_heart` default) + `speed` in config |
 | 10 | Streaming | Sentence-by-sentence streaming, playback never waits for full synthesis |
-| 11 | Hotkeys | `SUPER + CTRL + S` (primary), `F8` (alternate, unmodified — adjacent to Omarchy's F9 dictation: F9 speaks you, F8 speaks back. F10 rejected: Hyprland binding would silently break in-app F10 menus) via `~/.config/hypr/bindings.lua` |
+| 11 | Hotkeys | `F8` (unmodified — adjacent to Omarchy's F9 dictation: F9 speaks you, F8 speaks back). `SUPER+CTRL+S` rejected: Omarchy binds it to Share. Via `~/.config/hypr/bindings.lua` |
 | 12 | Name | Omatalk; daemon `omatalk`, config `~/.config/omatalk/`, state `~/.local/share/omatalk/` |
 | 13 | License | MIT |
 | 14 | Distribution | Curl-able install script in repo; AUR as fast-follow |
@@ -45,7 +47,7 @@ selected text becomes voice. Fully local — no network calls at runtime.
 ## Architecture
 
 ```
-bindings.lua ──(SUPER+CTRL+S / F8)──▶ omarchy-spawned one-shot client
+bindings.lua ──(F8)──▶ omarchy-spawned one-shot client
                                               │
                                               ▼
                                    Unix socket (omatalk.sock)
@@ -79,21 +81,26 @@ Notes:
 - Daemon not running: notification suggesting `systemctl --user start omatalk`.
 - Synthesis/playback failure: notification with the error, daemon stays alive.
 
-## Install (MVP)
+## Install (MVP, implemented in `install.sh`)
 
-`install.sh` in repo root:
-
-1. Install system deps: `espeak-ng`, verify PipeWire tools present.
-2. Set up uv-managed Python env in the repo/data dir; install `kokoro-onnx`.
-3. Download model + voice files to `~/.local/share/omatalk/models/`.
-4. Install systemd user unit (`omatalk.service`), enable + start.
-5. Print the two `o.bind(...)` lines to add to `~/.config/hypr/bindings.lua`
-   (hotkeys are user-owned config, not touched by the installer).
+1. Check system deps; install missing ones via `omarchy pkg add` (python,
+   git, curl, pipewire, wl-clipboard, uv). Stock Omarchy needs at most uv,
+   and kokoro-onnx bundles its own phonemizer (espeakng-loader), so
+   espeak-ng is not required.
+2. Copy source to `~/.local/share/omatalk/src/`, create a uv venv at
+   `~/.local/share/omatalk/venv/`, install the package (console scripts
+   `omatalk` / `omatalkd`).
+3. Download model + voice files (~340MB) from the kokoro-onnx v1.0 release
+   into `~/.local/share/omatalk/models/` (skipped when present).
+4. Install `systemd/omatalk.service` as a systemd user unit, enable + start.
+5. Copy the client launcher to `~/.local/bin/omatalk`.
+6. Print the `o.bind(...)` line for `~/.config/hypr/bindings.lua` (F8) —
+   hotkeys are user-owned config, never touched by the installer.
 
 ## MVP acceptance criteria
 
-1. Fresh omarchy machine: install script completes; after adding the two
-   bindings and reloading, selecting text and pressing `SUPER+CTRL+S` speaks
+1. Fresh omarchy machine: install script completes; after adding the
+   binding and reloading, selecting text and pressing `F8` speaks
    it within ~1s (first audio).
 2. Pressing the Speak Key mid-speech interrupts and speaks the new selection.
 3. Works in Firefox, Chromium, a GTK app, and a terminal (primary selection);

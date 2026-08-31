@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omatalk"
+version = "0.1.0"
+description = "Local text-to-speech for Omarchy: hotkey, and the machine speaks your selected text."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["kokoro-onnx>=0.4,<0.5"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[project.scripts]
+omatalk = "omatalk.cli:main"
+omatalkd = "omatalk.daemon:serve"
+
+[tool.setuptools]
+packages = ["omatalk"]

@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # The version-bump commit carries [skip ci]; merges and manual
+    # version edits run the release.
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve version (auto-bump patch when already tagged)
+        id: ver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml | head -1)
+          if git ls-remote --tags origin "refs/tags/v$version" | grep -q "refs/tags/v$version"; then
+            major=$(echo "$version" | cut -d. -f1)
+            minor=$(echo "$version" | cut -d. -f2)
+            patch=$(echo "$version" | cut -d. -f3)
+            version="$major.$minor.$((patch + 1))"
+            sed -i "s/^version = \".*\"/version = \"$version\"/" pyproject.toml
+            git config user.name "omatalk-release[bot]"
+            git config user.email "release@omatalk.invalid"
+            git commit -am "chore: bump version to $version [skip ci]"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Pack source tarball
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          # Runtime minimum only: package, service unit, build metadata,
+          # README (referenced by pyproject), uninstaller. No site, tests,
+          # docs, or CI config. tar of the working tree (not HEAD) so an
+          # auto-bumped pyproject version is included.
+          tar --transform "s,^,omatalk/," \
+            -czf omatalk-src.tar.gz \
+            omatalk systemd pyproject.toml README.md uninstall.sh
+          sha256sum omatalk-src.tar.gz > omatalk-src.tar.gz.sha256
+      - name: Create or update release
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$VERSION"
+          gh release create "$tag" --title "$tag" --generate-notes \
+            omatalk-src.tar.gz omatalk-src.tar.gz.sha256 \
+            || gh release upload "$tag" --clobber \
+              omatalk-src.tar.gz omatalk-src.tar.gz.sha256

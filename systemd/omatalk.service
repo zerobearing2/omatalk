@@ -1,0 +1,13 @@
+[Unit]
+Description=Omatalk daemon: local text-to-speech, model warm
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/share/omatalk/venv/bin/omatalkd
+Environment=OMATALK_MODELS=%h/.local/share/omatalk/models
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

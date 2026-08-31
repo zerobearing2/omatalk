@@ -1,6 +1,8 @@
 import time
 
 from conftest import (
+    FAKES,
+    REPO,
     clear_logs,
     log,
     send,
@@ -117,6 +119,38 @@ def test_new_selection_interrupts_and_speaks_new(daemon):
     wait_status(daemon, "idle")
     starts = len([l for l in log(daemon).splitlines() if l.startswith("start")])
     assert starts == 2
+
+
+def test_playback_failure_notifies_and_daemon_survives(daemon):
+    import subprocess
+
+    cfg_path = daemon["tmp"] / "config-fail.toml"
+    cfg_path.write_text(
+        f'capture_primary = ["{FAKES}/capture-primary"]\n'
+        f'capture_clipboard = ["{FAKES}/capture-clipboard"]\n'
+        f'player = ["{FAKES}/player-fail"]\n'
+        f'notify = ["{FAKES}/notify"]\n'
+    )
+    env = {
+        **daemon["env"],
+        "OMATALK_CONFIG": str(cfg_path),
+        "OMATALK_SOCKET": str(daemon["tmp"] / "fail.sock"),
+    }
+    fail_proc = subprocess.Popen([str(REPO / "bin" / "omatalkd")], env=env)
+    deadline = time.time() + 60
+    while not (daemon["tmp"] / "fail.sock").exists():
+        assert time.time() < deadline
+        time.sleep(0.1)
+    try:
+        clear_logs(daemon)
+        assert send(daemon, "speak One sentence.", sock="fail.sock") == "ok"
+        wait_status(daemon, "error", sock="fail.sock")
+        assert "error" in read_notify(daemon)
+        assert send(daemon, "stop", sock="fail.sock") == "ok"
+        assert send(daemon, "status", sock="fail.sock") == "idle"
+    finally:
+        fail_proc.terminate()
+        fail_proc.wait(timeout=10)
 
 
 def test_clipboard_fallback_when_idle(daemon):

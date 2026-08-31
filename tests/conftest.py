@@ -54,22 +54,22 @@ def daemon(config, tmp_base):
     proc.wait(timeout=10)
 
 
-def send(daemon, line: str) -> str:
+def send(daemon, line: str, sock: str = "d.sock") -> str:
     import socket as s
 
     client = s.socket(s.AF_UNIX, s.SOCK_STREAM)
     client.settimeout(10)
-    client.connect(str(daemon["tmp"] / "d.sock"))
+    client.connect(str(daemon["tmp"] / sock))
     client.sendall((line + "\n").encode())
     reply = client.recv(1024).decode().strip()
     client.close()
     return reply
 
 
-def wait_status(daemon, want: str, timeout: float = 20):
+def wait_status(daemon, want: str, timeout: float = 20, sock: str = "d.sock"):
     deadline = time.time() + timeout
     while time.time() < deadline:
-        if send(daemon, "status") == want:
+        if send(daemon, "status", sock=sock) == want:
             return
         time.sleep(0.05)
     raise AssertionError(f"status never reached {want!r}")
