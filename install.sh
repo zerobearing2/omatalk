@@ -45,7 +45,18 @@ elif [ "${OMATALK_SOURCE:-}" = "1" ]; then
   fi
 else
   base="${OMATALK_REPO%.git}"
-  if curl -fsIL -o /dev/null "$base/releases/latest/download/omatalk-src.tar.gz.sha256"; then
+  slug="${base#https://github.com/}"
+  got_release=0
+  # Private repos need auth: use gh when available, plain curl for public.
+  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1 \
+      && gh release view --repo "$slug" >/dev/null 2>&1; then
+    msg "Installing latest release (via gh)"
+    mkdir -p "$OMATALK_HOME/src"
+    (cd "$OMATALK_HOME" && gh release download --repo "$slug" \
+      --pattern "omatalk-src.tar.gz*" --clobber)
+    (cd "$OMATALK_HOME" && sha256sum -c omatalk-src.tar.gz.sha256 --quiet)
+    got_release=1
+  elif curl -fsIL -o /dev/null "$base/releases/latest/download/omatalk-src.tar.gz.sha256"; then
     msg "Installing latest release"
     mkdir -p "$OMATALK_HOME/src"
     curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" \
@@ -53,6 +64,11 @@ else
     curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" \
       "$base/releases/latest/download/omatalk-src.tar.gz.sha256"
     (cd "$OMATALK_HOME" && sha256sum -c omatalk-src.tar.gz.sha256 --quiet)
+    got_release=1
+  fi
+  if [ "$got_release" = 1 ]; then
+    rm -rf "$OMATALK_HOME/src"
+    mkdir -p "$OMATALK_HOME/src"
     tar -xzf "$OMATALK_HOME/omatalk-src.tar.gz" -C "$OMATALK_HOME/src" --strip-components=1
     rm -f "$OMATALK_HOME/omatalk-src.tar.gz" "$OMATALK_HOME/omatalk-src.tar.gz.sha256"
   else
