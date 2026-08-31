@@ -602,6 +602,7 @@
         <a href="#config">Config</a>
         <a href="#architecture">Architecture</a>
         <a href="#stack">How it's built</a>
+        <a href="#roadmap">Roadmap</a>
       </nav>
     </div>
   </div>
@@ -835,6 +836,22 @@
       <div class="row"><div class="name">PipeWire</div><div class="why"><code class="mono" style="background:none;border:none;padding:0;">pw-play</code> streams PCM chunks into the existing audio graph as they're synthesized, layering over whatever else is playing.</div></div>
       <div class="row"><div class="name">systemd --user</div><div class="why">Starts the daemon at login and keeps it resident across the session; state and models live under <code class="mono" style="background:none;border:none;padding:0;">~/.local/share/omatalk/</code>.</div></div>
       <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config, never touched by the installer. F8 sits next to voxtype's F9 dictation key on purpose: F9 speaks you, F8 speaks back.</div></div>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <div class="eyebrow">roadmap</div>
+    <h2>What's next</h2>
+    <p class="prose">The MVP scope stayed narrow on purpose. These are next, in roughly the order they'll land.</p>
+    <div class="manifest">
+      <div class="row"><div class="name">AUR package</div><div class="why">Curl install ships today. An AUR package is the fast-follow, so Omatalk installs and updates like the rest of an Arch-based Omarchy system.</div></div>
+      <div class="row"><div class="name">Quickshell widget</div><div class="why">A status indicator in Omarchy's own shell instead of just notify-send. Designed for, not built yet: the daemon's <code class="mono" style="background:none;border:none;padding:0;">status</code> verb already reports idle, speaking, or error.</div></div>
+      <div class="row"><div class="name">Voice picker UI</div><div class="why">Switching voices today means editing <code class="mono" style="background:none;border:none;padding:0;">config.toml</code> and restarting the daemon. A picker removes both steps.</div></div>
+      <div class="row"><div class="name">Low-resource model profile</div><div class="why">Kokoro-82M is comfortable on a modern CPU but heavy for a potato-class machine. An fp16 or int8 export would roughly halve the ~340MB download and the resident memory, checked against the full model in a listening test before it ships.</div></div>
+      <div class="row"><div class="name">Rust engine</div><div class="why">The socket protocol is the seam a rewrite would sit behind. Evidence-gated: it ships only if it beats the Python and kokoro-onnx pipeline in a blind listening test, not on paper.</div></div>
+      <div class="row"><div class="name">Media ducking</div><div class="why">Automatically lower other audio while Omatalk is speaking, opt-in via config.</div></div>
+      <div class="row"><div class="name">Queueing</div><div class="why">A second press interrupts today. A queue mode would let utterances stack instead of cutting off.</div></div>
+      <div class="row"><div class="name">More languages</div><div class="why">Kokoro-82M ships packs for nine languages. Omatalk speaks English only for now.</div></div>
     </div>
   </section>
 
