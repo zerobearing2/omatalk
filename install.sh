@@ -92,7 +92,7 @@ uv pip install --quiet --python "$OMATALK_HOME/venv/bin/python" "$OMATALK_HOME/s
 mkdir -p "$OMATALK_HOME/models"
 for f in kokoro-v1.0.onnx voices-v1.0.bin; do
   if [ ! -s "$OMATALK_HOME/models/$f" ]; then
-    msg "Downloading $f"
+    msg "Downloading $f (~340MB total) — this can take a few minutes depending on your connection"
     curl -L --fail --progress-bar -o "$OMATALK_HOME/models/$f" "$MODEL_BASE/$f"
   fi
 done
