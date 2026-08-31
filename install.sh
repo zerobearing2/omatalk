@@ -113,4 +113,17 @@ cp "$OMATALK_HOME/venv/bin/omatalk" "$HOME/.local/bin/omatalk"
 # 7. Keybindings are user-owned; the installer only prints the line.
 msg "Add this line to ~/.config/hypr/bindings.lua (then reload):"
 printf '  o.bind("F8", "Omatalk", "omatalk speak")\n'
+
+# 8. Welcome through the freshly installed daemon — proves the whole
+# pipeline (service, socket, warm model, audio) works end to end.
+for _ in $(seq 1 30); do
+  "$HOME/.local/bin/omatalk" status >/dev/null 2>&1 && break
+  sleep 1
+done
+if "$HOME/.local/bin/omatalk" status >/dev/null 2>&1; then
+  "$HOME/.local/bin/omatalk" speak "Welcome to omatalk!" >/dev/null 2>&1
+else
+  msg "Daemon not up yet; check: journalctl --user -u omatalk"
+fi
+
 msg "Done. Select text and press F8, or run: omatalk speak|stop|status"
