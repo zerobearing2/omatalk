@@ -26,7 +26,7 @@ runtime.
 On an Omarchy machine:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/zerobearing2/omatalk/master/install.sh | bash
+curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
 ```
 
 or from a clone of the repo: `./install.sh`.

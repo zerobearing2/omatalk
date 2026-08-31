@@ -5,6 +5,7 @@ on:
     branches: [master]
     paths:
       - public/**
+      - install.sh
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -26,6 +27,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Publish install.sh alongside the site
+        run: cp install.sh public/install.sh
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
