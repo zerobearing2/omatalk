@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "$*" >> "$OMATALK_TEST_NOTIFY_LOG"

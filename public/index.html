@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Omatalk</title>
+<meta name="description" content="Select text, press a key, and the machine reads it back — a local, always-warm text-to-speech daemon for Omarchy. The reverse of dictation.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23151210'/%3E%3Cpath d='M8 34h5l4-14 6 28 6-36 6 32 5-18 5 8h6' stroke='%23ec7a4c' stroke-width='4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@1,400;1,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #eef0ea;
+    --ink-alt: #e2e5dd;
+    --surface: #ffffff;
+    --fg: #201d1a;
+    --fg-dim: #443f3a;
+    --muted: #726b62;
+    --border: rgba(32,29,26,0.14);
+    --border-strong: rgba(32,29,26,0.28);
+    --accent: #2f7a70;      /* teal leads in light mode */
+    --accent-2: #c85a32;    /* ember, secondary in light mode */
+    --accent-ink: #f3f6f1;
+    --shadow: 0 1px 0 rgba(32,29,26,0.06);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #151210;
+      --ink-alt: #1c1815;
+      --surface: #1e1a17;
+      --fg: #efe8e0;
+      --fg-dim: #cabfb4;
+      --muted: #93867b;
+      --border: rgba(239,232,224,0.12);
+      --border-strong: rgba(239,232,224,0.22);
+      --accent: #ec7a4c;     /* ember leads in dark mode */
+      --accent-2: #5fada2;   /* teal, secondary in dark mode */
+      --accent-ink: #1b120c;
+      --shadow: 0 1px 0 rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #151210;
+    --ink-alt: #1c1815;
+    --surface: #1e1a17;
+    --fg: #efe8e0;
+    --fg-dim: #cabfb4;
+    --muted: #93867b;
+    --border: rgba(239,232,224,0.12);
+    --border-strong: rgba(239,232,224,0.22);
+    --accent: #ec7a4c;
+    --accent-2: #5fada2;
+    --accent-ink: #1b120c;
+    --shadow: 0 1px 0 rgba(0,0,0,0.4);
+  }
+
+  * { box-sizing: border-box; }
+  html { color-scheme: light dark; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--fg);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent); color: var(--accent-ink); }
+
+  .mono { font-family: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace; }
+  .voice { font-family: "IBM Plex Serif", Georgia, serif; font-style: italic; }
+
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+  a { color: inherit; }
+
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 0 clamp(20px, 5vw, 40px);
+  }
+
+  .eyebrow {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 1.4em;
+    height: 1px;
+    background: var(--accent);
+    opacity: 0.7;
+  }
+
+  /* ---------- header ---------- */
+  header.top {
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px clamp(20px, 5vw, 40px);
+    max-width: 920px;
+    margin: 0 auto;
+  }
+  .wordmark {
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .wordmark .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+  .for-omarchy {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    padding: 5px 12px;
+  }
+
+  /* ---------- hero ---------- */
+  .hero { padding: clamp(52px, 9vw, 96px) 0 clamp(40px, 6vw, 64px); }
+  .hero h1 {
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 800;
+    font-size: clamp(2.4rem, 5.6vw + 0.6rem, 4.6rem);
+    line-height: 1.04;
+    letter-spacing: -0.01em;
+    margin-top: 18px;
+  }
+  .hero h1 .accent { color: var(--accent); }
+  .hero .sub {
+    max-width: 62ch;
+    margin-top: 22px;
+    font-size: 1.1rem;
+    color: var(--fg-dim);
+  }
+
+  .keys { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; align-items: center; }
+  .key {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    transition: transform 120ms ease, border-color 120ms ease;
+  }
+  .key.primary { border-color: var(--accent); color: var(--accent); }
+  .key.pressed { transform: translateY(1px) scale(0.97); border-color: var(--accent); }
+  .keys .or { color: var(--muted); font-family: "JetBrains Mono", monospace; font-size: 0.8rem; }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 30px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .status-pill .led {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent-2);
+    animation: blink 2.4s ease-in-out infinite;
+  }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* ---------- demo terminal ---------- */
+  .demo {
+    margin-top: 48px;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: 0 24px 60px -30px rgba(0,0,0,0.5);
+  }
+  .demo-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--ink-alt);
+  }
+  .demo-bar .traffic { width: 9px; height: 9px; border-radius: 50%; background: var(--border-strong); }
+  .demo-bar .title {
+    margin-left: 8px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .demo-body { padding: 26px clamp(18px, 4vw, 30px) 22px; }
+  .demo-line {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 1rem;
+    line-height: 1.7;
+  }
+  .demo-line .sel {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    border-radius: 3px;
+    padding: 0 2px;
+  }
+  .demo-line .cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1.1em;
+    background: var(--accent);
+    vertical-align: -0.18em;
+    margin-left: 1px;
+    animation: caret 1s steps(1) infinite;
+  }
+  @keyframes caret { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+
+  canvas#wave { width: 100%; height: 84px; display: block; margin-top: 18px; }
+
+  .demo-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 14px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.76rem;
+    color: var(--muted);
+  }
+  #state-label { color: var(--accent); font-weight: 600; }
+
+  /* ---------- sections ---------- */
+  section { padding: clamp(56px, 8vw, 92px) 0; border-top: 1px solid var(--border); }
+  section h2 {
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 700;
+    font-size: clamp(1.6rem, 2.4vw + 0.8rem, 2.3rem);
+    margin-top: 14px;
+    max-width: 20ch;
+  }
+
+  .prose { max-width: 66ch; margin-top: 22px; color: var(--fg-dim); font-size: 1.04rem; }
+  .prose p + p { margin-top: 1.1em; }
+
+  blockquote.pull {
+    margin: 34px 0 0;
+    padding-left: 22px;
+    border-left: 2px solid var(--accent-2);
+    font-size: 1.28rem;
+    max-width: 46ch;
+    color: var(--fg);
+  }
+
+  /* ---------- loop list ---------- */
+  ol.loop { list-style: none; margin: 30px 0 0; padding: 0; counter-reset: step; max-width: 68ch; }
+  ol.loop li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 2.6rem 1fr;
+    gap: 6px 16px;
+    padding: 18px 0;
+    border-top: 1px solid var(--border);
+  }
+  ol.loop li:first-child { border-top: none; }
+  ol.loop li::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 700;
+    color: var(--muted);
+    font-size: 0.95rem;
+    padding-top: 2px;
+  }
+  ol.loop li .step-body { color: var(--fg-dim); }
+  ol.loop li .step-body b { color: var(--fg); font-weight: 600; }
+  ol.loop li .step-body code {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.88em;
+    background: var(--ink-alt);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+  }
+
+  /* ---------- architecture diagram ---------- */
+  .diagram {
+    margin-top: 40px;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: var(--surface);
+    overflow-x: auto;
+  }
+  .diagram pre {
+    margin: 0;
+    padding: 24px clamp(16px, 3vw, 28px);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: var(--fg-dim);
+    white-space: pre;
+  }
+  .diagram pre .hi { color: var(--accent); }
+  .diagram pre .hi2 { color: var(--accent-2); }
+
+  /* ---------- stack manifest ---------- */
+  .manifest { margin-top: 34px; display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .manifest .row {
+    background: var(--surface);
+    padding: 20px clamp(16px, 3vw, 26px);
+    display: grid;
+    grid-template-columns: minmax(0, 15ch) 1fr;
+    gap: 6px 24px;
+  }
+  .manifest .row .name {
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 600;
+    color: var(--fg);
+    font-size: 0.95rem;
+  }
+  .manifest .row .why { color: var(--muted); font-size: 0.94rem; }
+  @media (max-width: 640px) {
+    .manifest .row { grid-template-columns: 1fr; }
+  }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 34px 0 44px;
+  }
+  .foot-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 16px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="topbar">
+    <div class="wordmark"><span class="dot"></span>omatalk</div>
+    <div class="for-omarchy">for Omarchy · Hyprland</div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero" style="border-top:none; padding-top: clamp(48px,8vw,84px);">
+    <div class="eyebrow">the reverse of dictation</div>
+    <h1>Select text.<br>Press a key.<br><span class="accent">It speaks.</span></h1>
+    <p class="sub">Omatalk reads your selection out loud through a local neural voice, streamed
+      sentence by sentence as it's synthesized. No network call, no API key, no cloud
+      round-trip — the model stays warm on your own CPU.</p>
+
+    <div class="keys">
+      <span class="key primary mono" id="key-primary">SUPER + CTRL + S</span>
+      <span class="or">or</span>
+      <span class="key mono" id="key-alt">SUPER + F9</span>
+    </div>
+
+    <div class="status-pill"><span class="led"></span>MVP spec locked · daemon in active development</div>
+
+    <div class="demo">
+      <div class="demo-bar">
+        <span class="traffic"></span><span class="traffic"></span><span class="traffic"></span>
+        <span class="title">~/docs/roadmap.md — primary selection</span>
+      </div>
+      <div class="demo-body">
+        <div class="demo-line" id="demo-text">
+          The reverse of dictation<span class="sel">: instead of you talking to the machine, the machine reads back to you.</span><span class="cursor"></span>
+        </div>
+        <canvas id="wave" width="800" height="84" aria-hidden="true"></canvas>
+        <div class="demo-foot">
+          <span>state: <span id="state-label" class="mono">idle</span></span>
+          <span class="mono">kokoro-82m · 24kHz · af_heart</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="why">
+    <div class="eyebrow">why</div>
+    <h2>Reading isn't always the shape you want text in</h2>
+    <div class="prose">
+      <p>Some text is meant to be listened to, not stared at: a long changelog, a doc
+        someone dropped in a channel, an email that can wait until you're not looking at a
+        screen. Dictation tools like voxtype went one direction — voice into text. Nothing
+        closed the loop back the other way for people living in Hyprland.</p>
+      <p>Cloud TTS solves the "read it to me" problem by shipping your clipboard to someone
+        else's server. That's a real cost for a genuinely small task. Omatalk keeps the
+        whole loop — capture, synthesis, playback — on the machine you're already sitting
+        at.</p>
+    </div>
+    <blockquote class="pull voice">"instead of you talking to the machine, the machine reads back to you."</blockquote>
+  </section>
+
+  <section id="what">
+    <div class="eyebrow">what it does</div>
+    <h2>One hotkey, four moves</h2>
+    <ol class="loop">
+      <li><div class="step-body"><b>Highlight text</b> anywhere in Hyprland — a browser tab, a terminal, a GTK app, an editor buffer.</div></li>
+      <li><div class="step-body"><b>Press the Speak Key.</b> Omatalk resolves the <b>Source</b>: the Wayland primary selection first (<code>wl-paste --primary</code>), the clipboard if nothing's selected.</div></li>
+      <li><div class="step-body"><b>The daemon streams it.</b> Text is split into sentences and synthesized one at a time through Kokoro-82M — first audio lands before the rest has finished rendering.</div></li>
+      <li><div class="step-body"><b>Press it again to interrupt.</b> The playing <b>Utterance</b> cuts off immediately and the new selection starts speaking. No queue, no "stop, then start."</div></li>
+    </ol>
+  </section>
+
+  <section id="architecture">
+    <div class="eyebrow">architecture</div>
+    <h2>A warm daemon behind a socket</h2>
+    <p class="prose" style="margin-top:14px;">One hotkey press is a one-shot client; the daemon holds the model warm from login
+      so nothing pays a cold-load tax mid-sentence.</p>
+    <div class="diagram">
+<pre>bindings.lua ──(<span class="hi">SUPER+CTRL+S</span> / <span class="hi">SUPER+F9</span>)──▶ one-shot client
+                                               │
+                                               ▼
+                                    Unix socket (<span class="hi2">omatalk.sock</span>)
+                                               │
+                                               ▼
+┌─────────────────────── omatalk daemon (systemd --user) ─────────────────────┐
+│  capture:  wl-paste --primary → wl-paste (clipboard fallback)               │
+│  chunker:  text → sentences                                                 │
+│  engine:   <span class="hi">Kokoro-82M</span> · ONNX Runtime · CPU, warm session               │
+│  player:   stream PCM chunks → pw-play / PipeWire                           │
+│  state:    idle | speaking | error                                          │
+└───────────────────────────────────────────────────────────────────────────┘</pre>
+    </div>
+  </section>
+
+  <section id="stack">
+    <div class="eyebrow">how it's built</div>
+    <h2>No cloud in the loop</h2>
+    <div class="manifest">
+      <div class="row"><div class="name">Kokoro-82M</div><div class="why">ONNX Runtime, CPU. Chosen over Piper (fast but audibly robotic) and XTTS/Chatterbox (GPU-sized, restrictive licenses) — near top-of-class naturalness at ~300MB, faster than real time on a mid-range laptop CPU.</div></div>
+      <div class="row"><div class="name">Python daemon (uv)</div><div class="why">Keeps the model warm in memory so a hotkey press never pays a 10–30s cold-load tax. Talks over a Unix socket with a three-verb protocol: <code class="mono" style="background:none;border:none;padding:0;">speak</code> / <code class="mono" style="background:none;border:none;padding:0;">stop</code> / <code class="mono" style="background:none;border:none;padding:0;">status</code>.</div></div>
+      <div class="row"><div class="name">wl-paste --primary</div><div class="why">Reads the Wayland primary selection directly — no synthetic keystrokes, no clipboard mutation, no keyboard-injection daemon.</div></div>
+      <div class="row"><div class="name">PipeWire</div><div class="why"><code class="mono" style="background:none;border:none;padding:0;">pw-play</code> streams PCM chunks into the existing audio graph as they're synthesized, layering over whatever else is playing.</div></div>
+      <div class="row"><div class="name">systemd --user</div><div class="why">Starts the daemon at login and keeps it resident across the session; state and models live under <code class="mono" style="background:none;border:none;padding:0;">~/.local/share/omatalk/</code>.</div></div>
+      <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config, never touched by the installer — mirroring voxtype's primary/alternate key pattern.</div></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot-row">
+    <span>MIT License</span>
+    <span>Built for the Omarchy ecosystem · mirrors voxtype, in reverse</span>
+    <span>No telemetry. No network calls at runtime.</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var canvas = document.getElementById("wave");
+  var ctx = canvas.getContext("2d");
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize() {
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, rect.width * dpr);
+    canvas.height = Math.max(1, rect.height * dpr);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  var accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#ec7a4c";
+
+  // state machine: idle -> pressed -> speaking -> idle (loops)
+  var STATES = ["idle", "pressed", "speaking"];
+  var state = "idle";
+  var t0 = performance.now();
+  var stateLabel = document.getElementById("state-label");
+  var selEl = document.querySelector("#demo-text .sel");
+  var keyPrimary = document.getElementById("key-primary");
+
+  function setState(s) {
+    state = s;
+    t0 = performance.now();
+    stateLabel.textContent = s;
+    if (s === "pressed") {
+      keyPrimary.classList.add("pressed");
+      setTimeout(function () { keyPrimary.classList.remove("pressed"); }, 220);
+    }
+  }
+
+  function cycle() {
+    var elapsed = performance.now() - t0;
+    if (state === "idle" && elapsed > 1800) setState("pressed");
+    else if (state === "pressed" && elapsed > 260) setState("speaking");
+    else if (state === "speaking" && elapsed > 4200) setState("idle");
+  }
+
+  function draw(now) {
+    var w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    var mid = h / 2;
+    var bars = 64;
+    var gap = w / bars;
+    var speaking = state === "speaking";
+    var energy = speaking ? 1 : 0.14;
+    var seed = now / 1000;
+
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = Math.max(2, gap * 0.34) * dpr / dpr;
+
+    for (var i = 0; i < bars; i++) {
+      var x = i * gap + gap / 2;
+      var n = Math.sin(seed * 3.1 + i * 0.6) * 0.5 + Math.sin(seed * 5.3 + i * 0.21) * 0.3 + Math.sin(i * 1.7) * 0.2;
+      var amp = Math.abs(n) * energy;
+      var barH = Math.max(2 * dpr, amp * (h * 0.42));
+      ctx.beginPath();
+      ctx.moveTo(x, mid - barH);
+      ctx.lineTo(x, mid + barH);
+      ctx.globalAlpha = 0.55 + 0.45 * amp;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function frame(now) {
+    cycle();
+    draw(now);
+    if (!reduceMotion) requestAnimationFrame(frame);
+  }
+
+  if (reduceMotion) {
+    setState("speaking");
+    draw(performance.now());
+  } else {
+    requestAnimationFrame(frame);
+  }
+})();
+</script>
+
+</body>
+</html>

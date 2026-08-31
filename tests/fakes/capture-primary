@@ -1,0 +1,3 @@
+#!/bin/sh
+[ -n "$OMATALK_TEST_CAPTURE_FILE" ] && cat "$OMATALK_TEST_CAPTURE_FILE" 2>/dev/null
+exit 0

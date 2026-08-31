@@ -1,0 +1,104 @@
+import time
+
+from conftest import (
+    clear_logs,
+    log,
+    send,
+    set_capture,
+    set_play_ticks,
+    wait_log,
+    wait_status,
+)
+
+
+def read_notify(daemon) -> str:
+    return (daemon["tmp"] / "notify.log").read_text()
+
+
+def test_unknown_command(daemon):
+    assert send(daemon, "frobnicate") == "unknown command"
+
+
+def test_status_idle(daemon):
+    assert send(daemon, "status") == "idle"
+
+
+def test_speak_captured_text_plays_all_chunks(daemon):
+    clear_logs(daemon)
+    set_capture(daemon, "Hello there. Second sentence here. Third one.")
+    assert send(daemon, "speak") == "ok"
+    wait_status(daemon, "speaking")
+    wait_status(daemon, "idle")
+    entries = log(daemon).splitlines()
+    assert len([l for l in entries if l.startswith("start")]) == 3
+    assert len([l for l in entries if l.startswith("end")]) == 3
+    assert not [l for l in entries if l.startswith("killed")]
+
+
+def test_speak_inline_text(daemon):
+    clear_logs(daemon)
+    assert send(daemon, "speak Only inline text.") == "ok"
+    wait_status(daemon, "speaking")
+    wait_status(daemon, "idle")
+    assert len([l for l in log(daemon).splitlines() if l.startswith("end")]) == 1
+
+
+def test_interrupt_cuts_current_and_plays_new(daemon):
+    clear_logs(daemon)
+    set_play_ticks(daemon, "30")
+    set_capture(daemon, "First long sentence. Second long sentence.")
+    assert send(daemon, "speak") == "ok"
+    wait_status(daemon, "speaking")
+    wait_log(daemon, "start")
+    assert send(daemon, "speak Quick replacement.") == "ok"
+    wait_status(daemon, "idle")
+    entries = log(daemon).splitlines()
+    assert [l for l in entries if l.startswith("killed")]
+
+
+def test_stop_cuts_playback(daemon):
+    clear_logs(daemon)
+    set_play_ticks(daemon, "30")
+    set_capture(daemon, "A sentence that plays for a while. And another.")
+    assert send(daemon, "speak") == "ok"
+    wait_status(daemon, "speaking")
+    wait_log(daemon, "start")
+    assert send(daemon, "stop") == "ok"
+    assert send(daemon, "status") == "idle"
+    assert [l for l in log(daemon).splitlines() if l.startswith("killed")]
+
+
+def test_empty_source_notifies_and_stays_idle(daemon):
+    clear_logs(daemon)
+    set_play_ticks(daemon, "1")
+    set_capture(daemon, "")
+    before = log(daemon).splitlines()
+    assert send(daemon, "speak") == "ok"
+    time.sleep(0.5)
+    assert send(daemon, "status") == "idle"
+    assert "nothing to read" in read_notify(daemon)
+    assert log(daemon).splitlines() == before
+
+
+def test_empty_selection_while_speaking_stops(daemon):
+    clear_logs(daemon)
+    set_play_ticks(daemon, "30")
+    set_capture(daemon, "A sentence that plays for a while. And another.")
+    assert send(daemon, "speak") == "ok"
+    wait_log(daemon, "start")
+    set_capture(daemon, "")
+    assert send(daemon, "speak") == "ok"
+    assert send(daemon, "status") == "idle"
+    wait_log(daemon, "killed")
+    assert "nothing to read" not in read_notify(daemon)
+
+
+def test_clipboard_fallback_when_idle(daemon):
+    clear_logs(daemon)
+    set_play_ticks(daemon, "1")
+    set_capture(daemon, "")
+    (daemon["tmp"] / "clipboard.txt").write_text("From the clipboard instead.")
+    assert send(daemon, "speak") == "ok"
+    wait_status(daemon, "speaking")
+    wait_status(daemon, "idle")
+    assert len([l for l in log(daemon).splitlines() if l.startswith("end")]) == 1

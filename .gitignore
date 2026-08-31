@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+
+# uv
+uv.lock
+
+# Local TTS models and audio caches
+models/
+*.onnx
+*.bin
+
+# Runtime state
+*.sock
+*.pid
+
+# Local markdown issue tracker (see docs/agents/issue-tracker.md)
+.scratch/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,3 @@
+#!/bin/sh
+[ -n "$OMATALK_TEST_CLIPBOARD_FILE" ] && cat "$OMATALK_TEST_CLIPBOARD_FILE" 2>/dev/null
+exit 0
