@@ -26,13 +26,13 @@ runtime.
 On an Omarchy machine:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/zerobearing2/omatalk/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zerobearing2/omatalk/master/install.sh | bash
 ```
 
 or from a clone of the repo: `./install.sh`.
 
 The script installs, in order of preference: the **latest GitHub release
-tarball** (checksum-verified, published by CI on every merge to `main`),
+tarball** (checksum-verified, published by CI on every merge to `master`),
 a git clone fallback (also used for updates when a release isn't
 available — `OMATALK_SOURCE=1 ./install.sh` forces it), or the local
 checkout you're running it from. Then it:
@@ -51,7 +51,7 @@ checkout you're running it from. Then it:
    line for `~/.config/hypr/bindings.lua`. The installer never edits your
    keybindings.
 
-Releases are built automatically: every push to `main` tags `v<version>`
+Releases are built automatically: every push to `master` tags `v<version>`
 from `pyproject.toml` and attaches the source tarball + sha256 (see
 `.github/workflows/release.yml`). Re-running the installer picks up the
 newest release.
