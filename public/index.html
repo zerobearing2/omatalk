@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Omatalk</title>
-<meta name="description" content="Select text, press a key, and the machine reads it back — a local, always-warm text-to-speech daemon for Omarchy. The reverse of dictation.">
+<meta name="description" content="Select text, press a key, and the machine reads it back. A local, always-warm text-to-speech daemon for Omarchy: the reverse of dictation.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23151210'/%3E%3Cpath d='M8 34h5l4-14 6 28 6-36 6 32 5-18 5 8h6' stroke='%23ec7a4c' stroke-width='4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -231,30 +231,6 @@
     box-shadow: var(--shadow);
   }
   .key.primary { border-color: var(--accent); color: var(--accent); }
-
-  .install-bar {
-    margin-top: 28px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
-    border-radius: 10px;
-    padding: 12px 12px 12px 16px;
-    box-shadow: var(--shadow);
-    max-width: 640px;
-  }
-  .install-prompt { color: var(--accent); font-weight: 700; flex: 0 0 auto; }
-  .install-cmd {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow-x: auto;
-    white-space: pre;
-    font-size: 0.86rem;
-    color: var(--fg-dim);
-    scrollbar-width: none;
-  }
-  .install-cmd::-webkit-scrollbar { display: none; }
 
   @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
@@ -614,24 +590,15 @@
 <main class="wrap">
   <section class="hero" style="border-top:none; padding-top: clamp(48px,8vw,84px);">
     <div class="eyebrow">the reverse of dictation</div>
-    <h1>Select text.<br>Press a key.<br><span class="accent">It speaks.</span></h1>
+    <h1>Select text.<br>Press a key.<br><span class="accent">It talks.</span></h1>
     <p class="sub">Omatalk reads your selection out loud through a local neural voice, streamed
       sentence by sentence as it's synthesized. No network call, no API key, no cloud
-      round-trip — the model stays warm on your own CPU.</p>
-
-    <div class="install-bar">
-      <span class="install-prompt mono" aria-hidden="true">$</span>
-      <code class="install-cmd mono">curl -fsSL https://raw.githubusercontent.com/zerobearing2/omatalk/master/install.sh | bash</code>
-      <button class="copy-btn" type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/zerobearing2/omatalk/master/install.sh | bash">
-        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
-        <span class="copy-label">copy</span>
-      </button>
-    </div>
+      round-trip. The model stays warm on your own CPU.</p>
 
     <div class="demo">
       <div class="demo-bar">
         <span class="traffic"></span><span class="traffic"></span><span class="traffic"></span>
-        <span class="title">~/docs/roadmap.md — primary selection</span>
+        <span class="title">~/docs/roadmap.md · primary selection</span>
       </div>
       <div class="demo-body">
         <div class="demo-line" id="demo-text">
@@ -648,11 +615,11 @@
 
   <section id="install">
     <div class="eyebrow">install</div>
-    <h2>One command on a fresh Omarchy machine</h2>
+    <h2>One command<br>Omarchy OS</h2>
     <p class="prose" style="margin-top:14px;"><code class="inline-code">install.sh</code> checks system dependencies, pulls
-      the latest tagged release (falling back to <code class="inline-code">git clone</code> only if none exists), builds a
-      uv-managed venv, downloads the ~340MB Kokoro-82M model (checksum-verified against the exact files the benchmark
-      was run on), and installs the <code class="inline-code">omatalk.service</code> systemd user unit — warm and
+      the latest tagged release (falling back to <code class="inline-code">git clone</code> only if none exists), and builds
+      a uv-managed venv. Then it downloads the ~340MB Kokoro-82M model (checksum-verified against the exact files the
+      benchmark was run on) and installs the <code class="inline-code">omatalk.service</code> systemd user unit, warm and
       running before the command exits. It only <em>prints</em> the bindings.lua line; your keybindings stay
       yours to edit.</p>
 
@@ -667,7 +634,7 @@
       <pre>curl -fsSL https://raw.githubusercontent.com/zerobearing2/omatalk/master/install.sh | bash</pre>
     </div>
 
-    <p class="prose" style="margin-top:26px; max-width:66ch;">Re-run the same command any time to update — it re-fetches
+    <p class="prose" style="margin-top:26px; max-width:66ch;">Re-run the same command any time to update. It re-fetches
       the latest release, reinstalls, and restarts the service. Model download is skipped once the files are present.</p>
 
     <div class="code-card">
@@ -681,7 +648,7 @@
       <pre>~/.local/share/omatalk/src/uninstall.sh</pre>
     </div>
     <p class="prose" style="margin-top:14px; max-width:66ch;">Stops and disables the service, kills any stray daemon, and
-      removes the launcher — then asks before deleting the models and your config. It won't touch the
+      removes the launcher, then asks before deleting the models and your config. It won't touch the
       <code class="inline-code">o.bind</code> line in <code class="inline-code">bindings.lua</code>; remove that yourself.</p>
   </section>
 
@@ -691,12 +658,11 @@
     <div class="prose">
       <p>Some text is meant to be listened to, not stared at: a long changelog, a doc
         someone dropped in a channel, an email that can wait until you're not looking at a
-        screen. Dictation tools like voxtype went one direction — voice into text. Nothing
+        screen. Dictation tools like voxtype went one direction: voice into text. Nothing
         closed the loop back the other way for people living in Hyprland.</p>
       <p>Cloud TTS solves the "read it to me" problem by shipping your clipboard to someone
         else's server. That's a real cost for a genuinely small task. Omatalk keeps the
-        whole loop — capture, synthesis, playback — on the machine you're already sitting
-        at.</p>
+        whole loop on the machine you're already sitting at: capture, synthesis, playback.</p>
     </div>
     <blockquote class="pull voice">"instead of you talking to the machine, the machine reads back to you."</blockquote>
   </section>
@@ -705,9 +671,9 @@
     <div class="eyebrow">what it does</div>
     <h2>One hotkey, four moves</h2>
     <ol class="loop">
-      <li><div class="step-body"><b>Highlight text</b> anywhere in Hyprland — a browser tab, a terminal, a GTK app, an editor buffer.</div></li>
+      <li><div class="step-body"><b>Highlight text</b> anywhere in Hyprland: a browser tab, a terminal, a GTK app, an editor buffer.</div></li>
       <li><div class="step-body"><b>Press the Speak Key.</b> Omatalk resolves the <b>Source</b>: the Wayland primary selection first (<code>wl-paste --primary</code>), the clipboard if nothing's selected.</div></li>
-      <li><div class="step-body"><b>The daemon streams it.</b> Text is split into sentences and synthesized one at a time through Kokoro-82M — first audio lands before the rest has finished rendering.</div></li>
+      <li><div class="step-body"><b>The daemon streams it.</b> Text is split into sentences and synthesized one at a time through Kokoro-82M. First audio lands before the rest has finished rendering.</div></li>
       <li><div class="step-body"><b>Press it again to interrupt.</b> The playing <b>Utterance</b> cuts off immediately and the new selection starts speaking. No queue, no "stop, then start."</div></li>
     </ol>
   </section>
@@ -716,10 +682,10 @@
     <div class="eyebrow">voices</div>
     <h2>Twenty-eight voices, one config line</h2>
     <p class="prose" style="margin-top:14px;">Kokoro-82M ships packs across nine languages; Omatalk speaks
-      English only for now — American and British, eleven female and nine male US voices, four and four UK.
+      English only for now: American and British, eleven female and nine male US voices, four and four UK.
       Set <code class="inline-code">voice = "…"</code>
       in <code class="inline-code">config.toml</code>
-      to any name below — <code class="inline-code">af_heart</code> is the default. Every clip is the same line, rendered
+      to any name below. <code class="inline-code">af_heart</code> is the default. Every clip is the same line, rendered
       through the pipeline Omatalk actually runs: Kokoro-82M, ONNX Runtime, CPU.</p>
 
     <div class="voice-groups" id="voice-groups">
@@ -777,12 +743,12 @@
   <section id="config">
     <div class="eyebrow">config</div>
     <h2>The whole configuration surface</h2>
-    <p class="prose" style="margin-top:14px;">No flags, no dashboard, nothing to click through — two files, edited by hand.</p>
+    <p class="prose" style="margin-top:14px;">No flags, no dashboard, nothing to click through. Two files, edited by hand.</p>
 
     <div class="config-grid">
       <div>
         <p class="prose" style="margin-top:0; font-size:0.98rem;"><code class="inline-code">~/.config/omatalk/config.toml</code> is
-          entirely optional — missing file, Omatalk just runs on defaults. Point <code class="inline-code">voice</code> at any
+          entirely optional. Missing the file, Omatalk just runs on defaults. Point <code class="inline-code">voice</code> at any
           name from the list above, tune <code class="inline-code">speed</code>, save.</p>
         <div class="code-card">
           <div class="cc-title">
@@ -799,7 +765,7 @@
 
       <div>
         <p class="prose" style="margin-top:0; font-size:0.98rem;"><span class="key primary mono" style="font-size:0.78rem; padding:3px 9px; margin-right:2px;">F8</span> answers
-          F9 — voxtype's dictation key speaks <em>to</em> the machine, F8 speaks back. The installer only <em>prints</em> this
+          F9: voxtype's dictation key speaks <em>to</em> the machine, F8 speaks back. The installer only <em>prints</em> this
           line; paste it into <code class="inline-code">~/.config/hypr/bindings.lua</code> yourself.</p>
         <div class="code-card">
           <div class="cc-title">
@@ -843,12 +809,12 @@
     <div class="eyebrow">how it's built</div>
     <h2>No cloud in the loop</h2>
     <div class="manifest">
-      <div class="row"><div class="name">Kokoro-82M</div><div class="why">ONNX Runtime, CPU. Chosen over Piper (fast but audibly robotic) and XTTS/Chatterbox (GPU-sized, restrictive licenses) — near top-of-class naturalness at ~300MB, faster than real time on a mid-range laptop CPU.</div></div>
+      <div class="row"><div class="name">Kokoro-82M</div><div class="why">ONNX Runtime, CPU. Chosen over Piper (fast but audibly robotic) and XTTS/Chatterbox (GPU-sized, restrictive licenses). Near top-of-class naturalness at ~300MB, faster than real time on a mid-range laptop CPU.</div></div>
       <div class="row"><div class="name">Python daemon (uv)</div><div class="why">Keeps the model warm in memory so a hotkey press never pays a 10–30s cold-load tax. Talks over a Unix socket with a three-verb protocol: <code class="mono" style="background:none;border:none;padding:0;">speak</code> / <code class="mono" style="background:none;border:none;padding:0;">stop</code> / <code class="mono" style="background:none;border:none;padding:0;">status</code>.</div></div>
-      <div class="row"><div class="name">wl-paste --primary</div><div class="why">Reads the Wayland primary selection directly — no synthetic keystrokes, no clipboard mutation, no keyboard-injection daemon.</div></div>
+      <div class="row"><div class="name">wl-paste --primary</div><div class="why">Reads the Wayland primary selection directly: no synthetic keystrokes, no clipboard mutation, no keyboard-injection daemon.</div></div>
       <div class="row"><div class="name">PipeWire</div><div class="why"><code class="mono" style="background:none;border:none;padding:0;">pw-play</code> streams PCM chunks into the existing audio graph as they're synthesized, layering over whatever else is playing.</div></div>
       <div class="row"><div class="name">systemd --user</div><div class="why">Starts the daemon at login and keeps it resident across the session; state and models live under <code class="mono" style="background:none;border:none;padding:0;">~/.local/share/omatalk/</code>.</div></div>
-      <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config, never touched by the installer. F8 sits next to voxtype's F9 dictation key on purpose — F9 speaks you, F8 speaks back.</div></div>
+      <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config, never touched by the installer. F8 sits next to voxtype's F9 dictation key on purpose: F9 speaks you, F8 speaks back.</div></div>
     </div>
   </section>
 
@@ -857,7 +823,7 @@
 <footer>
   <div class="wrap foot-row">
     <span>MIT License</span>
-    <span>Built for the Omarchy ecosystem · mirrors voxtype, in reverse</span>
+    <span>Built for the Omarchy</span>
     <span>No telemetry. No network calls at runtime.</span>
   </div>
 </footer>
@@ -948,23 +914,48 @@
     return Math.abs(h);
   }
 
+  function shade(hex, amt) {
+    hex = hex.replace("#", "");
+    if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    var r = parseInt(hex.substr(0, 2), 16), g = parseInt(hex.substr(2, 2), 16), b = parseInt(hex.substr(4, 2), 16);
+    var f = function (c) { return Math.max(0, Math.min(255, Math.round(c * (1 + amt)))); };
+    return "rgb(" + f(r) + "," + f(g) + "," + f(b) + ")";
+  }
+
   function avatarSvg(seed) {
     var h = hash(seed);
     var female = /^(a|b)f_/.test(seed);
     var color = female ? accent : accent2;
-    var bars = 5;
-    var w = 44, hgt = 44, gap = 4;
-    var barW = (w - gap * (bars - 1)) / bars;
-    var rects = "";
-    for (var i = 0; i < bars; i++) {
-      var v = (h >> (i * 5)) % 100 / 100; // 0..1
-      var barH = 8 + v * 26;
-      var x = i * (barW + gap);
-      var y = (hgt - barH) / 2;
-      rects += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + barW.toFixed(1) +
-        '" height="' + barH.toFixed(1) + '" rx="' + (barW / 2).toFixed(1) + '" fill="' + color + '" opacity="' + (0.55 + v * 0.45).toFixed(2) + '"/>';
+    var hairColor = shade(color, -0.4);
+    var feature = "rgba(0,0,0,.55)";
+    var cx = 22, cy = 22;
+
+    var eyeR = 1.5 + ((h >> 2) % 5) / 10;       // 1.5-1.9
+    var eyeDx = 4.2 + ((h >> 5) % 6) / 10;      // 4.2-4.7
+    var smile = 1.5 + ((h >> 8) % 6) / 2;       // 1.5-4.0 (curve depth)
+    var wide = 3.6 + ((h >> 11) % 4) / 2;       // mouth half-width
+
+    var mouth = '<path d="M' + (cx - wide).toFixed(1) + ' 26.5 Q ' + cx + ' ' + (26.5 + smile).toFixed(1) +
+      ' ' + (cx + wide).toFixed(1) + ' 26.5" stroke="' + feature + '" stroke-width="1.4" fill="none" stroke-linecap="round"/>';
+    var eyes = '<circle cx="' + (cx - eyeDx).toFixed(1) + '" cy="19.5" r="' + eyeR.toFixed(1) + '" fill="' + feature + '"/>' +
+      '<circle cx="' + (cx + eyeDx).toFixed(1) + '" cy="19.5" r="' + eyeR.toFixed(1) + '" fill="' + feature + '"/>';
+
+    var face = '<circle cx="' + cx + '" cy="' + cy + '" r="11" fill="' + color + '"/>';
+    var hair = "";
+    if (female) {
+      var long = (h >> 14) % 2 === 0;
+      if (long) {
+        hair = '<path d="M9 21 A13 13 0 0 1 35 21 L34 32 A2.5 2.5 0 0 1 29 32 L29 24 L15 24 L15 32 A2.5 2.5 0 0 1 10 32 Z" fill="' + hairColor + '"/>';
+      } else {
+        hair = '<path d="M9.5 22 A12.5 12.5 0 0 1 34.5 22 L33.5 26 A11.5 12.5 0 0 0 10.5 26 Z" fill="' + hairColor + '"/>';
+      }
+    } else {
+      var part = (h >> 16) % 2 === 0;
+      hair = '<path d="M10.5 19.5 A11.5 11.5 0 0 1 33.5 19.5 L33.5 15.5 A11.5 11.5 0 0 0 10.5 15.5 Z" fill="' + hairColor + '"/>';
+      if (part) hair += '<rect x="20.5" y="11" width="1.6" height="5" fill="' + hairColor + '" transform="rotate(20 21.3 13.5)"/>';
     }
-    return '<svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">' + rects + '</svg>';
+
+    return '<svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">' + face + hair + eyes + mouth + '</svg>';
   }
 
   document.querySelectorAll(".voice-avatar").forEach(function (el) {
