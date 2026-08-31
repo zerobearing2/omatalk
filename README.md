@@ -52,9 +52,10 @@ checkout you're running it from. Then it:
    keybindings.
 
 Releases are built automatically: every push to `master` tags `v<version>`
-from `pyproject.toml` and attaches the source tarball + sha256 (see
-`.github/workflows/release.yml`). Re-running the installer picks up the
-newest release.
+(from `pyproject.toml`, patch auto-bumped when the tag already exists) and
+attaches the source tarball + sha256 (see `.github/workflows/release.yml`).
+The tag is the version record — the workflow never commits to the branch.
+Re-running the installer picks up the newest release.
 
 ## Uninstall
 

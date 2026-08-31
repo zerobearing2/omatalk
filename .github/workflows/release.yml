@@ -8,40 +8,37 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
-    # The version-bump commit carries [skip ci]; merges and manual
-    # version edits run the release.
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Resolve version (auto-bump patch when already tagged)
         id: ver
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
+          # The tag is the version record; nothing is committed back to the
+          # branch, so pushes never race the bot.
           version=$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml | head -1)
           if git ls-remote --tags origin "refs/tags/v$version" | grep -q "refs/tags/v$version"; then
             major=$(echo "$version" | cut -d. -f1)
             minor=$(echo "$version" | cut -d. -f2)
             patch=$(echo "$version" | cut -d. -f3)
             version="$major.$minor.$((patch + 1))"
-            sed -i "s/^version = \".*\"/version = \"$version\"/" pyproject.toml
-            git config user.name "omatalk-release[bot]"
-            git config user.email "release@omatalk.invalid"
-            git commit -am "chore: bump version to $version [skip ci]"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Pack source tarball
-        env:
-          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           # Runtime minimum only: package, service unit, build metadata,
           # README (referenced by pyproject), uninstaller. No site, tests,
-          # docs, or CI config. tar of the working tree (not HEAD) so an
-          # auto-bumped pyproject version is included.
+          # docs, or CI config. The resolved version is written into the
+          # packed pyproject so the tarball self-describes.
+          sed "s/^version = \".*\"/version = \"${{ steps.ver.outputs.version }}\"/" \
+            pyproject.toml > /tmp/pyproject.toml && mv /tmp/pyproject.toml pyproject.toml
           tar --transform "s,^,omatalk/," \
             -czf omatalk-src.tar.gz \
             omatalk systemd pyproject.toml README.md uninstall.sh
