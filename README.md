@@ -42,9 +42,10 @@ served from the site by the Pages workflow). Then it:
    `~/.local/share/omatalk/models/` (skipped if present).
 4. Installs and enables the `omatalk.service` systemd user unit — the daemon
    is warm from login and survives relogin.
-5. Puts `omatalk` on PATH (`~/.local/bin/`) and prints the `o.bind(...)`
-   line for `~/.config/hypr/bindings.lua`. The installer never edits your
-   keybindings.
+5. Puts `omatalk` on PATH (`~/.local/bin/`) and prints a copy-paste command
+   that adds the F8 `o.bind(...)` line to `~/.config/hypr/bindings.lua` and
+   reloads Hyprland (idempotent — safe to re-run). The installer never edits
+   your keybindings itself.
 
 Releases are built automatically: every push to `master` tags `v<version>`
 (from `pyproject.toml`, patch auto-bumped when the tag already exists) and

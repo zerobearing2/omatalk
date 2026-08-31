@@ -68,9 +68,11 @@ systemctl --user enable --now omatalk.service
 # 6. Client on PATH.
 cp "$OMATALK_HOME/venv/bin/omatalk" "$HOME/.local/bin/omatalk"
 
-# 7. Keybindings are user-owned; the installer only prints the line.
-msg "Add this line to ~/.config/hypr/bindings.lua (then reload):"
-printf '  o.bind("F8", "Omatalk", "omatalk speak")\n'
+# 7. Keybindings are user-owned; the installer only prints the command.
+msg "To bind F8, paste this command (safe to re-run):"
+cat <<'EOF'
+  grep -q omatalk ~/.config/hypr/bindings.lua || printf '\no.bind("F8", "Omatalk", "omatalk speak")\n' >> ~/.config/hypr/bindings.lua; hyprctl reload
+EOF
 
 # 8. Welcome through the freshly installed daemon — proves the whole
 # pipeline (service, socket, warm model, audio) works end to end.
