@@ -10,6 +10,11 @@ UNIT="$HOME/.config/systemd/user/omatalk.service"
 msg() { printf '\033[1;32m==>\033[0m %s\n' "$1"; }
 warn() { printf '\033[1;33m==>\033[0m %s\n' "$1"; }
 
+# Prompts read the terminal when piped via curl | bash; fall back to stdin
+# for scripted runs where /dev/tty is unavailable.
+ASK_FROM=/dev/tty
+{ : < /dev/tty; } 2>/dev/null || ASK_FROM=/dev/stdin
+
 systemctl --user disable --now omatalk.service 2>/dev/null || true
 rm -f "$UNIT"
 systemctl --user daemon-reload
@@ -19,7 +24,7 @@ rm -f "$HOME/.local/bin/omatalk" "$HOME/.local/bin/omatalkd"
 msg "Service stopped and removed; stray daemons killed; launcher removed"
 
 if [ -d "$OMATALK_HOME" ]; then
-  read -r -p "Remove $OMATALK_HOME (source, venv, ~340MB models)? [y/N] " answer < /dev/tty
+  read -r -p "Remove $OMATALK_HOME (source, venv, ~340MB models)? [y/N] " answer < "$ASK_FROM"
   if [[ "$answer" =~ ^[Yy]$ ]]; then
     rm -rf "$OMATALK_HOME"
     msg "Removed $OMATALK_HOME"
@@ -29,7 +34,7 @@ if [ -d "$OMATALK_HOME" ]; then
 fi
 
 if [ -d "$HOME/.config/omatalk" ]; then
-  read -r -p "Remove config $HOME/.config/omatalk? [y/N] " answer < /dev/tty
+  read -r -p "Remove config $HOME/.config/omatalk? [y/N] " answer < "$ASK_FROM"
   if [[ "$answer" =~ ^[Yy]$ ]]; then
     rm -rf "$HOME/.config/omatalk"
     msg "Removed config"
