@@ -17,6 +17,7 @@ class Daemon:
         self._cancel = None
         self._proc = None
         self._thread = None
+        self._current_text = ""
 
     def _notify(self, msg: str):
         subprocess.run(
@@ -39,6 +40,9 @@ class Daemon:
 
     def speak(self, text: str):
         text = text.strip() or capture_primary(self.cfg)
+        if text and self.state == "speaking" and text == self._current_text:
+            self.stop()
+            return
         if not text:
             if self.state == "speaking":
                 self.stop()
@@ -50,6 +54,7 @@ class Daemon:
         self._stop_current()
         cancel = threading.Event()
         self._cancel = cancel
+        self._current_text = text
         self.state = "speaking"
         self._thread = threading.Thread(
             target=self._run, args=(text, cancel), daemon=True

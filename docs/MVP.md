@@ -26,8 +26,8 @@ selected text becomes voice. Fully local — no network calls at runtime.
 |---|----------|--------|
 | 1 | Audience | Community-grade from day one (omarchy ecosystem, voxtype as the shape-precedent) |
 | 2 | Text source | Selection, with Clipboard fallback, one hotkey |
-| 3 | Interaction | Single keypress toggles; press while speaking = interrupt + speak new |
-| 4 | Interrupt semantics | Stop-and-speak-new in one press |
+| 3 | Interaction | Single keypress: speak new Selection; while speaking, same-or-empty Selection = stop, changed Selection = interrupt + speak new (Wayland primary selection is sticky after deselect, so unchanged text means the user wants silence) |
+| 4 | Interrupt semantics | Cut off immediately; speak new only when the Selection changed, otherwise stop |
 | 5 | Engine | Kokoro-82M, ONNX Runtime, CPU (see [ADR-0001](./adr/0001-kokoro-onnx-cpu.md)) |
 | 6 | Process shape | Persistent daemon, systemd user service, model warm from login |
 | 7 | Language | Python daemon (uv), shell glue; Rust is a later optimization (see [ADR-0002](./adr/0002-python-daemon.md)) |

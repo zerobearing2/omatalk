@@ -338,6 +338,59 @@
     .manifest .row { grid-template-columns: 1fr; }
   }
 
+  /* ---------- voice preview ---------- */
+  .voice-groups { margin-top: 36px; display: grid; gap: 26px; }
+  .voice-group-label {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .voice-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .voice-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82rem;
+    color: var(--fg-dim);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+  }
+  .voice-btn:hover { border-color: var(--accent); color: var(--fg); }
+  .voice-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .voice-btn .icon {
+    width: 0; height: 0;
+    border-style: solid;
+    border-width: 5px 0 5px 8px;
+    border-color: transparent transparent transparent var(--muted);
+    flex: 0 0 auto;
+  }
+  .voice-btn.playing {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  }
+  .voice-btn.playing .icon {
+    border-color: transparent transparent transparent var(--accent);
+    animation: blink 1s ease-in-out infinite;
+  }
+  .voice-tag {
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent-2);
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+
   footer {
     border-top: 1px solid var(--border);
     padding: 34px 0 44px;
@@ -375,10 +428,11 @@
       round-trip — the model stays warm on your own CPU.</p>
 
     <div class="keys">
-      <span class="key primary mono" id="key-primary">SUPER + CTRL + S</span>
+      <span class="key primary mono" id="key-primary">F8</span>
       <span class="or">or</span>
-      <span class="key mono" id="key-alt">SUPER + F9</span>
+      <span class="key mono" id="key-alt">SUPER + CTRL + S</span>
     </div>
+    <p class="sub" style="margin-top:12px; font-size:0.95rem;">F8 answers F9 — voxtype's dictation key speaks <em>to</em> the machine, F8 speaks back.</p>
 
     <div class="status-pill"><span class="led"></span>MVP spec locked · daemon in active development</div>
 
@@ -427,13 +481,75 @@
     </ol>
   </section>
 
+  <section id="voices">
+    <div class="eyebrow">voices</div>
+    <h2>Twenty-eight voices, one config line</h2>
+    <p class="prose" style="margin-top:14px;">Kokoro-82M ships packs across nine languages; Omatalk's MVP speaks
+      English only — American and British, eleven female and nine male US voices, four and four UK.
+      Set <code class="mono" style="background:var(--ink-alt);border:1px solid var(--border);border-radius:4px;padding:0.1em 0.4em;">voice = "…"</code>
+      in <code class="mono" style="background:var(--ink-alt);border:1px solid var(--border);border-radius:4px;padding:0.1em 0.4em;">config.toml</code>
+      to any name below — <code class="mono" style="background:var(--ink-alt);border:1px solid var(--border);border-radius:4px;padding:0.1em 0.4em;">af_heart</code> is the default. Every clip is the same line, rendered
+      through the pipeline Omatalk actually runs: Kokoro-82M, ONNX Runtime, CPU.</p>
+
+    <div class="voice-groups" id="voice-groups">
+      <div class="voice-group">
+        <div class="voice-group-label">American English · Female</div>
+        <div class="voice-grid">
+          <button class="voice-btn" data-src="audio/voices/af_alloy.mp3"><span class="icon"></span>af_alloy</button>
+          <button class="voice-btn" data-src="audio/voices/af_aoede.mp3"><span class="icon"></span>af_aoede</button>
+          <button class="voice-btn" data-src="audio/voices/af_bella.mp3"><span class="icon"></span>af_bella</button>
+          <button class="voice-btn" data-src="audio/voices/af_heart.mp3"><span class="icon"></span>af_heart<span class="voice-tag">default</span></button>
+          <button class="voice-btn" data-src="audio/voices/af_jessica.mp3"><span class="icon"></span>af_jessica</button>
+          <button class="voice-btn" data-src="audio/voices/af_kore.mp3"><span class="icon"></span>af_kore</button>
+          <button class="voice-btn" data-src="audio/voices/af_nicole.mp3"><span class="icon"></span>af_nicole</button>
+          <button class="voice-btn" data-src="audio/voices/af_nova.mp3"><span class="icon"></span>af_nova</button>
+          <button class="voice-btn" data-src="audio/voices/af_river.mp3"><span class="icon"></span>af_river</button>
+          <button class="voice-btn" data-src="audio/voices/af_sarah.mp3"><span class="icon"></span>af_sarah</button>
+          <button class="voice-btn" data-src="audio/voices/af_sky.mp3"><span class="icon"></span>af_sky</button>
+        </div>
+      </div>
+      <div class="voice-group">
+        <div class="voice-group-label">American English · Male</div>
+        <div class="voice-grid">
+          <button class="voice-btn" data-src="audio/voices/am_adam.mp3"><span class="icon"></span>am_adam</button>
+          <button class="voice-btn" data-src="audio/voices/am_echo.mp3"><span class="icon"></span>am_echo</button>
+          <button class="voice-btn" data-src="audio/voices/am_eric.mp3"><span class="icon"></span>am_eric</button>
+          <button class="voice-btn" data-src="audio/voices/am_fenrir.mp3"><span class="icon"></span>am_fenrir</button>
+          <button class="voice-btn" data-src="audio/voices/am_liam.mp3"><span class="icon"></span>am_liam</button>
+          <button class="voice-btn" data-src="audio/voices/am_michael.mp3"><span class="icon"></span>am_michael</button>
+          <button class="voice-btn" data-src="audio/voices/am_onyx.mp3"><span class="icon"></span>am_onyx</button>
+          <button class="voice-btn" data-src="audio/voices/am_puck.mp3"><span class="icon"></span>am_puck</button>
+          <button class="voice-btn" data-src="audio/voices/am_santa.mp3"><span class="icon"></span>am_santa</button>
+        </div>
+      </div>
+      <div class="voice-group">
+        <div class="voice-group-label">British English · Female</div>
+        <div class="voice-grid">
+          <button class="voice-btn" data-src="audio/voices/bf_alice.mp3"><span class="icon"></span>bf_alice</button>
+          <button class="voice-btn" data-src="audio/voices/bf_emma.mp3"><span class="icon"></span>bf_emma</button>
+          <button class="voice-btn" data-src="audio/voices/bf_isabella.mp3"><span class="icon"></span>bf_isabella</button>
+          <button class="voice-btn" data-src="audio/voices/bf_lily.mp3"><span class="icon"></span>bf_lily</button>
+        </div>
+      </div>
+      <div class="voice-group">
+        <div class="voice-group-label">British English · Male</div>
+        <div class="voice-grid">
+          <button class="voice-btn" data-src="audio/voices/bm_daniel.mp3"><span class="icon"></span>bm_daniel</button>
+          <button class="voice-btn" data-src="audio/voices/bm_fable.mp3"><span class="icon"></span>bm_fable</button>
+          <button class="voice-btn" data-src="audio/voices/bm_george.mp3"><span class="icon"></span>bm_george</button>
+          <button class="voice-btn" data-src="audio/voices/bm_lewis.mp3"><span class="icon"></span>bm_lewis</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="architecture">
     <div class="eyebrow">architecture</div>
     <h2>A warm daemon behind a socket</h2>
     <p class="prose" style="margin-top:14px;">One hotkey press is a one-shot client; the daemon holds the model warm from login
       so nothing pays a cold-load tax mid-sentence.</p>
     <div class="diagram">
-<pre>bindings.lua ──(<span class="hi">SUPER+CTRL+S</span> / <span class="hi">SUPER+F9</span>)──▶ one-shot client
+<pre>bindings.lua ──(<span class="hi">F8</span> / <span class="hi">SUPER+CTRL+S</span>)──▶ one-shot client
                                                │
                                                ▼
                                     Unix socket (<span class="hi2">omatalk.sock</span>)
@@ -458,7 +574,7 @@
       <div class="row"><div class="name">wl-paste --primary</div><div class="why">Reads the Wayland primary selection directly — no synthetic keystrokes, no clipboard mutation, no keyboard-injection daemon.</div></div>
       <div class="row"><div class="name">PipeWire</div><div class="why"><code class="mono" style="background:none;border:none;padding:0;">pw-play</code> streams PCM chunks into the existing audio graph as they're synthesized, layering over whatever else is playing.</div></div>
       <div class="row"><div class="name">systemd --user</div><div class="why">Starts the daemon at login and keeps it resident across the session; state and models live under <code class="mono" style="background:none;border:none;padding:0;">~/.local/share/omatalk/</code>.</div></div>
-      <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config, never touched by the installer — mirroring voxtype's primary/alternate key pattern.</div></div>
+      <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config, never touched by the installer. F8 and SUPER+CTRL+S both speak — F8 sits next to voxtype's F9 dictation key on purpose.</div></div>
     </div>
   </section>
 
@@ -555,6 +671,31 @@
   } else {
     requestAnimationFrame(frame);
   }
+})();
+
+(function () {
+  "use strict";
+  var player = new Audio();
+  var active = null;
+
+  function stop() {
+    player.pause();
+    if (active) active.classList.remove("playing");
+    active = null;
+  }
+
+  player.addEventListener("ended", stop);
+
+  document.querySelectorAll(".voice-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      if (active === btn) { stop(); return; }
+      stop();
+      player.src = btn.dataset.src;
+      player.play();
+      btn.classList.add("playing");
+      active = btn;
+    });
+  });
 })();
 </script>
 

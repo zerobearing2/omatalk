@@ -93,6 +93,32 @@ def test_empty_selection_while_speaking_stops(daemon):
     assert "nothing to read" not in read_notify(daemon)
 
 
+def test_same_text_press_while_speaking_stops(daemon):
+    clear_logs(daemon)
+    set_play_ticks(daemon, "30")
+    set_capture(daemon, "Sticky selection text. Still the same text.")
+    assert send(daemon, "speak") == "ok"
+    wait_log(daemon, "start")
+    assert send(daemon, "speak") == "ok"
+    assert send(daemon, "status") == "idle"
+    wait_log(daemon, "killed")
+    wait_log(daemon, "start", count=1)
+
+
+def test_new_selection_interrupts_and_speaks_new(daemon):
+    clear_logs(daemon)
+    set_play_ticks(daemon, "30")
+    set_capture(daemon, "First very long utterance. Still going on and on.")
+    assert send(daemon, "speak") == "ok"
+    wait_log(daemon, "start")
+    set_capture(daemon, "Completely new selection.")
+    assert send(daemon, "speak") == "ok"
+    wait_status(daemon, "speaking")
+    wait_status(daemon, "idle")
+    starts = len([l for l in log(daemon).splitlines() if l.startswith("start")])
+    assert starts == 2
+
+
 def test_clipboard_fallback_when_idle(daemon):
     clear_logs(daemon)
     set_play_ticks(daemon, "1")

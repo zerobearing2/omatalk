@@ -26,8 +26,9 @@ _Avoid_: request, job, playback
 
 **Interrupt**:
 Pressing the hotkey while speech is playing: the playing Utterance is cut off
-immediately and the new press's Utterance begins.
-_Avoid_: cancel, stop (which implies speech ends without a new Utterance)
+immediately. If the press carries a new Source (different Selection), the new
+Utterance begins; if the Selection is unchanged or empty, speech simply stops.
+_Avoid_: cancel (for stop, which implies speech ends without a new Utterance)
 
 **Daemon**:
 The always-running local process that holds the TTS model warm, receives
