@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -37,6 +38,8 @@ def daemon(config, tmp_base):
         "OMATALK_TEST_LOG": str(tmp_base / "play.log"),
         "OMATALK_TEST_NOTIFY_LOG": str(tmp_base / "notify.log"),
         "OMATALK_TEST_TICKS_FILE": str(tmp_base / "ticks.txt"),
+        "OMATALK_PYTHON": sys.executable,
+        "OMATALK_TEST_FAKE_ENGINE": "1",
     }
     (tmp_base / "ticks.txt").write_text("1")
     proc = subprocess.Popen(

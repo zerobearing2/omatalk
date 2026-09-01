@@ -1,3 +1,4 @@
+import os
 import socket
 import subprocess
 import threading
@@ -15,11 +16,22 @@ from .player import play
 IDLE_TIMEOUT = 600
 
 
+def build_engine(cfg: dict):
+    # Tests run without the 183MB model via a fake synthesizer.
+    if os.environ.get("OMATALK_TEST_FAKE_ENGINE"):
+        class FakeEngine:
+            def synthesize(self, text: str):
+                return [0.0] * 2400, 24000
+
+        return FakeEngine()
+    return Engine(cfg)
+
+
 class Daemon:
     def __init__(self, cfg: dict):
         self.cfg = cfg
         self.state = "idle"
-        self.engine = Engine(cfg)
+        self.engine = build_engine(cfg)
         self._cancel = None
         self._proc = None
         self._thread = None
