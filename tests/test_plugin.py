@@ -39,7 +39,10 @@ def test_manifest_points_to_megaphone():
 
 
 @pytest.mark.parametrize("vertical", [False, True])
-def test_megaphone_socket_widget_round_trip(tmp_path, vertical):
+@pytest.mark.parametrize("initially_available", [False, True])
+def test_megaphone_socket_widget_round_trip(
+    tmp_path, vertical, initially_available
+):
     quickshell = shutil.which("quickshell")
     shell_dir = Path("/usr/share/omarchy/shell")
     if not quickshell or not (shell_dir / "Ui/qmldir").is_file():
@@ -53,10 +56,12 @@ def test_megaphone_socket_widget_round_trip(tmp_path, vertical):
         (imports / module).symlink_to(shell_dir / module, target_is_directory=True)
 
     socket_path = tmp_path / "omatalk.sock"
-    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    server.bind(str(socket_path))
-    server.listen(1)
-    server.settimeout(10)
+    server = None
+    if initially_available:
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(str(socket_path))
+        server.listen(1)
+        server.settimeout(10)
 
     shell = tmp_path / "shell.qml"
     shell.write_text(
@@ -119,11 +124,19 @@ ShellRoot {{
 
     connection = None
     try:
+        if not initially_available:
+            time.sleep(3)
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            server.bind(str(socket_path))
+            server.listen(1)
+            server.settimeout(10)
+        assert server is not None
         connection, _ = server.accept()
         connection.settimeout(10)
         assert connection.recv(64) == b"follow\n"
         connection.sendall(b"idle\n")
-        output_until(process, "WIDGET_READY state=idle")
+        if initially_available:
+            output_until(process, "WIDGET_READY state=idle")
 
         connection.sendall(b"speaking\n")
         output_until(process, "WIDGET_STATE state=speaking")
@@ -141,7 +154,8 @@ ShellRoot {{
 
         connection.close()
         connection = None
-        server.close()
+        if server is not None:
+            server.close()
         socket_path.unlink(missing_ok=True)
         output_until(process, "WIDGET_UNAVAILABLE unavailable=true", timeout=6)
         time.sleep(2)
@@ -159,6 +173,7 @@ ShellRoot {{
     finally:
         if connection is not None:
             connection.close()
-        server.close()
+        if server is not None:
+            server.close()
         process.terminate()
         process.wait(timeout=10)

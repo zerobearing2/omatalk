@@ -93,6 +93,7 @@ BarWidget {
     id: retry
     interval: 1000
     repeat: true
+    running: true
     onTriggered: {
       stateSocketLoader.active = false
       reconnect.start()
