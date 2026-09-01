@@ -748,8 +748,9 @@
     <p class="prose" style="margin-top:14px;"><code class="inline-code">install.sh</code> checks system dependencies, pulls
       the latest tagged release from this site (checksum-verified), and builds
       a uv-managed venv. Then it downloads the ~185MB Kokoro-82M model (checksum-verified against the exact files the
-      benchmark was run on) and installs the <code class="inline-code">omatalk.service</code> systemd user unit, warm and
-      running before the command exits. It only <em>prints</em> the bindings.lua line; your keybindings stay
+      benchmark was run on), stops the current daemon, and starts a fresh
+      <code class="inline-code">omatalk.service</code> systemd user unit before the command exits. It only <em>prints</em>
+      the bindings.lua line; your keybindings stay
       yours to edit.</p>
 
     <div class="code-card">
@@ -764,7 +765,20 @@
     </div>
 
     <p class="prose" style="margin-top:26px; max-width:66ch;">Re-run the same command any time to update. It re-fetches
-      the latest release, reinstalls, and restarts the service. Model download is skipped once the files are present.</p>
+      the latest release, replaces the daemon and bar plugin, and skips models whose checksums still match. Your config
+      and keybindings are never edited. After this first bootstrap, use <code class="inline-code">omatalk upgrade</code>
+      to run the same installer.</p>
+
+    <div class="code-card">
+      <div class="cc-title">
+        upgrade
+        <button class="copy-btn" type="button" data-copy="omatalk upgrade">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+          <span class="copy-label">copy</span>
+        </button>
+      </div>
+      <pre>omatalk upgrade</pre>
+    </div>
 
     <div class="code-card">
       <div class="cc-title">
