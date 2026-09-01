@@ -28,6 +28,8 @@ The bar keeps one megaphone icon in the same spot and changes its color:
 - `speaking`: theme accent; selected text is being read.
 - `unavailable`: urgent color after a 3-second disconnect grace period.
 
+The live bar context is softened around the Omatalk glyph so the state colors are easy to spot.
+
 ![Omatalk bar widget showing idle, speaking, and unavailable states](public/images/omatalk-bar-states.png)
 
 ## Install
