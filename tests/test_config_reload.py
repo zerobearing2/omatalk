@@ -2,7 +2,7 @@ import subprocess
 import sys
 import time
 
-from conftest import FAKES, REPO
+from conftest import FAKES, REPO, send, wait_log, wait_status
 
 
 def wait_for_socket(sock_path, proc, timeout=60):
@@ -12,36 +12,6 @@ def wait_for_socket(sock_path, proc, timeout=60):
         if proc.poll() is not None:
             raise RuntimeError(f"daemon died: {proc.stderr}")
         time.sleep(0.1)
-
-
-def send(sock_path, line: str) -> str:
-    import socket as s
-
-    client = s.socket(s.AF_UNIX, s.SOCK_STREAM)
-    client.settimeout(10)
-    client.connect(str(sock_path))
-    client.sendall((line + "\n").encode())
-    reply = client.recv(1024).decode().strip()
-    client.close()
-    return reply
-
-
-def wait_status(sock_path, want: str, timeout: float = 20):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if send(sock_path, "status") == want:
-            return
-        time.sleep(0.05)
-    raise AssertionError(f"status never reached {want!r}")
-
-
-def wait_voice_log(log_path, count: int, timeout: float = 20):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if log_path.exists() and len(log_path.read_text().splitlines()) >= count:
-            return log_path.read_text().splitlines()
-        time.sleep(0.05)
-    raise AssertionError(f"voice log never reached {count} lines")
 
 
 def test_daemon_reloads_voice_and_speed_from_config_toml_mtime(tmp_path):
@@ -55,7 +25,6 @@ def test_daemon_reloads_voice_and_speed_from_config_toml_mtime(tmp_path):
         f'notify = ["{FAKES}/notify"]\n'
     )
     sock = tmp_path / "reload.sock"
-    voice_log = tmp_path / "voice.log"
     env = {
         "PATH": "/usr/bin:/bin",
         "OMATALK_CONFIG": str(config),
@@ -65,18 +34,19 @@ def test_daemon_reloads_voice_and_speed_from_config_toml_mtime(tmp_path):
         "OMATALK_TEST_LOG": str(tmp_path / "play.log"),
         "OMATALK_TEST_NOTIFY_LOG": str(tmp_path / "notify.log"),
         "OMATALK_TEST_TICKS_FILE": str(tmp_path / "ticks.txt"),
-        "OMATALK_TEST_VOICE_LOG": str(voice_log),
+        "OMATALK_TEST_VOICE_LOG": str(tmp_path / "voice.log"),
         "OMATALK_PYTHON": sys.executable,
         "OMATALK_TEST_FAKE_ENGINE": "1",
     }
     (tmp_path / "ticks.txt").write_text("1")
     proc = subprocess.Popen([str(REPO / "bin" / "omatalkd")], env=env)
+    daemon = {"tmp": tmp_path, "sock": "reload.sock"}
     try:
         wait_for_socket(sock, proc)
 
-        assert send(sock, "speak First utterance.") == "ok"
-        wait_status(sock, "idle")
-        first = wait_voice_log(voice_log, 1)
+        assert send(daemon, "speak First utterance.", sock="reload.sock") == "ok"
+        wait_status(daemon, "idle", sock="reload.sock")
+        first = wait_log(daemon, "", count=1, filename="voice.log")
         assert first[-1] == "af_heart 1.0"
 
         # Bypass the CLI on purpose: this seam proves the Daemon's own
@@ -98,9 +68,9 @@ def test_daemon_reloads_voice_and_speed_from_config_toml_mtime(tmp_path):
         lines = first
         while time.time() < deadline and lines[-1] != "af_bella 1.5":
             time.sleep(1.5)
-            assert send(sock, "speak Second utterance.") == "ok"
-            wait_status(sock, "idle")
-            lines = wait_voice_log(voice_log, len(lines) + 1)
+            assert send(daemon, "speak Second utterance.", sock="reload.sock") == "ok"
+            wait_status(daemon, "idle", sock="reload.sock")
+            lines = wait_log(daemon, "", count=len(lines) + 1, filename="voice.log")
         assert lines[-1] == "af_bella 1.5", "daemon never picked up the config.toml change"
     finally:
         proc.terminate()

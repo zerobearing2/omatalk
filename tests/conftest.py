@@ -78,18 +78,18 @@ def wait_status(daemon, want: str, timeout: float = 20, sock: str = "d.sock"):
     raise AssertionError(f"status never reached {want!r}")
 
 
-def wait_log(daemon, prefix: str, count: int = 1, timeout: float = 20):
+def wait_log(daemon, prefix: str, count: int = 1, timeout: float = 20, filename: str = "play.log"):
     deadline = time.time() + timeout
     while time.time() < deadline:
-        lines = log(daemon).splitlines()
+        lines = log(daemon, filename).splitlines()
         if len([l for l in lines if l.startswith(prefix)]) >= count:
             return lines
         time.sleep(0.05)
-    raise AssertionError(f"log never reached {count} {prefix!r} lines")
+    raise AssertionError(f"{filename} never reached {count} {prefix!r} lines")
 
 
-def log(daemon) -> str:
-    return (daemon["tmp"] / "play.log").read_text()
+def log(daemon, filename: str = "play.log") -> str:
+    return (daemon["tmp"] / filename).read_text()
 
 
 def set_play_ticks(daemon, ticks: str):

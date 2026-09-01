@@ -99,23 +99,23 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _print_json_or_lines(as_json: bool, data, plain_lines) -> None:
+    if as_json:
+        print(json.dumps(data))
+    else:
+        for line in plain_lines:
+            print(line)
+
+
 def config_get(as_json: bool) -> int:
     cfg = config.load()
-    if as_json:
-        print(json.dumps(cfg))
-    else:
-        for key in sorted(cfg):
-            print(f"{key} = {cfg[key]}")
+    _print_json_or_lines(as_json, cfg, (f"{key} = {cfg[key]}" for key in sorted(cfg)))
     return 0
 
 
 def config_voices(as_json: bool) -> int:
     names = config.voices()
-    if as_json:
-        print(json.dumps(names))
-    else:
-        for name in names:
-            print(name)
+    _print_json_or_lines(as_json, names, names)
     return 0
 
 

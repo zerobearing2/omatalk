@@ -88,7 +88,7 @@ BarWidget {
       : (root.speaking ? "Omatalk is speaking" : "Omatalk")
     text: "󰃦"
 
-    onPressed: function(b) { root.togglePanel() }
+    onPressed: function(b) { if (b === Qt.LeftButton) root.togglePanel() }
   }
 
   Component {

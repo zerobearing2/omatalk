@@ -40,22 +40,21 @@ def _toml_literal(value) -> str:
 
 
 def set(key: str, value) -> None:
-    """Write one key to config.toml, leaving every other key (including ones
-    the user hand-set and this module has never touched) untouched. Only the
-    raw file overrides are read here, never DEFAULTS-merged, so a key left at
-    its default is never written and stays free to pick up future default
-    changes."""
+    # Read raw file overrides, never DEFAULTS-merged, so a key left at its
+    # default is never written and future default changes still apply to it.
     path = config_path()
     overrides = tomllib.loads(path.read_text()) if path.exists() else {}
-    overrides[key] = value
+    # Coerced here, not just by the caller, so this stays the one place that
+    # can write a wrongly-typed value into config.toml.
+    overrides[key] = type(DEFAULTS[key])(value)
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [f"{k} = {_toml_literal(v)}" for k, v in overrides.items()]
     path.write_text("\n".join(lines) + "\n")
 
 
 def voices() -> list:
-    """Voice names, read straight from the voices archive — no Kokoro/
-    onnxruntime session required, so this works without the Daemon."""
+    # Read straight from the voices archive: no Kokoro/onnxruntime session
+    # (and so no Daemon) required.
     import numpy
 
     with numpy.load(models_path() / "voices-v1.0.bin") as archive:
