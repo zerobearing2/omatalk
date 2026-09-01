@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://omatalk.zerobearing.com/sitemap.xml
