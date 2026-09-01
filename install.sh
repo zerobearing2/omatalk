@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Omatalk installer: system deps (omarchy-approved), latest release from the
-# site, venv, models, systemd user service, PATH launcher, keybinding line.
+# Omatalk installer: system deps (omarchy-approved), latest GitHub release,
+# venv, models, systemd user service, PATH launcher, keybinding line.
 set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
-SITE_BASE="${SITE_BASE:-https://omatalk.zerobearing.com}"
+RELEASE_BASE="${RELEASE_BASE:-https://github.com/zerobearing2/omatalk/releases/latest/download}"
 MODEL_BASE="${MODEL_BASE:-https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1}"
 MODEL_SHA256="${MODEL_SHA256:-f3a290d384fbb27966d462905c71a46cef9e5fd00516b40df32a0b4afe77ac96}"
 VOICES_SHA256="${VOICES_SHA256:-bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d}"
@@ -45,15 +45,12 @@ else
   done
 fi
 
-# 2. Source: always the latest release tarball, mirrored on the site by
-# the Pages workflow. The CDN may cache aggressively (observed 4h on the
-# tarball), so both files are cache-busted with one timestamp — they then
-# come straight from the current deploy as a matching pair.
-msg "Downloading latest release from $SITE_BASE"
+# 2. Source: always the latest GitHub release tarball and checksum.
+msg "Downloading latest release from GitHub"
 TS=$(date +%s)
 mkdir -p "$OMATALK_HOME"
-curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" "$SITE_BASE/omatalk-src.tar.gz?ts=$TS"
-curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" "$SITE_BASE/omatalk-src.tar.gz.sha256?ts=$TS"
+curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" "$RELEASE_BASE/omatalk-src.tar.gz?ts=$TS"
+curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" "$RELEASE_BASE/omatalk-src.tar.gz.sha256?ts=$TS"
 (cd "$OMATALK_HOME" && sha256sum -c omatalk-src.tar.gz.sha256 --quiet)
 
 # 3. Models (~185MB, skipped when their checksums match). fp16 half-size

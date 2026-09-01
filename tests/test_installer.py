@@ -143,7 +143,7 @@ printf 'omarchy-shell %s\\n' "$*" >> "$FAKE_LOG"
         **os.environ,
         "HOME": str(tmp_path / "home"),
         "PATH": f"{fake_bin}:{os.environ['PATH']}",
-        "SITE_BASE": site.url,
+        "RELEASE_BASE": site.url,
         "OMATALK_HOME": str(tmp_path / "omatalk"),
         "MODEL_BASE": f"{site.url}/models",
         "MODEL_SHA256": hashlib.sha256(model).hexdigest(),
