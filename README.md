@@ -31,7 +31,7 @@ The script downloads the latest release tarball (checksum-verified), then:
    `omarchy pkg add` (python, curl, pipewire, wl-clipboard, uv; stock
    Omarchy usually only lacks uv).
 2. Builds a uv-managed venv at `~/.local/share/omatalk/venv/`.
-3. Downloads the Kokoro-82M model and voice files (~340MB) to
+3. Downloads the Kokoro-82M model and voice files (~185MB) to
    `~/.local/share/omatalk/models/`, skipped if already present.
 4. Installs and enables the `omatalk.service` systemd user unit, so the
    daemon is warm from login and survives relogin.
@@ -49,7 +49,7 @@ curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
 ```
 
 Stops and removes the systemd service, the launcher, and the source. Asks
-before deleting the models (~340MB) and your config. Remove the F8 binding
+before deleting the models (~185MB) and your config. Remove the F8 binding
 from `~/.config/hypr/bindings.lua` yourself.
 
 ## Usage

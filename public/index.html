@@ -639,7 +639,7 @@
     <h2>One command<br>Omarchy OS</h2>
     <p class="prose" style="margin-top:14px;"><code class="inline-code">install.sh</code> checks system dependencies, pulls
       the latest tagged release from this site (checksum-verified), and builds
-      a uv-managed venv. Then it downloads the ~340MB Kokoro-82M model (checksum-verified against the exact files the
+      a uv-managed venv. Then it downloads the ~185MB Kokoro-82M model (checksum-verified against the exact files the
       benchmark was run on) and installs the <code class="inline-code">omatalk.service</code> systemd user unit, warm and
       running before the command exits. It only <em>prints</em> the bindings.lua line; your keybindings stay
       yours to edit.</p>
@@ -846,7 +846,7 @@
     <div class="manifest">
       <div class="row"><div class="name">Quickshell widget</div><div class="why">A status indicator in Omarchy's own shell instead of just notify-send. Designed for, not built yet: the daemon's <code class="mono" style="background:none;border:none;padding:0;">status</code> verb already reports idle, speaking, or error.</div></div>
       <div class="row"><div class="name">Voice picker UI</div><div class="why">Switching voices today means editing <code class="mono" style="background:none;border:none;padding:0;">config.toml</code> and restarting the daemon. A picker removes both steps.</div></div>
-      <div class="row"><div class="name">Low-resource model profile</div><div class="why">Kokoro-82M is comfortable on a modern CPU but heavy for a potato-class machine. An fp16 or int8 export would roughly halve the ~340MB download and the resident memory, checked against the full model in a listening test before it ships.</div></div>
+      <div class="row"><div class="name">Low-resource model profile — shipped</div><div class="why">The installer now ships the fp16 export (~185MB download, spectral correlation 0.999 against fp32 — audibly identical). Measured resident memory dropped from ~900MB to ~550–630MB; that gain comes from the kokoro-onnx 0.6 upgrade, not fp16 — on CPU the fp16 graph upcasts to fp32 at load and measures ~50MB higher than fp32.</div></div>
       <div class="row"><div class="name">Media ducking</div><div class="why">Automatically lower other audio while Omatalk is speaking, opt-in via config.</div></div>
       <div class="row"><div class="name">More languages</div><div class="why">Kokoro-82M ships packs for nine languages. Omatalk speaks English only for now.</div></div>
     </div>
