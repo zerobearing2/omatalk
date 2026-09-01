@@ -59,13 +59,12 @@ BarWidget {
     }
   }
 
-  Process {
-    id: userIdProcess
-    command: ["id", "-u"]
-    running: root.socketOverride === "" && root.runtimeDir === ""
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.userId = String(text).trim()
+  FileView {
+    path: "/proc/self/status"
+    printErrors: false
+    onLoaded: {
+      var match = text().match(/^Uid:\s+(\d+)/m)
+      if (match) root.userId = match[1]
     }
   }
 
