@@ -88,27 +88,6 @@ mkdir -p "$HOME/.config/systemd/user" "$HOME/.local/bin"
 cp "$OMATALK_HOME/src/systemd/omatalk.service" "$HOME/.config/systemd/user/"
 cp "$OMATALK_HOME/venv/bin/omatalk" "$HOME/.local/bin/omatalk"
 
-# 6b. Bar plugin (Omarchy only).
-if command -v omarchy >/dev/null 2>&1; then
-  msg "Installing Omarchy bar plugin"
-  mkdir -p "$HOME/.config/omarchy/plugins"
-  rm -rf "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
-  cp -r "$OMATALK_HOME/src/plugin" "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
-  omarchy-shell shell rescanPlugins
-  plugin_enabled=0
-  for _ in $(seq 1 50); do
-    if omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1; then
-      plugin_enabled=1
-      break
-    fi
-    sleep 0.1
-  done
-  if (( ! plugin_enabled )); then
-    msg "Could not enable the Omarchy bar plugin; run: omarchy plugin enable zerobearing.omatalk"
-    exit 1
-  fi
-fi
-
 systemctl --user daemon-reload
 systemctl --user enable --now omatalk.service
 
@@ -130,9 +109,52 @@ if ! "$HOME/.local/bin/omatalk" status >/dev/null 2>&1; then
   msg "Daemon did not start; check: journalctl --user -u omatalk"
   exit 1
 fi
+
+# 9. Bar plugin (Omarchy only). This mirrors what `omarchy plugin add` does
+# (/usr/share/omarchy/bin/omarchy-plugin-add): stage the files, move them into
+# place with one rename, rescan, wait until the shell reports the plugin
+# discovered, then enable it once.
+#
+# The rename is the part that matters. Copying file by file into the live
+# plugins directory fires an inotify event per file, and the shell debounces a
+# reload 150ms after any of them, so a copy slower than that gets scanned while
+# it is half written. Staging outside the directory keeps the plugin whole:
+# absent, then complete, never partial.
+#
+# Waiting for discovery replaces guesswork about how long a reload takes. The
+# shell refuses to enable a plugin it has not scanned yet
+# (PluginRegistry.setEnabled), so asking it what it knows is the signal.
 if command -v omarchy >/dev/null 2>&1; then
-  omarchy-shell shell rescanPlugins
+  msg "Installing Omarchy bar plugin"
+  plugins_dir="$HOME/.config/omarchy/plugins"
+  stage="$plugins_dir/.omatalk.add.$$"
+  mkdir -p "$plugins_dir"
+  rm -rf "$stage"
+  cp -r "$OMATALK_HOME/src/plugin" "$stage"
+  rm -rf "$plugins_dir/zerobearing.omatalk"
+  mv "$stage" "$plugins_dir/zerobearing.omatalk"
+  omarchy-shell shell rescanPlugins >/dev/null
+
+  plugin_seen=0
+  for _ in $(seq 1 40); do
+    if omarchy plugin list --json |
+      jq -e 'any(.[]; .id == "zerobearing.omatalk")' >/dev/null 2>&1; then
+      plugin_seen=1
+      break
+    fi
+    sleep 0.05
+  done
+  if (( ! plugin_seen )); then
+    msg "Omarchy did not discover the bar plugin; run: omarchy plugin enable zerobearing.omatalk"
+    exit 1
+  fi
+
+  if ! omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1; then
+    msg "Could not enable the Omarchy bar plugin; run: omarchy plugin enable zerobearing.omatalk"
+    exit 1
+  fi
 fi
+
 "$HOME/.local/bin/omatalk" speak "Welcome to omatalk!" >/dev/null 2>&1
 
 msg "Done. Select text and press F8, or run: omatalk speak|stop|status|upgrade"

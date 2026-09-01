@@ -65,6 +65,7 @@ def make_source(stale=False, plugin="old plugin"):
         "pyproject.toml": "[project]\nname = 'omatalk'\n",
         "systemd/omatalk.service": "[Service]\nExecStart=fake\n",
         "plugin/Megaphone.qml": plugin,
+        "plugin/manifest.json": '{"id": "zerobearing.omatalk"}',
         "current.py": "new source\n",
     }
     if stale:
@@ -119,6 +120,15 @@ esac
 set -eu
 printf 'omarchy %s\\n' "$*" >> "$FAKE_LOG"
 if [ "$1" = pkg ] && [ "$2" = present ]; then exit 0; fi
+if [ "$1" = plugin ] && [ "$2" = list ]; then
+  # The shell only reports a plugin once its files are in place.
+  if [ -f "$HOME/.config/omarchy/plugins/zerobearing.omatalk/manifest.json" ]; then
+    printf '[{"id":"zerobearing.omatalk"}]\n'
+  else
+    printf '[]\n'
+  fi
+  exit 0
+fi
 if [ "$1" = plugin ] && [ "$2" = enable ]; then exit 0; fi
 """
     )
@@ -225,10 +235,14 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     plugin = max(i for i, line in enumerate(lines) if "omarchy plugin enable" in line)
     start = max(i for i, line in enumerate(lines) if "systemctl --user enable --now" in line)
     assert stop < clear
+    # Same sequence as `omarchy plugin add`: one rescan, then wait for the
+    # shell to report the plugin discovered, then enable it once. The shell
+    # refuses to enable a plugin it has not scanned, so the discovery gate is
+    # what makes the enable safe -- not a sleep, and not a second rescan.
     rescans = [i for i, line in enumerate(lines) if "omarchy-shell shell rescanPlugins" in line]
-    assert len(rescans) >= 2
-    assert rescans[-2] < plugin < start < rescans[-1]
-    assert "omarchy-shell shell rescanPlugins" in log.read_text()
+    listed = [i for i, line in enumerate(lines) if "omarchy plugin list" in line]
+    assert len(rescans) == 3
+    assert start < rescans[-1] < listed[-1] < plugin
     assert not any("omarchy restart shell" in line for line in lines)
 
 
