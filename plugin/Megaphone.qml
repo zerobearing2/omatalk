@@ -60,6 +60,7 @@ BarWidget {
     id: stateSocketComponent
 
     Socket {
+      id: stateSocket
       path: root.socketPath
       connected: true
       parser: SplitParser {
@@ -77,7 +78,6 @@ BarWidget {
         }
       }
 
-      onError: root.scheduleReconnect()
     }
   }
 
@@ -85,6 +85,11 @@ BarWidget {
     id: stateSocketLoader
     sourceComponent: stateSocketComponent
     active: true
+  }
+
+  Connections {
+    target: stateSocketLoader.item
+    function onError() { root.scheduleReconnect() }
   }
 
   Timer {

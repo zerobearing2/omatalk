@@ -39,7 +39,8 @@ def test_manifest_points_to_megaphone():
     assert "Speaker.qml" not in manifest["entryPoints"].values()
 
 
-def test_megaphone_socket_widget_round_trip(tmp_path):
+@pytest.mark.parametrize("vertical", [False, True])
+def test_megaphone_socket_widget_round_trip(tmp_path, vertical):
     quickshell = shutil.which("quickshell")
     shell_dir = Path("/usr/share/omarchy/shell")
     if not quickshell or not (shell_dir / "Ui/qmldir").is_file():
@@ -66,7 +67,7 @@ import Quickshell
 ShellRoot {{
   QtObject {{
     id: testBar
-    property bool vertical: false
+    property bool vertical: {str(vertical).lower()}
     property int barSize: 26
     property color barForeground: "#dddddd"
     property color foreground: "#dddddd"
@@ -131,6 +132,13 @@ ShellRoot {{
         output_until(process, "WIDGET_STATE state=speaking")
         connection.sendall(b"unknown\n")
         output_until(process, "WIDGET_STATE state=idle")
+
+        connection.close()
+        connection, _ = server.accept()
+        connection.settimeout(10)
+        assert connection.recv(64) == b"follow\n"
+        connection.sendall(b"speaking\n")
+        output_until(process, "WIDGET_STATE state=speaking")
     finally:
         if connection is not None:
             connection.close()
