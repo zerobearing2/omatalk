@@ -8,14 +8,16 @@ USAGE = "usage: omatalk speak|stop|status"
 
 
 def main():
-    if len(sys.argv) < 2 or sys.argv[1] not in ("speak", "stop", "status"):
+    args = sys.argv[1:]
+    if not args or args[0] not in ("speak", "stop", "status"):
         print(USAGE, file=sys.stderr)
         sys.exit(2)
+    cmd = " ".join(args)
     try:
         client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         client.settimeout(5)
         client.connect(str(socket_path()))
-        client.sendall((" ".join(sys.argv[1:]) + "\n").encode())
+        client.sendall((cmd + "\n").encode())
         print(client.recv(1024).decode().strip())
     except OSError:
         subprocess.run(

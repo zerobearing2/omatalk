@@ -46,14 +46,14 @@ jobs:
       - name: Pack source tarball
         run: |
           # Runtime minimum only: package, service unit, build metadata,
-          # README (referenced by pyproject), uninstaller. No site, tests,
-          # docs, or CI config. The resolved version is written into the
-          # packed pyproject so the tarball self-describes.
+          # README (referenced by pyproject), uninstaller, bar plugin.
+          # No site, tests, docs, or CI config. The resolved version is
+          # written into the packed pyproject so the tarball self-describes.
           sed "s/^version = \".*\"/version = \"${{ steps.ver.outputs.version }}\"/" \
             pyproject.toml > /tmp/pyproject.toml && mv /tmp/pyproject.toml pyproject.toml
           tar --transform "s,^,omatalk/," \
             -czf omatalk-src.tar.gz \
-            omatalk systemd pyproject.toml README.md uninstall.sh
+            omatalk systemd plugin pyproject.toml README.md uninstall.sh
           sha256sum omatalk-src.tar.gz > omatalk-src.tar.gz.sha256
       - name: Create or update release
         env:

@@ -73,6 +73,14 @@ systemctl --user enable --now omatalk.service
 # 6. Client on PATH.
 cp "$OMATALK_HOME/venv/bin/omatalk" "$HOME/.local/bin/omatalk"
 
+# 6b. Bar plugin (Omarchy only).
+if command -v omarchy >/dev/null 2>&1; then
+  msg "Installing Omarchy bar plugin"
+  rm -rf "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
+  cp -r "$OMATALK_HOME/src/plugin" "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
+  omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1 || true
+fi
+
 # 7. Keybindings are user-owned; the installer only prints the command.
 msg "To bind F8, paste this command (safe to re-run):"
 cat <<'EOF'

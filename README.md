@@ -17,6 +17,9 @@ talks to you. Fully local, no network calls at runtime.
    changed, speech just stops. If it has, the old sentence cuts off and the
    new one starts.
 
+On Omarchy, the bar shows a megaphone in the normal bar color and switches it to
+the active color while Omatalk is speaking.
+
 ## Install
 
 On an Omarchy machine:
@@ -35,7 +38,8 @@ The script downloads the latest release tarball (checksum-verified), then:
    `~/.local/share/omatalk/models/`, skipped if already present.
 4. Installs and enables the `omatalk.service` systemd user unit, so the
    daemon is warm from login and survives relogin.
-5. Puts `omatalk` on `PATH` and prints a copy-paste command that adds the F8
+5. Puts `omatalk` on `PATH` and installs the Omarchy bar plugin. The installer
+   then prints a copy-paste command that adds the F8
    binding to `~/.config/hypr/bindings.lua` and reloads Hyprland. The
    installer never edits your keybindings itself.
 
@@ -48,9 +52,9 @@ installer picks up whatever is newest.
 curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
 ```
 
-Stops and removes the systemd service, the launcher, and the source. Asks
-before deleting the models (~185MB) and your config. Remove the F8 binding
-from `~/.config/hypr/bindings.lua` yourself.
+Stops and removes the systemd service, the launcher, the source, and the
+Omarchy bar plugin. Asks before deleting the models (~185MB) and your config.
+Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself.
 
 ## Usage
 
@@ -97,9 +101,9 @@ Voice previews are on the [project site](https://omatalk.zerobearing.com).
 ```
 
 The hotkey runs a one-shot client that sends a request over the socket; the
-daemon does the rest. Its three-verb protocol (`speak` / `stop` / `status`)
-is the single seam: the client, the tests, and any future rewrite all go
-through it.
+daemon does the rest. Its request verbs (`speak` / `stop` / `status`) and the
+streaming `follow` command are the single seam: clients, the bar, tests, and
+any future rewrite all go through it.
 
 ## Design docs
 

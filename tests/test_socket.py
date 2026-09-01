@@ -25,6 +25,51 @@ def test_status_idle(daemon):
     assert send(daemon, "status") == "idle"
 
 
+def test_follow_streams_state(daemon):
+    import socket as s
+
+    client = s.socket(s.AF_UNIX, s.SOCK_STREAM)
+    client.settimeout(10)
+    client.connect(str(daemon["tmp"] / "d.sock"))
+    client.sendall(b"follow\n")
+    rfile = client.makefile("r")
+    assert rfile.readline().strip() == "idle"
+    set_play_ticks(daemon, "20")
+    set_capture(daemon, "One sentence to watch. And a second one.")
+    assert send(daemon, "speak") == "ok"
+    assert rfile.readline().strip() == "speaking"
+    assert rfile.readline().strip() == "idle"
+    client.close()
+    # The follow connection must not have blocked the accept loop.
+    assert send(daemon, "status") == "idle"
+
+
+def test_follow_supports_multiple_bar_instances(daemon):
+    import socket as s
+
+    clients = []
+    readers = []
+    for _ in range(2):
+        client = s.socket(s.AF_UNIX, s.SOCK_STREAM)
+        client.settimeout(10)
+        client.connect(str(daemon["tmp"] / "d.sock"))
+        client.sendall(b"follow\n")
+        clients.append(client)
+        readers.append(client.makefile("r"))
+
+    assert [reader.readline().strip() for reader in readers] == ["idle", "idle"]
+    set_play_ticks(daemon, "20")
+    set_capture(daemon, "Two bar instances.")
+    assert send(daemon, "speak") == "ok"
+    assert [reader.readline().strip() for reader in readers] == ["speaking", "speaking"]
+    assert [reader.readline().strip() for reader in readers] == ["idle", "idle"]
+
+    for reader in readers:
+        reader.close()
+    for client in clients:
+        client.close()
+
+
 def test_speak_captured_text_plays_all_chunks(daemon):
     clear_logs(daemon)
     set_capture(daemon, "Hello there. Second sentence here. Third one.")
