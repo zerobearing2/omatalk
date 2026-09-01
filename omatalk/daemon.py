@@ -1,6 +1,7 @@
 import socket
 import subprocess
 import threading
+import traceback
 
 from .capture import capture_clipboard, capture_primary
 from .chunker import sentences
@@ -86,6 +87,7 @@ class Daemon:
                 self.state = "idle"
         except Exception as e:
             if not cancel.is_set():
+                traceback.print_exc()
                 self._notify(f"error: {e}")
                 self.state = "error"
 
