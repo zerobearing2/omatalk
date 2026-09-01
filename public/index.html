@@ -322,15 +322,70 @@
   /* ---------- bar widget states ---------- */
   .bar-states {
     margin: 34px 0 0;
+    padding: 25px clamp(16px, 3vw, 28px) 0;
     border: 1px solid var(--border-strong);
     border-radius: 12px;
     background: var(--surface);
     overflow: hidden;
     box-shadow: 0 24px 60px -30px rgba(0,0,0,0.5);
   }
-  .bar-states img { display: block; width: 100%; height: auto; }
+  .bar-widget-title {
+    color: var(--accent);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .bar-widget-subtitle {
+    margin-top: 5px;
+    color: var(--muted);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.78rem;
+  }
+  .bar-state-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .bar-state {
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--ink-alt);
+  }
+  .bar-state-head {
+    padding: 13px 15px 10px;
+    color: var(--fg);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .bar-state.speaking .bar-state-head { color: var(--accent); }
+  .bar-state.unavailable .bar-state-head { color: #ff6178; }
+  .bar-state-image { display: block; width: 100%; height: auto; }
+  .bar-state-copy { padding: 14px 15px 17px; }
+  .bar-state-copy strong {
+    display: block;
+    color: var(--fg-dim);
+    font-size: 0.96rem;
+    font-weight: 500;
+  }
+  .bar-state-copy span {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.78rem;
+  }
+  .bar-state.speaking .bar-state-copy strong { color: var(--accent); }
+  .bar-state.unavailable .bar-state-copy strong { color: #ff6178; }
   .bar-states figcaption {
-    padding: 13px 18px 15px;
+    margin-top: 24px;
+    padding: 13px 0 15px;
     border-top: 1px solid var(--border);
     color: var(--muted);
     font-family: "JetBrains Mono", monospace;
@@ -458,6 +513,9 @@
   #roadmap .manifest .row.shipped .why { color: var(--fg-dim); }
   @media (max-width: 640px) {
     .manifest .row { grid-template-columns: 1fr; }
+    .bar-state-grid { grid-template-columns: 1fr; }
+    .bar-state-head { padding-bottom: 9px; }
+    .bar-state-copy { padding-bottom: 16px; }
   }
 
   /* ---------- voice preview ---------- */
@@ -689,8 +747,26 @@
     <h2>One icon, three signals</h2>
     <p class="prose">The megaphone stays in the same place on the Omarchy bar. Its color tells you whether Omatalk is ready, reading your selection, or disconnected.</p>
     <figure class="bar-states">
-      <img src="images/omatalk-bar-states.png" alt="The Omatalk megaphone bar widget in idle, speaking, and unavailable states">
-      <figcaption>Live bar context, enlarged and softened around the Omatalk glyph for clarity.</figcaption>
+      <div class="bar-widget-title">Omatalk bar widget</div>
+      <div class="bar-widget-subtitle">One megaphone glyph. Three useful states.</div>
+      <div class="bar-state-grid">
+        <article class="bar-state idle">
+          <h3 class="bar-state-head">Idle</h3>
+          <img class="bar-state-image" src="images/omatalk-bar-idle.png" alt="Omatalk megaphone in its idle state">
+          <div class="bar-state-copy"><strong>Daemon ready</strong><span>Normal bar color</span></div>
+        </article>
+        <article class="bar-state speaking">
+          <h3 class="bar-state-head">Speaking</h3>
+          <img class="bar-state-image" src="images/omatalk-bar-speaking.png" alt="Omatalk megaphone while speaking">
+          <div class="bar-state-copy"><strong>Reading selection</strong><span>Theme accent</span></div>
+        </article>
+        <article class="bar-state unavailable">
+          <h3 class="bar-state-head">Unavailable</h3>
+          <img class="bar-state-image" src="images/omatalk-bar-unavailable.png" alt="Omatalk megaphone when the daemon is unavailable">
+          <div class="bar-state-copy"><strong>Daemon disconnected</strong><span>Urgent color</span></div>
+        </article>
+      </div>
+      <figcaption>Live bar context, softened around the Omatalk glyph so the state color stays clear.</figcaption>
     </figure>
   </section>
 

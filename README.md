@@ -30,7 +30,23 @@ The bar keeps one megaphone icon in the same spot and changes its color:
 
 The live bar context is softened around the Omatalk glyph so the state colors are easy to spot.
 
-![Omatalk bar widget showing idle, speaking, and unavailable states](public/images/omatalk-bar-states.png)
+### Idle
+
+The daemon is ready and the icon uses the normal bar color.
+
+![Omatalk bar widget in its idle state](public/images/omatalk-bar-idle.png)
+
+### Speaking
+
+Omatalk is reading the current selection in the theme accent color.
+
+![Omatalk bar widget in its speaking state](public/images/omatalk-bar-speaking.png)
+
+### Unavailable
+
+The daemon has been disconnected long enough to show the urgent color.
+
+![Omatalk bar widget in its unavailable state](public/images/omatalk-bar-unavailable.png)
 
 ## Install
 
