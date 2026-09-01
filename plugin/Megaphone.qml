@@ -13,12 +13,10 @@ BarWidget {
   property string daemonState: "idle"
   readonly property string socketOverride: Quickshell.env("OMATALK_SOCKET")
   readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR")
-  property string userId: ""
   readonly property bool speaking: daemonState === "speaking"
   readonly property string socketPath: {
     if (socketOverride !== "") return socketOverride
     if (runtimeDir !== "") return runtimeDir + "/omatalk/omatalk.sock"
-    if (userId !== "") return "/run/user/" + userId + "/omatalk/omatalk.sock"
     return ""
   }
 
@@ -45,36 +43,13 @@ BarWidget {
     useActiveColor: true
     pressable: false
     tooltipText: root.speaking ? "Omatalk is speaking" : "Omatalk"
-    iconComponent: Component {
-      OpticalGlyph {
-        anchors.fill: parent
-        text: "󰃦"
-        fontFamily: button.fontFamily
-        fontSize: button.fontSize
-        color: root.speaking ? button.activeColor : button.foreground
-
-        Behavior on color {
-          enabled: true
-          ColorAnimation { duration: 160 }
-        }
-      }
-    }
-  }
-
-  FileView {
-    path: "/proc/self/status"
-    printErrors: false
-    onLoaded: {
-      var match = text().match(/^Uid:\s+(\d+)/m)
-      if (match) root.userId = match[1]
-    }
+    text: "󰃦"
   }
 
   Component {
     id: stateSocketComponent
 
     Socket {
-      id: stateSocket
       path: root.socketPath
       connected: true
       parser: SplitParser {

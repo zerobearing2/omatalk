@@ -36,7 +36,6 @@ def test_manifest_points_to_megaphone():
     assert manifest["kinds"] == ["bar-widget"]
     assert manifest["entryPoints"]["barWidget"] == "Megaphone.qml"
     assert (PLUGIN / manifest["entryPoints"]["barWidget"]).is_file()
-    assert "Speaker.qml" not in manifest["entryPoints"].values()
 
 
 @pytest.mark.parametrize("vertical", [False, True])

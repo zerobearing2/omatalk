@@ -22,26 +22,7 @@ pkill -f "[o]matalk.daemon" 2>/dev/null || true
 rm -rf "${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk"
 rm -f "$HOME/.local/bin/omatalk" "$HOME/.local/bin/omatalkd"
 if command -v omarchy >/dev/null 2>&1 && [ -d "$HOME/.config/omarchy/plugins/zerobearing.omatalk" ]; then
-  if ! omarchy plugin remove zerobearing.omatalk --yes >/dev/null 2>&1; then
-    shell_config="$HOME/.config/omarchy/shell.json"
-    if [ -f "$shell_config" ]; then
-      shell_config_tmp=$(mktemp)
-      if jq --arg id "zerobearing.omatalk" '
-        if (.bar.layout | type) == "object" then
-          .bar.layout |= with_entries(.value |= map(select((.id // "") != $id)))
-        else . end
-        | if (.plugins | type) == "array" then
-            .plugins |= map(select((.id // "") != $id))
-          else . end
-      ' "$shell_config" > "$shell_config_tmp"; then
-        mv "$shell_config_tmp" "$shell_config"
-      else
-        rm -f "$shell_config_tmp"
-        msg "Could not remove the Omatalk bar entry from $shell_config"
-        exit 1
-      fi
-    fi
-  fi
+  omarchy plugin remove zerobearing.omatalk --yes >/dev/null 2>&1
   rm -rf "$HOME/.config/omarchy/plugins"/.zerobearing.omatalk.bak.*
 fi
 rm -rf "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
