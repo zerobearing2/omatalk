@@ -11,9 +11,12 @@ BarWidget {
 
   moduleName: "zerobearing.omatalk"
   property string daemonState: "idle"
+  property bool connectionLost: false
   readonly property string socketOverride: Quickshell.env("OMATALK_SOCKET")
   readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR")
   readonly property bool speaking: daemonState === "speaking"
+  readonly property bool daemonUnavailable: daemonState === "error"
+    || (connectionLost && !reconnectGrace.running)
   readonly property string socketPath: {
     if (socketOverride !== "") return socketOverride
     if (runtimeDir !== "") return runtimeDir + "/omatalk/omatalk.sock"
@@ -28,6 +31,8 @@ BarWidget {
 
   function scheduleReconnect() {
     daemonState = "idle"
+    connectionLost = true
+    if (!reconnectGrace.running) reconnectGrace.start()
     if (!retry.running) retry.start()
   }
 
@@ -38,11 +43,12 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    active: root.speaking
-    activeColor: Color.accent
+    active: root.speaking || root.daemonUnavailable
+    activeColor: root.daemonUnavailable ? Color.urgent : Color.accent
     useActiveColor: true
     pressable: false
-    tooltipText: root.speaking ? "Omatalk is speaking" : "Omatalk"
+    tooltipText: root.daemonUnavailable ? "Omatalk is unavailable"
+      : (root.speaking ? "Omatalk is speaking" : "Omatalk")
     text: "󰃦"
   }
 
@@ -59,6 +65,8 @@ BarWidget {
       onConnectionStateChanged: {
         if (connected) {
           retry.stop()
+          reconnectGrace.stop()
+          root.connectionLost = false
           root.daemonState = "idle"
           write("follow\n")
           flush()
@@ -89,6 +97,12 @@ BarWidget {
       stateSocketLoader.active = false
       reconnect.start()
     }
+  }
+
+  Timer {
+    id: reconnectGrace
+    interval: 3000
+    repeat: false
   }
 
   Timer {

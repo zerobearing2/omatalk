@@ -94,6 +94,9 @@ ShellRoot {{
     function onDaemonStateChanged() {{
       console.warn("WIDGET_STATE state=" + widgetLoader.item.daemonState)
     }}
+    function onDaemonUnavailableChanged() {{
+      console.warn("WIDGET_UNAVAILABLE unavailable=" + widgetLoader.item.daemonUnavailable)
+    }}
   }}
 }}
 '''
@@ -131,11 +134,25 @@ ShellRoot {{
         output_until(process, "WIDGET_STATE state=speaking")
         connection.sendall(b"unknown\n")
         output_until(process, "WIDGET_STATE state=idle")
+        connection.sendall(b"error\n")
+        output_until(process, "WIDGET_UNAVAILABLE unavailable=true")
+        connection.sendall(b"idle\n")
+        output_until(process, "WIDGET_UNAVAILABLE unavailable=false")
 
         connection.close()
+        connection = None
+        server.close()
+        socket_path.unlink(missing_ok=True)
+        output_until(process, "WIDGET_UNAVAILABLE unavailable=true", timeout=6)
+
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(str(socket_path))
+        server.listen(1)
+        server.settimeout(10)
         connection, _ = server.accept()
         connection.settimeout(10)
         assert connection.recv(64) == b"follow\n"
+        output_until(process, "WIDGET_UNAVAILABLE unavailable=false")
         connection.sendall(b"speaking\n")
         output_until(process, "WIDGET_STATE state=speaking")
     finally:
