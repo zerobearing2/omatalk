@@ -39,14 +39,18 @@ def test_cli_rejects_follow(daemon):
     assert result.stderr.startswith("usage: omatalk")
 
 
-def test_follow_streams_state(daemon):
+def follow_client(daemon):
     import socket as s
 
     client = s.socket(s.AF_UNIX, s.SOCK_STREAM)
     client.settimeout(10)
     client.connect(str(daemon["tmp"] / "d.sock"))
     client.sendall(b"follow\n")
-    rfile = client.makefile("r")
+    return client, client.makefile("r")
+
+
+def test_follow_streams_state(daemon):
+    client, rfile = follow_client(daemon)
     assert rfile.readline().strip() == "idle"
     set_play_ticks(daemon, "20")
     set_capture(daemon, "One sentence to watch. And a second one.")
@@ -59,16 +63,10 @@ def test_follow_streams_state(daemon):
 
 
 def test_follow_catches_change_before_initial_reply_is_read(daemon):
-    import socket as s
-
-    client = s.socket(s.AF_UNIX, s.SOCK_STREAM)
-    client.settimeout(10)
-    client.connect(str(daemon["tmp"] / "d.sock"))
-    client.sendall(b"follow\n")
+    client, reader = follow_client(daemon)
     set_play_ticks(daemon, "20")
     set_capture(daemon, "Immediate follow transition.")
     assert send(daemon, "speak") == "ok"
-    reader = client.makefile("r")
 
     assert reader.readline().strip() == "idle"
     assert reader.readline().strip() == "speaking"
@@ -78,17 +76,12 @@ def test_follow_catches_change_before_initial_reply_is_read(daemon):
 
 
 def test_follow_supports_multiple_bar_instances(daemon):
-    import socket as s
-
     clients = []
     readers = []
     for _ in range(2):
-        client = s.socket(s.AF_UNIX, s.SOCK_STREAM)
-        client.settimeout(10)
-        client.connect(str(daemon["tmp"] / "d.sock"))
-        client.sendall(b"follow\n")
+        client, reader = follow_client(daemon)
         clients.append(client)
-        readers.append(client.makefile("r"))
+        readers.append(reader)
 
     assert [reader.readline().strip() for reader in readers] == ["idle", "idle"]
     set_play_ticks(daemon, "20")

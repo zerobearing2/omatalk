@@ -37,7 +37,7 @@ class Daemon:
         self._thread = None
         self._current_text = ""
         self._last_busy = time.monotonic()
-        self._cond = threading.Condition()
+        self._state_condition = threading.Condition()
 
     def _notify(self, msg: str):
         subprocess.run(
@@ -94,14 +94,14 @@ class Daemon:
         return time.monotonic() - self._last_busy
 
     def _set_state(self, state: str):
-        with self._cond:
+        with self._state_condition:
             self.state = state
-            self._cond.notify_all()
+            self._state_condition.notify_all()
 
     def follow(self, conn: socket.socket):
         # Snapshot and register under one condition lock so a transition
         # cannot land between the initial reply and the follower's baseline.
-        with self._cond:
+        with self._state_condition:
             initial = self.state
             conn.sendall((initial + "\n").encode())
             threading.Thread(
@@ -114,8 +114,8 @@ class Daemon:
         # Streams state lines to one bar widget until it hangs up.
         try:
             while True:
-                with self._cond:
-                    self._cond.wait_for(lambda: self.state != last, timeout=1.0)
+                with self._state_condition:
+                    self._state_condition.wait_for(lambda: self.state != last, timeout=1.0)
                     state = self.state
                 if state != last:
                     conn.sendall((state + "\n").encode())

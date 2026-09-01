@@ -23,9 +23,10 @@ rm -rf "${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk"
 rm -f "$HOME/.local/bin/omatalk" "$HOME/.local/bin/omatalkd"
 if command -v omarchy >/dev/null 2>&1 && [ -d "$HOME/.config/omarchy/plugins/zerobearing.omatalk" ]; then
   omarchy plugin remove zerobearing.omatalk --yes
+  rm -rf "$HOME/.config/omarchy/plugins"/.zerobearing.omatalk.bak.*
 fi
 rm -rf "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
-msg "Service stopped and removed; stray daemons killed; launcher and bar plugin removed"
+msg "Daemon stopped and removed; stray daemons killed; launcher and bar plugin removed"
 
 if [ -d "$OMATALK_HOME" ]; then
   read -r -p "Remove $OMATALK_HOME (source, venv, ~340MB models)? [y/N] " answer < "$ASK_FROM"
