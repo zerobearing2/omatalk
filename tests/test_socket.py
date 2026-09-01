@@ -58,6 +58,25 @@ def test_follow_streams_state(daemon):
     assert send(daemon, "status") == "idle"
 
 
+def test_follow_catches_change_before_initial_reply_is_read(daemon):
+    import socket as s
+
+    client = s.socket(s.AF_UNIX, s.SOCK_STREAM)
+    client.settimeout(10)
+    client.connect(str(daemon["tmp"] / "d.sock"))
+    client.sendall(b"follow\n")
+    set_play_ticks(daemon, "20")
+    set_capture(daemon, "Immediate follow transition.")
+    assert send(daemon, "speak") == "ok"
+    reader = client.makefile("r")
+
+    assert reader.readline().strip() == "idle"
+    assert reader.readline().strip() == "speaking"
+    assert reader.readline().strip() == "idle"
+    reader.close()
+    client.close()
+
+
 def test_follow_supports_multiple_bar_instances(daemon):
     import socket as s
 

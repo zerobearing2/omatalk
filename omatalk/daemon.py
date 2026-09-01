@@ -115,7 +115,7 @@ class Daemon:
         try:
             while True:
                 with self._cond:
-                    self._cond.wait(timeout=1.0)
+                    self._cond.wait_for(lambda: self.state != last, timeout=1.0)
                     state = self.state
                 if state != last:
                     conn.sendall((state + "\n").encode())
