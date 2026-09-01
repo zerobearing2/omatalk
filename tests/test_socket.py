@@ -1,3 +1,5 @@
+import subprocess
+import sys
 import time
 
 from conftest import (
@@ -23,6 +25,75 @@ def test_unknown_command(daemon):
 
 def test_status_idle(daemon):
     assert send(daemon, "status") == "idle"
+
+
+def test_cli_rejects_follow(daemon):
+    result = subprocess.run(
+        [sys.executable, "-m", "omatalk.cli", "status", "--follow"],
+        cwd=REPO,
+        env=daemon["env"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert result.stderr.startswith("usage: omatalk")
+
+
+def follow_client(daemon):
+    import socket as s
+
+    client = s.socket(s.AF_UNIX, s.SOCK_STREAM)
+    client.settimeout(10)
+    client.connect(str(daemon["tmp"] / "d.sock"))
+    client.sendall(b"follow\n")
+    return client, client.makefile("r")
+
+
+def test_follow_streams_state(daemon):
+    client, rfile = follow_client(daemon)
+    assert rfile.readline().strip() == "idle"
+    set_play_ticks(daemon, "20")
+    set_capture(daemon, "One sentence to watch. And a second one.")
+    assert send(daemon, "speak") == "ok"
+    assert rfile.readline().strip() == "speaking"
+    assert rfile.readline().strip() == "idle"
+    client.close()
+    # The follow connection must not have blocked the accept loop.
+    assert send(daemon, "status") == "idle"
+
+
+def test_follow_catches_change_before_initial_reply_is_read(daemon):
+    client, reader = follow_client(daemon)
+    set_play_ticks(daemon, "20")
+    set_capture(daemon, "Immediate follow transition.")
+    assert send(daemon, "speak") == "ok"
+
+    assert reader.readline().strip() == "idle"
+    assert reader.readline().strip() == "speaking"
+    assert reader.readline().strip() == "idle"
+    reader.close()
+    client.close()
+
+
+def test_follow_supports_multiple_bar_instances(daemon):
+    clients = []
+    readers = []
+    for _ in range(2):
+        client, reader = follow_client(daemon)
+        clients.append(client)
+        readers.append(reader)
+
+    assert [reader.readline().strip() for reader in readers] == ["idle", "idle"]
+    set_play_ticks(daemon, "20")
+    set_capture(daemon, "Two bar instances.")
+    assert send(daemon, "speak") == "ok"
+    assert [reader.readline().strip() for reader in readers] == ["speaking", "speaking"]
+    assert [reader.readline().strip() for reader in readers] == ["idle", "idle"]
+
+    for reader in readers:
+        reader.close()
+    for client in clients:
+        client.close()
 
 
 def test_speak_captured_text_plays_all_chunks(daemon):

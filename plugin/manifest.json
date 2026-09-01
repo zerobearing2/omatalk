@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "zerobearing.omatalk",
+  "name": "Omatalk",
+  "version": "1.0.0",
+  "author": "Zerobearing",
+  "license": "MIT",
+  "description": "Megaphone icon in the Omarchy bar while Omatalk is speaking.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Megaphone.qml"
+  },
+  "barWidget": {
+    "displayName": "Omatalk",
+    "description": "Shows a megaphone while Omatalk reads text aloud.",
+    "category": "Utility",
+    "aliases": [
+      "tts",
+      "speech",
+      "speak"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

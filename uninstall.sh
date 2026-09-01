@@ -21,7 +21,12 @@ systemctl --user daemon-reload
 pkill -f "[o]matalk.daemon" 2>/dev/null || true
 rm -rf "${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk"
 rm -f "$HOME/.local/bin/omatalk" "$HOME/.local/bin/omatalkd"
-msg "Service stopped and removed; stray daemons killed; launcher removed"
+if command -v omarchy >/dev/null 2>&1 && [ -d "$HOME/.config/omarchy/plugins/zerobearing.omatalk" ]; then
+  omarchy plugin remove zerobearing.omatalk --yes >/dev/null 2>&1
+  rm -rf "$HOME/.config/omarchy/plugins"/.zerobearing.omatalk.bak.*
+fi
+rm -rf "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
+msg "Daemon stopped and removed; stray daemons killed; launcher and bar plugin removed"
 
 if [ -d "$OMATALK_HOME" ]; then
   read -r -p "Remove $OMATALK_HOME (source, venv, ~340MB models)? [y/N] " answer < "$ASK_FROM"

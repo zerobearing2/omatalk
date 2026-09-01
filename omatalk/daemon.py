@@ -37,6 +37,7 @@ class Daemon:
         self._thread = None
         self._current_text = ""
         self._last_busy = time.monotonic()
+        self._state_condition = threading.Condition()
 
     def _notify(self, msg: str):
         subprocess.run(
@@ -75,7 +76,7 @@ class Daemon:
         cancel = threading.Event()
         self._cancel = cancel
         self._current_text = text
-        self.state = "speaking"
+        self._set_state("speaking")
         self._thread = threading.Thread(
             target=self._run, args=(text, cancel), daemon=True
         )
@@ -84,13 +85,47 @@ class Daemon:
     def stop(self):
         self.touch()
         self._stop_current()
-        self.state = "idle"
+        self._set_state("idle")
 
     def touch(self):
         self._last_busy = time.monotonic()
 
     def idle_seconds(self):
         return time.monotonic() - self._last_busy
+
+    def _set_state(self, state: str):
+        with self._state_condition:
+            self.state = state
+            self._state_condition.notify_all()
+
+    def follow(self, conn: socket.socket):
+        # Snapshot and register under one condition lock so a transition
+        # cannot land between the initial reply and the follower's baseline.
+        with self._state_condition:
+            initial = self.state
+            conn.sendall((initial + "\n").encode())
+            threading.Thread(
+                target=self._follow_push,
+                args=(conn, initial),
+                daemon=True,
+            ).start()
+
+    def _follow_push(self, conn: socket.socket, last: str):
+        # Streams state lines to one bar widget until it hangs up.
+        try:
+            while True:
+                with self._state_condition:
+                    self._state_condition.wait_for(lambda: self.state != last, timeout=1.0)
+                    state = self.state
+                if state != last:
+                    conn.sendall((state + "\n").encode())
+                    last = state
+                elif _client_closed(conn):
+                    return
+        except OSError:
+            pass
+        finally:
+            conn.close()
 
     def _run(self, text: str, cancel: threading.Event):
         try:
@@ -110,12 +145,12 @@ class Daemon:
             if proc:
                 proc.wait()
             if not cancel.is_set():
-                self.state = "idle"
+                self._set_state("idle")
         except Exception as e:
             if not cancel.is_set():
                 traceback.print_exc()
                 self._notify(f"error: {e}")
-                self.state = "error"
+                self._set_state("error")
 
 
 def handle(daemon: Daemon, line: str) -> str:
@@ -130,6 +165,15 @@ def handle(daemon: Daemon, line: str) -> str:
     if cmd == "status":
         return daemon.state
     return "unknown command"
+
+
+def _client_closed(conn: socket.socket) -> bool:
+    try:
+        return conn.recv(1, socket.MSG_PEEK | socket.MSG_DONTWAIT) == b""
+    except BlockingIOError:
+        return False
+    except OSError:
+        return True
 
 
 def serve():
@@ -153,13 +197,20 @@ def serve():
                     break
                 continue
             try:
-                with conn:
-                    line = conn.makefile("r").readline()
-                    if not line:
-                        continue
-                    reply = handle(daemon, line.strip())
+                with conn.makefile("r") as reader:
+                    line = reader.readline()
+                if not line:
+                    conn.close()
+                    continue
+                cmd = line.strip()
+                if cmd == "follow":
+                    daemon.follow(conn)
+                else:
+                    reply = handle(daemon, cmd)
                     conn.sendall((reply + "\n").encode())
+                    conn.close()
             except (TimeoutError, OSError):
+                conn.close()
                 continue
     finally:
         path.unlink(missing_ok=True)
