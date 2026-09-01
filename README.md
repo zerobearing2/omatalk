@@ -101,6 +101,71 @@ omatalk upgrade               # install the latest release
 `systemctl --user start|stop|restart omatalk` controls the daemon.
 `journalctl --user -u omatalk -f` shows logs.
 
+## Troubleshooting
+
+The red megaphone means `unavailable`. The widget has either received the
+daemon's `error` state or has lost its `follow` socket connection for more than
+three seconds. It does not mean that speech is active.
+
+Run these commands on the affected machine and keep their output together:
+
+```sh
+omatalk status
+systemctl --user status omatalk.service --no-pager -l
+journalctl --user -u omatalk.service -b --no-pager -n 80
+stat -c '%A %U:%G %n' "${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk/omatalk.sock" \
+  ~/.config/omarchy/plugins/zerobearing.omatalk/manifest.json \
+  ~/.config/omarchy/plugins/zerobearing.omatalk/Megaphone.qml
+ss -xap | grep -E 'omatalk|quickshell'
+omarchy plugin list --json | grep -C 3 'zerobearing.omatalk'
+omarchy-shell shell listPlugins | grep -C 3 'zerobearing.omatalk'
+```
+
+Record which symptom you see: the icon is missing, present and red, present and
+normal, or changes color while F8 still fails. Also record whether F8 works,
+and when the problem started, especially after install, upgrade, or a shell
+restart. The widget needs both a running daemon and a live Quickshell
+connection to the daemon socket.
+
+After collecting the evidence, start an inactive daemon with
+`systemctl --user start omatalk.service`. If `omatalk status` works but the
+socket has no Quickshell peer, run `omarchy restart shell`.
+
+### Prompt for a local agent
+
+Paste this into an agent running on the affected machine:
+
+```text
+Debug my Omatalk installation and report the root cause. The symptom is:
+<describe missing, red, normal, or wrong-color icon; say whether F8 works>
+
+Run the Omatalk troubleshooting commands from README.md. Capture the current
+time and separate these checks:
+
+1. Is omatalk.service active and does `omatalk status` work?
+2. Is the socket present, and is a Quickshell process connected to it?
+3. Is zerobearing.omatalk present, discovered, and enabled?
+4. Do recent systemd or Quickshell logs show a QML/plugin load error?
+
+Preserve ~/.config/omatalk/config.toml, ~/.config/hypr/bindings.lua, and the
+Omarchy shell layout. Ask before making changes. Use the smallest targeted
+repair, then verify both `omatalk status` and the Quickshell socket connection.
+Do not call the problem fixed without saying what evidence proved it.
+
+Return this report:
+
+Symptom:
+Observed state:
+Evidence:
+Root cause:
+Commands or files changed:
+Verification:
+Remaining uncertainty:
+
+Redact credentials, tokens, and unrelated private log content before sharing
+the report.
+```
+
 ## Config
 
 `~/.config/omatalk/config.toml`:
