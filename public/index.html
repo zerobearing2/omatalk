@@ -3,9 +3,58 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Omatalk</title>
+<title>Omatalk: local TTS for Omarchy</title>
 <meta name="description" content="Select text, press a key, and the machine reads it back. A local, always-warm text-to-speech daemon for Omarchy: the reverse of dictation.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23151210'/%3E%3Cpath d='M8 34h5l4-14 6 28 6-36 6 32 5-18 5 8h6' stroke='%23ec7a4c' stroke-width='4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="author" content="Dave Bradford">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#151210" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#eef0ea" media="(prefers-color-scheme: light)">
+<link rel="canonical" href="https://omatalk.zerobearing.com/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_US">
+<meta property="og:site_name" content="Omatalk">
+<meta property="og:url" content="https://omatalk.zerobearing.com/">
+<meta property="og:title" content="Omatalk: local TTS for Omarchy">
+<meta property="og:description" content="Select text, press a key, and the machine reads it back. Fully local, no cloud, no API key.">
+<meta property="og:image" content="https://omatalk.zerobearing.com/images/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Omatalk: Select text. Press a key. It talks.">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@zerobearing2">
+<meta name="twitter:creator" content="@zerobearing2">
+<meta name="twitter:title" content="Omatalk: local TTS for Omarchy">
+<meta name="twitter:description" content="Select text, press a key, and the machine reads it back. Fully local, no cloud, no API key.">
+<meta name="twitter:image" content="https://omatalk.zerobearing.com/images/og.png">
+<meta name="twitter:image:alt" content="Omatalk: Select text. Press a key. It talks.">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Omatalk",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "Linux",
+  "url": "https://omatalk.zerobearing.com/",
+  "description": "Select text, press a key, and the machine reads it back. A local, always-warm text-to-speech daemon for Omarchy.",
+  "license": "https://opensource.org/license/mit",
+  "author": {
+    "@type": "Person",
+    "name": "Dave Bradford",
+    "url": "https://zerobearing.com"
+  },
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@1,400;1,500&display=swap" rel="stylesheet">
@@ -143,6 +192,15 @@
     border: 1px solid var(--border-strong);
     border-radius: 999px;
     padding: 5px 12px;
+    text-decoration: none;
+  }
+  .for-omarchy:hover, .for-omarchy:focus-visible {
+    color: var(--accent);
+    border-color: var(--accent);
+    outline: none;
+  }
+  @media (max-width: 560px) {
+    .for-omarchy { display: none; }
   }
 
   .gh-link {
@@ -403,6 +461,17 @@
 
   .prose { max-width: 66ch; margin-top: 22px; color: var(--fg-dim); font-size: 1.04rem; }
   .prose p + p { margin-top: 1.1em; }
+  .prose a, .manifest .row .why a {
+    color: var(--fg);
+    text-decoration: none;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .prose a:hover, .prose a:focus-visible,
+  .manifest .row .why a:hover, .manifest .row .why a:focus-visible {
+    color: var(--accent);
+    border-color: var(--accent);
+    outline: none;
+  }
 
   blockquote.pull {
     margin: 34px 0 0;
@@ -670,18 +739,46 @@
     border-top: 1px solid var(--border);
     padding: 34px 0 44px;
   }
-  .foot-row {
+  .foot {
     display: flex;
-    flex-wrap: wrap;
     justify-content: space-between;
-    gap: 16px;
+    align-items: flex-start;
+    gap: 20px 48px;
     font-family: "JetBrains Mono", monospace;
     font-size: 0.78rem;
     color: var(--muted);
   }
-  .foot-row a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border-strong); }
-  .foot-row a:hover, .foot-row a:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
-  .foot-credit { margin-top: 14px; gap: 16px 20px; }
+  .foot-left {
+    display: grid;
+    gap: 8px;
+  }
+  .foot-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px 18px;
+    max-width: 22rem;
+  }
+  .foot a {
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .foot a:hover, .foot a:focus-visible {
+    color: var(--accent);
+    border-color: var(--accent);
+    outline: none;
+  }
+  @media (max-width: 640px) {
+    .foot {
+      flex-direction: column;
+      gap: 16px;
+    }
+    .foot-links {
+      justify-content: flex-start;
+      max-width: none;
+    }
+  }
 
   @media (prefers-reduced-motion: reduce) {
     * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
@@ -694,7 +791,7 @@
   <div class="topbar">
     <div class="wordmark"><span class="dot"></span>omatalk</div>
     <div class="topbar-right">
-      <div class="for-omarchy">for Omarchy · Hyprland</div>
+      <a class="for-omarchy" href="https://omarchy.org" target="_blank" rel="noopener">for Omarchy · Hyprland</a>
       <a class="gh-link" href="https://github.com/zerobearing2/omatalk" target="_blank" rel="noopener" aria-label="Omatalk on GitHub">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.64 0 8.13c0 3.6 2.29 6.65 5.47 7.72.4.08.55-.17.55-.39 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.5-2.69-.96-.09-.23-.48-.96-.82-1.15-.28-.15-.68-.53-.01-.54.63-.01 1.08.58 1.23.83.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .22.15.48.55.39A8.13 8.13 0 0 0 16 8.13C16 3.64 12.42 0 8 0Z"/></svg>
       </a>
@@ -711,6 +808,7 @@
         <a href="#stack">How it's built</a>
         <a href="#architecture">Architecture</a>
         <a href="#roadmap">Roadmap</a>
+        <a href="#credits">Credits</a>
       </nav>
     </div>
   </div>
@@ -920,17 +1018,17 @@
       <div class="bar-state-grid">
         <article class="bar-state idle">
           <h3 class="bar-state-head">Idle</h3>
-          <img class="bar-state-image" src="images/omatalk-bar-idle.png" alt="Omatalk megaphone in its idle state">
+          <img class="bar-state-image" src="images/omatalk-bar-idle.png" alt="Omatalk megaphone in its idle state" width="420" height="155" loading="lazy" decoding="async">
           <div class="bar-state-copy"><strong>Daemon ready</strong><span>Normal bar color</span></div>
         </article>
         <article class="bar-state speaking">
           <h3 class="bar-state-head">Speaking</h3>
-          <img class="bar-state-image" src="images/omatalk-bar-speaking.png" alt="Omatalk megaphone while speaking">
+          <img class="bar-state-image" src="images/omatalk-bar-speaking.png" alt="Omatalk megaphone while speaking" width="420" height="155" loading="lazy" decoding="async">
           <div class="bar-state-copy"><strong>Reading selection</strong><span>Theme accent</span></div>
         </article>
         <article class="bar-state unavailable">
           <h3 class="bar-state-head">Unavailable</h3>
-          <img class="bar-state-image" src="images/omatalk-bar-unavailable.png" alt="Omatalk megaphone when the daemon is unavailable">
+          <img class="bar-state-image" src="images/omatalk-bar-unavailable.png" alt="Omatalk megaphone when the daemon is unavailable" width="420" height="155" loading="lazy" decoding="async">
           <div class="bar-state-copy"><strong>Daemon disconnected</strong><span>Urgent color</span></div>
         </article>
       </div>
@@ -942,7 +1040,7 @@
     <div class="eyebrow">how it's built</div>
     <h2>No cloud in the loop</h2>
     <div class="manifest">
-      <div class="row"><div class="name">Kokoro-82M</div><div class="why">ONNX Runtime, CPU. Chosen over Piper (fast but audibly robotic) and XTTS/Chatterbox (GPU-sized, restrictive licenses). Near top-of-class naturalness with a ~185MB fp16 download, faster than real time on a mid-range laptop CPU.</div></div>
+      <div class="row"><div class="name">Kokoro-82M</div><div class="why">ONNX Runtime, CPU, via <a href="https://github.com/thewh1teagle/kokoro-onnx" target="_blank" rel="noopener">kokoro-onnx</a> by <a href="https://github.com/thewh1teagle" target="_blank" rel="noopener">thewh1teagle</a>. Model and original inference by <a href="https://github.com/hexgrad/kokoro" target="_blank" rel="noopener">hexgrad</a>. Chosen over Piper (fast but audibly robotic) and XTTS/Chatterbox (GPU-sized, restrictive licenses). Near top-of-class naturalness with a ~185MB fp16 download, faster than real time on a mid-range laptop CPU.</div></div>
       <div class="row"><div class="name">Python daemon (uv)</div><div class="why">Keeps the model warm in memory so a hotkey press never pays a 10–30s cold-load tax. Talks over a Unix socket with a three-verb protocol: <code class="mono" style="background:none;border:none;padding:0;">speak</code> / <code class="mono" style="background:none;border:none;padding:0;">stop</code> / <code class="mono" style="background:none;border:none;padding:0;">status</code>.</div></div>
       <div class="row"><div class="name">wl-paste --primary</div><div class="why">Reads the Wayland primary selection directly: no synthetic keystrokes, no clipboard mutation, no keyboard-injection daemon.</div></div>
       <div class="row"><div class="name">PipeWire</div><div class="why"><code class="mono" style="background:none;border:none;padding:0;">pw-play</code> streams PCM chunks into the existing audio graph as they're synthesized, layering over whatever else is playing.</div></div>
@@ -988,17 +1086,37 @@
     </div>
   </section>
 
+  <section id="credits">
+    <div class="eyebrow">credits</div>
+    <h2>The voice and the OS</h2>
+    <div class="prose">
+      <p>The neural voice is <a href="https://huggingface.co/hexgrad/Kokoro-82M" target="_blank" rel="noopener">Kokoro-82M</a>
+        by <a href="https://github.com/hexgrad/kokoro" target="_blank" rel="noopener">hexgrad</a>.
+        Omatalk runs it through <a href="https://github.com/thewh1teagle/kokoro-onnx" target="_blank" rel="noopener">kokoro-onnx</a>
+        by <a href="https://github.com/thewh1teagle" target="_blank" rel="noopener">thewh1teagle</a>,
+        the Python ONNX package the daemon imports.</p>
+      <p>Omatalk is built for <a href="https://omarchy.org" target="_blank" rel="noopener">Omarchy</a> by DHH.
+        The bar plugin, the F8/F9 pairing, and the installer all sit on that desktop.
+        Source: <a href="https://github.com/omacom/omarchy" target="_blank" rel="noopener">github.com/omacom/omarchy</a>.</p>
+    </div>
+  </section>
+
 </main>
 
 <footer>
-  <div class="wrap foot-row">
-    <span>MIT License</span>
-    <span>Built for the Omarchy</span>
-    <span>No telemetry. No network calls at runtime.</span>
-  </div>
-  <div class="wrap foot-row foot-credit">
-    <span>&copy; 2026 <a href="https://zerobearing.com" target="_blank" rel="noopener">Dave Bradford</a></span>
-    <span><a href="https://github.com/zerobearing2/omatalk" target="_blank" rel="noopener">GitHub</a></span>
+  <div class="wrap foot">
+    <div class="foot-left">
+      <span>&copy; 2026 <a href="https://zerobearing.com" target="_blank" rel="noopener">Dave Bradford</a></span>
+      <span>Built for <a href="https://omarchy.org" target="_blank" rel="noopener">Omarchy</a></span>
+      <span>No telemetry. No network calls at runtime.</span>
+    </div>
+    <nav class="foot-links" aria-label="Credits">
+      <a href="https://github.com/hexgrad/kokoro" target="_blank" rel="noopener">kokoro</a>
+      <a href="https://github.com/thewh1teagle/kokoro-onnx" target="_blank" rel="noopener">kokoro-onnx</a>
+      <a href="https://github.com/omacom/omarchy" target="_blank" rel="noopener">omarchy</a>
+      <a href="https://github.com/zerobearing2/omatalk" target="_blank" rel="noopener">GitHub</a>
+      <span>MIT</span>
+    </nav>
   </div>
 </footer>
 
