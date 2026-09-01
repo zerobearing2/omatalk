@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 import qs.Ui
 
 BarWidget {
@@ -40,7 +41,7 @@ BarWidget {
     anchors.fill: parent
     bar: root.bar
     active: root.speaking
-    activeColor: "#85dacc"
+    activeColor: Color.accent
     useActiveColor: true
     pressable: false
     tooltipText: root.speaking ? "Omatalk is speaking" : "Omatalk"
