@@ -98,6 +98,35 @@ class Daemon:
             self.state = state
             self._cond.notify_all()
 
+    def follow(self, conn: socket.socket):
+        # Snapshot and register under one condition lock so a transition
+        # cannot land between the initial reply and the follower's baseline.
+        with self._cond:
+            initial = self.state
+            conn.sendall((initial + "\n").encode())
+            threading.Thread(
+                target=self._follow_push,
+                args=(conn, initial),
+                daemon=True,
+            ).start()
+
+    def _follow_push(self, conn: socket.socket, last: str):
+        # Streams state lines to one bar widget until it hangs up.
+        try:
+            while True:
+                with self._cond:
+                    self._cond.wait(timeout=1.0)
+                    state = self.state
+                if state != last:
+                    conn.sendall((state + "\n").encode())
+                    last = state
+                elif _client_closed(conn):
+                    return
+        except OSError:
+            pass
+        finally:
+            conn.close()
+
     def _run(self, text: str, cancel: threading.Event):
         try:
             proc = None
@@ -147,24 +176,6 @@ def _client_closed(conn: socket.socket) -> bool:
         return True
 
 
-def _follow_push(daemon: Daemon, conn: socket.socket, last: str):
-    # Streams state lines to one bar widget until it hangs up.
-    try:
-        while True:
-            with daemon._cond:
-                daemon._cond.wait(timeout=1.0)
-                state = daemon.state
-            if state != last:
-                conn.sendall((state + "\n").encode())
-                last = state
-            elif _client_closed(conn):
-                return
-    except OSError:
-        pass
-    finally:
-        conn.close()
-
-
 def serve():
     cfg = load()
     daemon = Daemon(cfg)
@@ -193,17 +204,7 @@ def serve():
                     continue
                 cmd = line.strip()
                 if cmd == "follow":
-                    # Snapshot and register under one condition lock so a
-                    # transition cannot land between the initial reply and
-                    # the follower's baseline.
-                    with daemon._cond:
-                        initial = daemon.state
-                        conn.sendall((initial + "\n").encode())
-                        threading.Thread(
-                            target=_follow_push,
-                            args=(daemon, conn, initial),
-                            daemon=True,
-                        ).start()
+                    daemon.follow(conn)
                 else:
                     reply = handle(daemon, cmd)
                     conn.sendall((reply + "\n").encode())

@@ -1,3 +1,5 @@
+import subprocess
+import sys
 import time
 
 from conftest import (
@@ -23,6 +25,18 @@ def test_unknown_command(daemon):
 
 def test_status_idle(daemon):
     assert send(daemon, "status") == "idle"
+
+
+def test_cli_rejects_follow(daemon):
+    result = subprocess.run(
+        [sys.executable, "-m", "omatalk.cli", "status", "--follow"],
+        cwd=REPO,
+        env=daemon["env"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert result.stderr.startswith("usage: omatalk")
 
 
 def test_follow_streams_state(daemon):

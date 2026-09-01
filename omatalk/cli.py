@@ -9,7 +9,8 @@ USAGE = "usage: omatalk speak|stop|status"
 
 def main():
     args = sys.argv[1:]
-    if not args or args[0] not in ("speak", "stop", "status"):
+    if (not args or args[0] not in ("speak", "stop", "status")
+            or (args[0] != "speak" and len(args) > 1)):
         print(USAGE, file=sys.stderr)
         sys.exit(2)
     cmd = " ".join(args)

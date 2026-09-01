@@ -17,9 +17,10 @@ BarWidget {
     return Quickshell.env("XDG_RUNTIME_DIR") + "/omatalk/omatalk.sock"
   }
 
-  function update(raw) {
+  function applyState(raw) {
     var next = String(raw).trim()
-    if (next === "idle" || next === "speaking" || next === "error") daemonState = next
+    daemonState = next === "idle" || next === "speaking" || next === "error"
+      ? next : "idle"
   }
 
   function scheduleReconnect() {
@@ -48,7 +49,7 @@ BarWidget {
       path: root.socketPath
       connected: true
       parser: SplitParser {
-        onRead: function(data) { root.update(data) }
+        onRead: function(data) { root.applyState(data) }
       }
 
       onConnectionStateChanged: {

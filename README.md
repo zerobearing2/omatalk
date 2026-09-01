@@ -100,7 +100,7 @@ Voice previews are on the [project site](https://omatalk.zerobearing.com).
 └───────────────────────────────────────────┘
 ```
 
-The hotkey runs a one-shot client that sends a request over the socket; the
+The hotkey runs a one-shot client that sends a command over the socket; the
 daemon does the rest. Its request verbs (`speak` / `stop` / `status`) and the
 streaming `follow` command are the single seam: clients, the bar, tests, and
 any future rewrite all go through it.

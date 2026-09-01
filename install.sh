@@ -78,7 +78,19 @@ if command -v omarchy >/dev/null 2>&1; then
   msg "Installing Omarchy bar plugin"
   rm -rf "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
   cp -r "$OMATALK_HOME/src/plugin" "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
-  omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1 || true
+  omarchy-shell shell rescanPlugins
+  plugin_enabled=0
+  for _ in $(seq 1 50); do
+    if omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1; then
+      plugin_enabled=1
+      break
+    fi
+    sleep 0.1
+  done
+  if (( ! plugin_enabled )); then
+    msg "Could not enable the Omarchy bar plugin; run: omarchy plugin enable zerobearing.omatalk"
+    exit 1
+  fi
 fi
 
 # 7. Keybindings are user-owned; the installer only prints the command.
