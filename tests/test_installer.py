@@ -222,11 +222,12 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     lines = log.read_text().splitlines()
     stop = max(i for i, line in enumerate(lines) if "systemctl --user stop" in line)
     clear = max(i for i, line in enumerate(lines) if "uv venv --quiet --clear" in line)
-    rescan = max(i for i, line in enumerate(lines) if "omarchy-shell shell rescanPlugins" in line)
     plugin = max(i for i, line in enumerate(lines) if "omarchy plugin enable" in line)
     start = max(i for i, line in enumerate(lines) if "systemctl --user enable --now" in line)
     assert stop < clear
-    assert rescan < plugin < start
+    rescans = [i for i, line in enumerate(lines) if "omarchy-shell shell rescanPlugins" in line]
+    assert len(rescans) >= 2
+    assert rescans[-2] < plugin < start < rescans[-1]
     assert "omarchy-shell shell rescanPlugins" in log.read_text()
     assert not any("omarchy restart shell" in line for line in lines)
 
