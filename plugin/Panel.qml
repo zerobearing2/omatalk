@@ -1,0 +1,222 @@
+import QtQuick
+import Quickshell.Io
+import qs.Commons
+import qs.Ui
+
+// Voice + speed config panel. Every control here auto-saves — there is no
+// save button — by shelling the `omatalk config` CLI, which owns all
+// config.toml reads and writes. The already-running Daemon (if any) picks
+// the change up on its own via its own mtime-poll reload; this panel never
+// touches config.toml directly and never needs the Daemon to be up.
+Panel {
+  id: root
+  moduleName: "zerobearing.omatalk"
+
+  property var anchorItem: null
+  property bool daemonUnavailable: false
+
+  readonly property var englishPrefixes: ["af_", "am_", "bf_", "bm_"]
+
+  // Test hook only: `keyCatcher` lives inside KeyboardPanel's separate
+  // PanelWindow surface, so it isn't reachable from outside this document
+  // via the normal Item.children tree. Exposing it lets a headless test
+  // walk down to the voice dropdown / speed slider by objectName.
+  readonly property Item contentRoot: keyCatcher
+
+  property var voiceOptions: []
+  property string voice: ""
+  property real speed: 1.0
+  property string voiceError: ""
+  property string speedError: ""
+
+  function isEnglishVoice(name) {
+    for (var i = 0; i < englishPrefixes.length; i++) {
+      if (String(name).indexOf(englishPrefixes[i]) === 0) return true
+    }
+    return false
+  }
+
+  function refresh() {
+    voicesProc.running = true
+    getProc.running = true
+  }
+
+  onOpenedChanged: if (opened) refresh()
+
+  function setVoice(value) {
+    root.voice = value
+    setVoiceProc.command = ["omatalk", "config", "set", "voice", value]
+    setVoiceProc.running = true
+  }
+
+  function setSpeed(value) {
+    root.speed = value
+    setSpeedProc.command = ["omatalk", "config", "set", "speed", String(value)]
+    setSpeedProc.running = true
+  }
+
+  Process {
+    id: voicesProc
+    command: ["omatalk", "config", "voices", "--json"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var all = JSON.parse(text)
+          var english = []
+          for (var i = 0; i < all.length; i++) {
+            if (root.isEnglishVoice(all[i])) english.push(all[i])
+          }
+          root.voiceOptions = english
+        } catch (e) {
+          // Leave the previous option list in place on a bad/empty response.
+        }
+      }
+    }
+  }
+
+  Process {
+    id: getProc
+    command: ["omatalk", "config", "get", "--json"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var cfg = JSON.parse(text)
+          if (cfg.voice !== undefined) root.voice = cfg.voice
+          if (cfg.speed !== undefined) root.speed = cfg.speed
+        } catch (e) {
+          // Leave the previous values in place on a bad/empty response.
+        }
+      }
+    }
+  }
+
+  Process {
+    id: setVoiceProc
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.voiceError = text.trim()
+    }
+    onExited: function(exitCode) { if (exitCode === 0) root.voiceError = "" }
+  }
+
+  Process {
+    id: setSpeedProc
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.speedError = text.trim()
+    }
+    onExited: function(exitCode) { if (exitCode === 0) root.speedError = "" }
+  }
+
+  KeyboardPanel {
+    id: panel
+    anchorItem: root.anchorItem
+    owner: root
+    bar: root.bar
+    open: root.opened
+    focusTarget: keyCatcher
+    contentWidth: panel.fittedContentWidth(Style.space(340))
+    contentHeight: panel.fittedContentHeight(content.implicitHeight)
+
+    PanelKeyCatcher {
+      id: keyCatcher
+      anchors.fill: parent
+      onCloseRequested: root.close()
+      onTabRequested: function(direction) { root.switchPanel(direction) }
+
+      Column {
+        id: content
+        width: parent.width
+        spacing: Style.space(14)
+
+        Text {
+          text: "Omatalk"
+          color: Color.popups.text
+          font.family: Style.font.family
+          font.pixelSize: Style.font.display
+          font.bold: true
+        }
+
+        PanelSeparator {}
+
+        PanelSectionHeader { text: "VOICE" }
+
+        SearchableDropdown {
+          id: voiceDropdown
+          objectName: "omatalkVoiceDropdown"
+          width: parent.width
+          options: root.voiceOptions
+          placeholderText: "Search voices…"
+          onChanged: function(v) { root.setVoice(v) }
+
+          Binding on value { value: root.voice }
+        }
+
+        Text {
+          visible: root.voiceError !== ""
+          width: parent.width
+          wrapMode: Text.WordWrap
+          text: root.voiceError
+          color: Color.urgent
+          font.family: Style.font.family
+          font.pixelSize: Style.font.bodySmall
+        }
+
+        PanelSectionHeader { text: "SPEED" }
+
+        Row {
+          width: parent.width
+          spacing: Style.space(12)
+
+          PanelSlider {
+            id: speedSlider
+            objectName: "omatalkSpeedSlider"
+            bar: root.bar
+            width: parent.width - speedLabel.width - Style.space(12)
+            minimum: 0.5
+            maximum: 2.0
+            step: 0.05
+            value: root.speed
+            onReleased: function(v) { root.setSpeed(v) }
+          }
+
+          Text {
+            id: speedLabel
+            text: speedSlider.liveValue.toFixed(2) + "x"
+            color: Color.popups.text
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+            width: Style.space(48)
+          }
+        }
+
+        Text {
+          visible: root.speedError !== ""
+          width: parent.width
+          wrapMode: Text.WordWrap
+          text: root.speedError
+          color: Color.urgent
+          font.family: Style.font.family
+          font.pixelSize: Style.font.bodySmall
+        }
+
+        Text {
+          visible: root.daemonUnavailable
+          width: parent.width
+          wrapMode: Text.WordWrap
+          text: "Daemon isn't running — changes will apply once it starts."
+          color: Qt.darker(Color.popups.text, 1.3)
+          font.family: Style.font.family
+          font.pixelSize: Style.font.bodySmall
+          font.italic: true
+        }
+
+        PanelSeparator {}
+      }
+    }
+  }
+}

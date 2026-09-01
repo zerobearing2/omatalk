@@ -94,11 +94,15 @@ Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself.
 ## Usage
 
 ```sh
-omatalk speak                # capture and speak (what the hotkey runs)
-omatalk speak "text here"    # speak given text
-omatalk stop                 # cut off the current utterance
-omatalk status                # idle | speaking | error
-omatalk upgrade               # install the latest release
+omatalk speak                       # capture and speak (what the hotkey runs)
+omatalk speak "text here"           # speak given text
+omatalk stop                        # cut off the current utterance
+omatalk status                      # idle | speaking | error
+omatalk upgrade                     # install the latest release
+omatalk config get [--json]         # print the effective config
+omatalk config set voice af_bella   # set voice or speed; auto-applies
+omatalk config set speed 1.25       # (0.5-2.0)
+omatalk config voices [--json]      # list available voice names
 ```
 
 `systemctl --user start|stop|restart omatalk` controls the daemon.
@@ -123,7 +127,7 @@ systemctl --user status omatalk.service --no-pager -l
 journalctl --user -u omatalk.service -b --no-pager -n 80
 stat -c '%A %U:%G %n' "${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk/omatalk.sock" \
   ~/.config/omarchy/plugins/zerobearing.omatalk/manifest.json \
-  ~/.config/omarchy/plugins/zerobearing.omatalk/Megaphone.qml
+  ~/.config/omarchy/plugins/zerobearing.omatalk/BarWidget.qml
 ss -xap | grep -E 'omatalk|quickshell'
 omarchy plugin list --json | grep -C 3 'zerobearing.omatalk'
 omarchy-shell shell listPlugins | grep -C 3 'zerobearing.omatalk'
@@ -179,14 +183,19 @@ the report.
 
 ## Config
 
-`~/.config/omatalk/config.toml`:
+Click the bar icon to open the voice/speed panel, or use `omatalk config`
+(see Usage above) — both auto-save to `~/.config/omatalk/config.toml` and the
+already-running daemon picks up the change on its own within about a second,
+no restart needed. The file is still hand-editable for the settings not yet
+exposed by the panel or CLI (`lang`, `capture_primary`, `capture_clipboard`,
+`player`, `notify`); those still require `systemctl --user restart omatalk`
+to take effect.
 
 ```toml
 voice = "af_heart"
 speed = 1.0
 ```
 
-Restart the daemon after changing it (`systemctl --user restart omatalk`).
 Voice previews are on the [project site](https://omatalk.zerobearing.com).
 
 ## Architecture

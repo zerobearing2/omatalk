@@ -35,8 +35,47 @@ BarWidget {
     if (!reconnectGrace.running) reconnectGrace.start()
   }
 
+  // Shape contract for Bar.findPanelWidget (requires open/close/opened on
+  // the bar-widget root), mirroring the weather plugin's BarWidget/Panel
+  // split.
+  function injectPanel() {
+    var target = panelLoader.item
+    if (!target) return
+    if ("bar" in target) target.bar = root.bar
+    if ("anchorItem" in target) target.anchorItem = button
+    if ("daemonUnavailable" in target) target.daemonUnavailable = root.daemonUnavailable
+  }
+
+  function togglePanel() {
+    if (panelLoader.item && panelLoader.item.toggle) panelLoader.item.toggle()
+  }
+
+  readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
+  readonly property var panelItem: panelLoader.item
+
+  function open() {
+    if (panelLoader.item && panelLoader.item.open) panelLoader.item.open()
+  }
+
+  function close() {
+    if (panelLoader.item && panelLoader.item.close) panelLoader.item.close()
+  }
+
+  onBarChanged: injectPanel()
+  onDaemonUnavailableChanged: injectPanel()
+
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
+
+  Loader {
+    id: panelLoader
+    active: true
+    source: Qt.resolvedUrl("Panel.qml")
+    onLoaded: {
+      root.injectPanel()
+      Qt.callLater(root.injectPanel)
+    }
+  }
 
   BarIconButton {
     id: button
@@ -45,10 +84,11 @@ BarWidget {
     active: root.speaking || root.daemonUnavailable
     activeColor: root.daemonUnavailable ? Color.urgent : Color.accent
     useActiveColor: true
-    pressable: false
     tooltipText: root.daemonUnavailable ? "Omatalk is unavailable"
       : (root.speaking ? "Omatalk is speaking" : "Omatalk")
     text: "󰃦"
+
+    onPressed: function(b) { root.togglePanel() }
   }
 
   Component {
