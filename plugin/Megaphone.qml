@@ -40,6 +40,7 @@ BarWidget {
     anchors.fill: parent
     bar: root.bar
     active: root.speaking
+    activeColor: "#85dacc"
     useActiveColor: true
     pressable: false
     tooltipText: root.speaking ? "Omatalk is speaking" : "Omatalk"
