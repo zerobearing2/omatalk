@@ -63,13 +63,12 @@ The script downloads the latest release tarball (checksum-verified), then:
    Omarchy usually only lacks uv).
 2. Builds a uv-managed venv at `~/.local/share/omatalk/venv/`.
 3. Downloads the Kokoro-82M model and voice files (~185MB) to
-   `~/.local/share/omatalk/models/`, skipped if already present.
+   `~/.local/share/omatalk/models/`, skipped when their checksums match.
 4. Stops any existing daemon, installs and enables a fresh `omatalk.service`
    systemd user unit, so the new daemon is running before the command exits.
 5. Puts `omatalk` on `PATH`, installs and refreshes the Omarchy bar plugin, and
-   prints a copy-paste command that adds the F8 binding to
-   `~/.config/hypr/bindings.lua` and reloads Hyprland. The installer never edits
-   your keybindings itself.
+   prints a copy-paste command to add the F8 binding when no Omatalk binding is
+   present. The installer never edits your keybindings itself.
 
 Every push to `master` tags a new release automatically. Re-running the
 installer picks up whatever is newest. After the first run of this installer,

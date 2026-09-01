@@ -104,7 +104,7 @@ printf 'systemctl %s\\n' "$*" >> "$FAKE_LOG"
 case "$*" in
   --user\\ stop*)
     rm -f "$FAKE_STATE/ready"
-    [ "${FAKE_STOP_FAIL:-0}" != 1 ]
+    exit "${FAKE_STOP_STATUS:-0}"
     ;;
   --user\\ enable\\ --now*)
     if [ "${FAKE_DAEMON_DOWN:-0}" != 1 ]; then
@@ -122,6 +122,13 @@ if [ "$1" = pkg ] && [ "$2" = present ]; then exit 0; fi
 if [ "$1" = plugin ] && [ "$2" = enable ]; then exit 0; fi
 """
     )
+    (fake_bin / "omarchy-shell").write_text(
+        """#!/bin/sh
+set -eu
+printf 'omarchy-shell %s\\n' "$*" >> "$FAKE_LOG"
+"""
+    )
+    (fake_bin / "sleep").write_text("#!/bin/sh\nexit 0\n")
     for tool in fake_bin.iterdir():
         tool.chmod(0o755)
 
@@ -215,29 +222,43 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     lines = log.read_text().splitlines()
     stop = max(i for i, line in enumerate(lines) if "systemctl --user stop" in line)
     clear = max(i for i, line in enumerate(lines) if "uv venv --quiet --clear" in line)
+    rescan = max(i for i, line in enumerate(lines) if "omarchy-shell shell rescanPlugins" in line)
     plugin = max(i for i, line in enumerate(lines) if "omarchy plugin enable" in line)
     start = max(i for i, line in enumerate(lines) if "systemctl --user enable --now" in line)
     restart = max(i for i, line in enumerate(lines) if "omarchy restart shell" in line)
     assert stop < clear
-    assert plugin < start < restart
-    assert "rescanPlugins" not in log.read_text()
+    assert rescan < plugin < start < restart
+    assert "omarchy-shell shell rescanPlugins" in log.read_text()
 
 
 def test_installer_tolerates_missing_unit(site, tmp_path):
     site.publish(make_source())
     env, _state, _log = fake_environment(site, tmp_path)
-    env["FAKE_STOP_FAIL"] = "1"
+    env["FAKE_STOP_STATUS"] = "5"
 
     result = run_install(env)
 
     assert result.returncode == 0, result.stderr
 
 
+def test_installer_does_not_replace_files_if_daemon_will_not_stop(site, tmp_path):
+    site.publish(make_source())
+    env, _state, _log = fake_environment(site, tmp_path)
+    old_source = Path(env["OMATALK_HOME"]) / "src/old.py"
+    old_source.parent.mkdir(parents=True)
+    old_source.write_text("keep me\n")
+    env["FAKE_STOP_STATUS"] = "1"
+
+    result = run_install(env)
+
+    assert result.returncode == 1
+    assert old_source.read_text() == "keep me\n"
+
+
 def test_installer_fails_if_daemon_never_becomes_ready(site, tmp_path):
     site.publish(make_source())
     env, _state, _log = fake_environment(site, tmp_path)
     env["FAKE_DAEMON_DOWN"] = "1"
-    env["DAEMON_READY_TIMEOUT"] = "1"
 
     result = run_install(env)
 

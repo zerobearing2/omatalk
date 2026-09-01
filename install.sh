@@ -9,7 +9,6 @@ MODEL_BASE="${MODEL_BASE:-https://github.com/thewh1teagle/kokoro-onnx/releases/d
 MODEL_SHA256="${MODEL_SHA256:-f3a290d384fbb27966d462905c71a46cef9e5fd00516b40df32a0b4afe77ac96}"
 VOICES_SHA256="${VOICES_SHA256:-bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d}"
 MODEL_FILE="kokoro-v1.0.fp16.onnx"
-DAEMON_READY_TIMEOUT="${DAEMON_READY_TIMEOUT:-30}"
 
 msg() { printf '\033[1;32m==>\033[0m %s\n' "$1"; }
 
@@ -58,7 +57,12 @@ curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" "$SITE_BASE
 (cd "$OMATALK_HOME" && sha256sum -c omatalk-src.tar.gz.sha256 --quiet)
 
 msg "Stopping the current daemon"
-systemctl --user stop omatalk.service 2>/dev/null || true
+stop_status=0
+systemctl --user stop omatalk.service 2>/dev/null || stop_status=$?
+if [ "$stop_status" -ne 0 ] && [ "$stop_status" -ne 5 ]; then
+  msg "Could not stop the current daemon; refusing to replace its files"
+  exit "$stop_status"
+fi
 rm -rf "$OMATALK_HOME/src"
 mkdir -p "$OMATALK_HOME/src"
 tar -xzf "$OMATALK_HOME/omatalk-src.tar.gz" -C "$OMATALK_HOME/src" --strip-components=1
@@ -89,6 +93,7 @@ if command -v omarchy >/dev/null 2>&1; then
   mkdir -p "$HOME/.config/omarchy/plugins"
   rm -rf "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
   cp -r "$OMATALK_HOME/src/plugin" "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
+  omarchy-shell shell rescanPlugins
   plugin_enabled=0
   for _ in $(seq 1 50); do
     if omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1; then
@@ -120,7 +125,7 @@ fi
 
 # 8. Welcome through the freshly installed daemon — proves the whole
 # pipeline (service, socket, warm model, audio) works end to end.
-for _ in $(seq 1 "$DAEMON_READY_TIMEOUT"); do
+for _ in $(seq 1 30); do
   "$HOME/.local/bin/omatalk" status >/dev/null 2>&1 && break
   sleep 1
 done
