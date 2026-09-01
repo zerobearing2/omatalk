@@ -33,7 +33,6 @@ BarWidget {
     daemonState = "idle"
     connectionLost = true
     if (!reconnectGrace.running) reconnectGrace.start()
-    if (!retry.running) retry.start()
   }
 
   implicitWidth: button.implicitWidth
@@ -64,7 +63,6 @@ BarWidget {
 
       onConnectionStateChanged: {
         if (connected) {
-          retry.stop()
           reconnectGrace.stop()
           root.connectionLost = false
           root.daemonState = "idle"
@@ -75,6 +73,10 @@ BarWidget {
         }
       }
 
+      // Inline on purpose: a failed connect can raise the error synchronously
+      // while the Loader is still constructing this object, before a
+      // Connections element bound to the Loader's item would see it.
+      onError: root.scheduleReconnect()
     }
   }
 
@@ -84,19 +86,19 @@ BarWidget {
     active: true
   }
 
-  Connections {
-    target: stateSocketLoader.item
-    function onError() { root.scheduleReconnect() }
-  }
-
   Timer {
     id: retry
     interval: 1000
+    // Driven by the socket's connected property instead of signal handlers,
+    // so a missed signal can never stop the reconnect loop.
     repeat: true
-    running: true
+    running: root.socketPath !== ""
+      && !(stateSocketLoader.item && stateSocketLoader.item.connected)
+    // A Socket whose connect failed cannot redial itself (setConnected(true)
+    // is a no-op while its internal QLocalSocket exists), so recreate it.
     onTriggered: {
       stateSocketLoader.active = false
-      reconnect.start()
+      stateSocketLoader.active = true
     }
   }
 
@@ -104,12 +106,5 @@ BarWidget {
     id: reconnectGrace
     interval: 3000
     repeat: false
-  }
-
-  Timer {
-    id: reconnect
-    interval: 0
-    repeat: false
-    onTriggered: stateSocketLoader.active = true
   }
 }
