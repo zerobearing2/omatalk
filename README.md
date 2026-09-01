@@ -136,8 +136,11 @@ restart. The widget needs both a running daemon and a live Quickshell
 connection to the daemon socket.
 
 After collecting the evidence, start an inactive daemon with
-`systemctl --user start omatalk.service`. If `omatalk status` works but the
-socket has no Quickshell peer, run `omarchy restart shell`.
+`systemctl --user start omatalk.service`. The widget reconnects to the socket
+on its own within a few seconds of the daemon coming up or restarting — no
+shell action needed. If `omatalk status` works and several seconds have
+passed but the socket still has no Quickshell peer, the plugin itself likely
+failed to load; check for a QML error and run `omarchy restart shell`.
 
 ### Prompt for a local agent
 
