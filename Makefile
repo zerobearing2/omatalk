@@ -6,3 +6,4 @@ test:
 clean:
 	rm -rf build dist .pytest_cache
 	rm -rf *.egg-info
+	rm -f server.pid
