@@ -81,8 +81,8 @@ mkdir -p "$OMATALK_HOME/models"
 download_model "$MODEL_FILE" "$MODEL_SHA256"
 download_model "voices-v1.0.bin" "$VOICES_SHA256"
 
-# 5. Client and systemd user service.
-msg "Installing systemd user service"
+# 5. Client and systemd user unit.
+msg "Installing systemd user unit"
 mkdir -p "$HOME/.config/systemd/user" "$HOME/.local/bin"
 cp "$OMATALK_HOME/src/systemd/omatalk.service" "$HOME/.config/systemd/user/"
 cp "$OMATALK_HOME/venv/bin/omatalk" "$HOME/.local/bin/omatalk"

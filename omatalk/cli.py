@@ -33,14 +33,23 @@ def upgrade():
             ],
             check=True,
         )
-        result = subprocess.run(["bash", path], check=False)
+        os.execvpe(
+            "bash",
+            [
+                "bash",
+                "-c",
+                'trap \'status=$?; rm -f -- "$1"; exit "$status"\' EXIT; bash "$1"',
+                "omatalk upgrade",
+                path,
+            ],
+            os.environ,
+        )
     except (OSError, subprocess.CalledProcessError) as error:
         print(f"upgrade failed: {error}", file=sys.stderr)
         sys.exit(1)
     finally:
         if path:
             Path(path).unlink(missing_ok=True)
-    sys.exit(result.returncode)
 
 
 def main():

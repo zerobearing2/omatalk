@@ -74,6 +74,10 @@ Every push to `master` tags a new release automatically. Re-running the
 installer picks up whatever is newest. After the first run of this installer,
 `omatalk upgrade` fetches and runs the same latest installer.
 
+Upgrades never create, merge, rewrite, or delete `~/.config/omatalk/config.toml`.
+An existing config stays byte-for-byte unchanged, and an absent config stays
+absent.
+
 ## Uninstall
 
 ```sh
