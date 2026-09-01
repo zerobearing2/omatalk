@@ -20,6 +20,16 @@ talks to you. Fully local, no network calls at runtime.
 On Omarchy, the bar shows a megaphone in the normal bar color and switches it to
 the active color while Omatalk is speaking.
 
+## Bar states
+
+The bar keeps one megaphone icon in the same spot and changes its color:
+
+- `idle`: normal bar color; the daemon is ready.
+- `speaking`: theme accent; selected text is being read.
+- `unavailable`: urgent color after a 3-second disconnect grace period.
+
+![Omatalk bar widget showing idle, speaking, and unavailable states](public/images/omatalk-bar-states.png)
+
 ## Install
 
 On an Omarchy machine:

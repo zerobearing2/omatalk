@@ -21,6 +21,7 @@
     --border-strong: rgba(32,29,26,0.28);
     --accent: #2f7a70;      /* teal leads in light mode */
     --accent-2: #c85a32;    /* ember, secondary in light mode */
+    --urgent: #be435c;
     --accent-ink: #f3f6f1;
     --shadow: 0 1px 0 rgba(32,29,26,0.06);
   }
@@ -37,6 +38,7 @@
       --border-strong: rgba(239,232,224,0.22);
       --accent: #ec7a4c;     /* ember leads in dark mode */
       --accent-2: #5fada2;   /* teal, secondary in dark mode */
+      --urgent: #ff6178;
       --accent-ink: #1b120c;
       --shadow: 0 1px 0 rgba(0,0,0,0.4);
     }
@@ -52,6 +54,7 @@
     --border-strong: rgba(239,232,224,0.22);
     --accent: #ec7a4c;
     --accent-2: #5fada2;
+    --urgent: #ff6178;
     --accent-ink: #1b120c;
     --shadow: 0 1px 0 rgba(0,0,0,0.4);
   }
@@ -318,6 +321,59 @@
     color: var(--muted);
   }
   #state-label { color: var(--accent); font-weight: 600; }
+
+  /* ---------- bar widget states ---------- */
+  .bar-states {
+    margin: 34px 0 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: var(--surface);
+    overflow: hidden;
+    box-shadow: 0 24px 60px -30px rgba(0,0,0,0.5);
+  }
+  .bar-states img { display: block; width: 100%; height: auto; }
+  .bar-states figcaption {
+    padding: 13px 18px 15px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.76rem;
+  }
+  .bar-state-legend {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: 1px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .bar-state {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 15px 16px;
+    background: var(--ink-alt);
+  }
+  .bar-state + .bar-state { border-left: 1px solid var(--border); }
+  .bar-state .state-dot {
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    margin-top: 5px;
+    border-radius: 50%;
+    background: var(--fg-dim);
+  }
+  .bar-state.speaking .state-dot { background: var(--accent); }
+  .bar-state.unavailable .state-dot { background: var(--urgent); }
+  .bar-state strong {
+    display: block;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+  }
+  .bar-state span:not(.state-dot) { color: var(--muted); font-size: 0.82rem; }
+  .bar-state.speaking strong { color: var(--accent); }
+  .bar-state.unavailable strong { color: var(--urgent); }
 
   /* ---------- sections ---------- */
   section { padding: clamp(56px, 8vw, 92px) 0; border-top: 1px solid var(--border); }
@@ -611,6 +667,10 @@
   @media (prefers-reduced-motion: reduce) {
     * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
   }
+  @media (max-width: 640px) {
+    .bar-state-legend { grid-template-columns: 1fr; }
+    .bar-state + .bar-state { border-top: 1px solid var(--border); border-left: none; }
+  }
 </style>
 </head>
 <body>
@@ -628,6 +688,7 @@
       </button>
       <nav class="site-nav" id="site-nav" hidden>
         <a href="#install">Install</a>
+        <a href="#bar">Bar states</a>
         <a href="#why">Why</a>
         <a href="#what">What it does</a>
         <a href="#voices">Voices</a>
@@ -663,6 +724,21 @@
           <span class="mono">kokoro-82m · 24kHz · af_heart</span>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section id="bar">
+    <div class="eyebrow">bar widget</div>
+    <h2>One icon, three signals</h2>
+    <p class="prose">The megaphone stays in the same place on the Omarchy bar. Its color tells you whether Omatalk is ready, reading your selection, or disconnected.</p>
+    <figure class="bar-states">
+      <img src="images/omatalk-bar-states.png" alt="The Omatalk megaphone bar widget in idle, speaking, and unavailable states">
+      <figcaption>Captured from the live Omarchy bar. The glyph stays the same; the state changes its color.</figcaption>
+    </figure>
+    <div class="bar-state-legend" aria-label="Bar widget state legend">
+      <div class="bar-state idle"><span class="state-dot" aria-hidden="true"></span><div><strong>Idle</strong><span>daemon ready</span></div></div>
+      <div class="bar-state speaking"><span class="state-dot" aria-hidden="true"></span><div><strong>Speaking</strong><span>reading selection</span></div></div>
+      <div class="bar-state unavailable"><span class="state-dot" aria-hidden="true"></span><div><strong>Unavailable</strong><span>urgent after 3 seconds</span></div></div>
     </div>
   </section>
 
