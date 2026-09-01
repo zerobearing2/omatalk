@@ -112,10 +112,6 @@ fi
 systemctl --user daemon-reload
 systemctl --user enable --now omatalk.service
 
-if command -v omarchy >/dev/null 2>&1; then
-  omarchy-shell shell rescanPlugins
-fi
-
 # 7. Keybindings are user-owned; the installer only prints the command.
 if [ ! -f "$HOME/.config/hypr/bindings.lua" ] || ! grep -q omatalk "$HOME/.config/hypr/bindings.lua"; then
   msg "To bind F8, paste this command (safe to re-run):"
@@ -133,6 +129,9 @@ done
 if ! "$HOME/.local/bin/omatalk" status >/dev/null 2>&1; then
   msg "Daemon did not start; check: journalctl --user -u omatalk"
   exit 1
+fi
+if command -v omarchy >/dev/null 2>&1; then
+  omarchy-shell shell rescanPlugins
 fi
 "$HOME/.local/bin/omatalk" speak "Welcome to omatalk!" >/dev/null 2>&1
 
