@@ -225,10 +225,10 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     rescan = max(i for i, line in enumerate(lines) if "omarchy-shell shell rescanPlugins" in line)
     plugin = max(i for i, line in enumerate(lines) if "omarchy plugin enable" in line)
     start = max(i for i, line in enumerate(lines) if "systemctl --user enable --now" in line)
-    restart = max(i for i, line in enumerate(lines) if "omarchy restart shell" in line)
     assert stop < clear
-    assert rescan < plugin < start < restart
+    assert rescan < plugin < start
     assert "omarchy-shell shell rescanPlugins" in log.read_text()
+    assert not any("omarchy restart shell" in line for line in lines)
 
 
 def test_installer_tolerates_missing_unit(site, tmp_path):
