@@ -1,6 +1,7 @@
 import socket
 import subprocess
 import threading
+import time
 import traceback
 
 from .capture import capture_clipboard, capture_primary
@@ -19,6 +20,7 @@ class Daemon:
         self._proc = None
         self._thread = None
         self._current_text = ""
+        self._last_busy = time.monotonic()
 
     def _notify(self, msg: str):
         subprocess.run(
@@ -95,6 +97,7 @@ class Daemon:
 def handle(daemon: Daemon, line: str) -> str:
     parts = line.split(" ", 1)
     cmd = parts[0]
+    daemon._last_busy = time.monotonic()
     if cmd == "speak":
         daemon.speak(parts[1] if len(parts) > 1 else "")
         return "ok"
@@ -115,9 +118,20 @@ def serve():
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     server.bind(str(path))
     server.listen(8)
+    server.settimeout(1.0)
     try:
         while True:
-            conn, _ = server.accept()
+            try:
+                conn, _ = server.accept()
+            except TimeoutError:
+                idle = time.monotonic() - daemon._last_busy
+                if daemon.state == "idle" and idle > cfg["idle_timeout"]:
+                    print(
+                        f"idle for {int(idle)}s; recycling to release memory",
+                        flush=True,
+                    )
+                    break
+                continue
             with conn:
                 line = conn.makefile("r").readline()
                 if not line:

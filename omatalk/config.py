@@ -10,6 +10,7 @@ DEFAULTS = {
     "capture_clipboard": ["wl-paste"],
     "player": ["pw-play"],
     "notify": ["notify-send", "Omatalk"],
+    "idle_timeout": 600,
 }
 
 
