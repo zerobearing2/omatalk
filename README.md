@@ -61,17 +61,25 @@ The script downloads the latest release tarball (checksum-verified), then:
 1. Checks system dependencies and installs any missing ones via
    `omarchy pkg add` (python, curl, pipewire, wl-clipboard, uv; stock
    Omarchy usually only lacks uv).
-2. Builds a uv-managed venv at `~/.local/share/omatalk/venv/`.
-3. Downloads the Kokoro-82M model and voice files (~185MB) to
-   `~/.local/share/omatalk/models/`, skipped if already present.
-4. Installs and enables the `omatalk.service` systemd user unit, so the
-   daemon is warm from login and survives relogin.
-5. Puts `omatalk` on `PATH`, installs the Omarchy bar plugin, and prints a
-   copy-paste command that adds the F8 binding to `~/.config/hypr/bindings.lua`
-   and reloads Hyprland. The installer never edits your keybindings itself.
+2. Downloads the Kokoro-82M model and voice files (~185MB) to
+   `~/.local/share/omatalk/models/`, skipped when their checksums match —
+   deliberately while any existing daemon is still running, since models
+   are only read at startup.
+3. Stops any existing daemon, rebuilds the uv-managed venv at
+   `~/.local/share/omatalk/venv/`, and installs and enables a fresh
+   `omatalk.service` systemd user unit, so the new daemon is running
+   before the command exits.
+4. Puts `omatalk` on `PATH`, installs and refreshes the Omarchy bar plugin, and
+   prints a copy-paste command to add the F8 binding when no Omatalk binding is
+   present. The installer never edits your keybindings itself.
 
 Every push to `master` tags a new release automatically. Re-running the
-installer picks up whatever is newest.
+installer picks up whatever is newest. After the first run of this installer,
+`omatalk upgrade` fetches and runs the same latest installer.
+
+Upgrades never create, merge, rewrite, or delete `~/.config/omatalk/config.toml`.
+An existing config stays byte-for-byte unchanged, and an absent config stays
+absent.
 
 ## Uninstall
 
@@ -90,10 +98,81 @@ omatalk speak                # capture and speak (what the hotkey runs)
 omatalk speak "text here"    # speak given text
 omatalk stop                 # cut off the current utterance
 omatalk status                # idle | speaking | error
+omatalk upgrade               # install the latest release
 ```
 
 `systemctl --user start|stop|restart omatalk` controls the daemon.
+
+When the daemon is down, `speak` and `stop` raise a desktop notification
+alongside the terminal error — they run from hotkeys, where there may be no
+terminal to read. `status` only prints the error, so scripts and installers
+can poll it silently.
 `journalctl --user -u omatalk -f` shows logs.
+
+## Troubleshooting
+
+The red megaphone means `unavailable`. The widget has either received the
+daemon's `error` state or has lost its `follow` socket connection for more than
+three seconds. It does not mean that speech is active.
+
+Run these commands on the affected machine and keep their output together:
+
+```sh
+omatalk status
+systemctl --user status omatalk.service --no-pager -l
+journalctl --user -u omatalk.service -b --no-pager -n 80
+stat -c '%A %U:%G %n' "${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk/omatalk.sock" \
+  ~/.config/omarchy/plugins/zerobearing.omatalk/manifest.json \
+  ~/.config/omarchy/plugins/zerobearing.omatalk/Megaphone.qml
+ss -xap | grep -E 'omatalk|quickshell'
+omarchy plugin list --json | grep -C 3 'zerobearing.omatalk'
+omarchy-shell shell listPlugins | grep -C 3 'zerobearing.omatalk'
+```
+
+Record which symptom you see: the icon is missing, present and red, present and
+normal, or changes color while F8 still fails. Also record whether F8 works,
+and when the problem started, especially after install, upgrade, or a shell
+restart. The widget needs both a running daemon and a live Quickshell
+connection to the daemon socket.
+
+After collecting the evidence, start an inactive daemon with
+`systemctl --user start omatalk.service`. If `omatalk status` works but the
+socket has no Quickshell peer, run `omarchy restart shell`.
+
+### Prompt for a local agent
+
+Paste this into an agent running on the affected machine:
+
+```text
+Debug my Omatalk installation and report the root cause. The symptom is:
+<describe missing, red, normal, or wrong-color icon; say whether F8 works>
+
+Run the Omatalk troubleshooting commands from README.md. Capture the current
+time and separate these checks:
+
+1. Is omatalk.service active and does `omatalk status` work?
+2. Is the socket present, and is a Quickshell process connected to it?
+3. Is zerobearing.omatalk present, discovered, and enabled?
+4. Do recent systemd or Quickshell logs show a QML/plugin load error?
+
+Preserve ~/.config/omatalk/config.toml, ~/.config/hypr/bindings.lua, and the
+Omarchy shell layout. Ask before making changes. Use the smallest targeted
+repair, then verify both `omatalk status` and the Quickshell socket connection.
+Do not call the problem fixed without saying what evidence proved it.
+
+Return this report:
+
+Symptom:
+Observed state:
+Evidence:
+Root cause:
+Commands or files changed:
+Verification:
+Remaining uncertainty:
+
+Redact credentials, tokens, and unrelated private log content before sharing
+the report.
+```
 
 ## Config
 
