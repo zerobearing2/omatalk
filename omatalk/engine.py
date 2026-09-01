@@ -7,7 +7,7 @@ class Engine:
 
         models = models_path()
         self._kokoro = Kokoro(
-            str(models / "kokoro-v1.0.onnx"), str(models / "voices-v1.0.bin")
+            str(models / "kokoro-v1.0.fp16.onnx"), str(models / "voices-v1.0.bin")
         )
         self._cfg = cfg
 

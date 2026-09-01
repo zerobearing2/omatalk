@@ -1,12 +1,18 @@
 import socket
 import subprocess
 import threading
+import time
+import traceback
 
 from .capture import capture_clipboard, capture_primary
 from .chunker import sentences
 from .config import load, socket_path
 from .engine import Engine
 from .player import play
+
+# The onnxruntime arena grows to fit the longest utterance and never shrinks;
+# an idle recycle lets systemd hand us a fresh process instead.
+IDLE_TIMEOUT = 600
 
 
 class Daemon:
@@ -18,6 +24,7 @@ class Daemon:
         self._proc = None
         self._thread = None
         self._current_text = ""
+        self._last_busy = time.monotonic()
 
     def _notify(self, msg: str):
         subprocess.run(
@@ -39,6 +46,7 @@ class Daemon:
             self._thread.join(timeout=10)
 
     def speak(self, text: str):
+        self.touch()
         text = text.strip() or capture_primary(self.cfg)
         if text and self.state == "speaking" and text == self._current_text:
             self.stop()
@@ -62,8 +70,15 @@ class Daemon:
         self._thread.start()
 
     def stop(self):
+        self.touch()
         self._stop_current()
         self.state = "idle"
+
+    def touch(self):
+        self._last_busy = time.monotonic()
+
+    def idle_seconds(self):
+        return time.monotonic() - self._last_busy
 
     def _run(self, text: str, cancel: threading.Event):
         try:
@@ -86,6 +101,7 @@ class Daemon:
                 self.state = "idle"
         except Exception as e:
             if not cancel.is_set():
+                traceback.print_exc()
                 self._notify(f"error: {e}")
                 self.state = "error"
 
@@ -113,15 +129,26 @@ def serve():
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     server.bind(str(path))
     server.listen(8)
+    server.settimeout(1.0)
     try:
         while True:
-            conn, _ = server.accept()
-            with conn:
-                line = conn.makefile("r").readline()
-                if not line:
-                    continue
-                reply = handle(daemon, line.strip())
-                conn.sendall((reply + "\n").encode())
+            try:
+                conn, _ = server.accept()
+            except TimeoutError:
+                idle = daemon.idle_seconds()
+                if daemon.state != "speaking" and idle > IDLE_TIMEOUT:
+                    print(f"idle {int(idle)}s; recycling", flush=True)
+                    break
+                continue
+            try:
+                with conn:
+                    line = conn.makefile("r").readline()
+                    if not line:
+                        continue
+                    reply = handle(daemon, line.strip())
+                    conn.sendall((reply + "\n").encode())
+            except (TimeoutError, OSError):
+                continue
     finally:
         path.unlink(missing_ok=True)
 

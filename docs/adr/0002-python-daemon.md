@@ -37,3 +37,10 @@ instead of tens of MB. The daemon's socket protocol is the seam: a Rust
 rewrite replaces the process, not the interface. The bar for reopening the
 Rust question is evidence-based: a Rust pipeline must beat the Python
 reference in a blind listening test and waveform analysis — not in a README.
+
+Revision 2026-08-31: resident memory re-measured on kokoro-onnx 0.6 + fp16:
+~500MB floor, and the onnxruntime arena grows to fit the longest utterance
+during sustained synthesis without ever shrinking (measured ~740MB after a
+30-sentence run; attempts to cap it via session options all measured worse
+than the default). Mitigated by an idle self-recycle: the daemon exits after
+10 idle minutes and systemd's Restart=always hands it a fresh process.

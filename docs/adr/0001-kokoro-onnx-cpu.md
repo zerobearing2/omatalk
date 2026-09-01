@@ -22,3 +22,11 @@ Considered and rejected:
 Consequences: no voice cloning is possible on this engine (fixed voice
 packs); English-first with 8-9 language voices available. espeak-ng is a hard
 phonemizer dependency.
+
+Revision 2026-08-31: the shipped artifact is the **fp16 export**
+(`kokoro-v1.0.fp16.onnx`, ~185MB download with voices), not the fp32 file
+this ADR originally sized at ~300MB. Validated by spectral correlation 0.999
+against fp32 plus a live listening test, not a blind comparison. Resident
+memory measured a wash versus fp32 (the CPU provider upcasts at load);
+kokoro-onnx 0.6 is required — the v1.1 exports declare `speed` as float and
+fail on 0.4.x.
