@@ -51,7 +51,7 @@ installer picks up whatever is newest.
 curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
 ```
 
-Stops and removes the systemd service, the launcher, the source, and the
+Stops and removes the systemd unit, the launcher, the source, and the
 Omarchy bar plugin. Asks before deleting the models (~185MB) and your config.
 Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself.
 

@@ -39,11 +39,24 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "󰃦"
     active: root.speaking
     useActiveColor: true
     pressable: false
     tooltipText: root.speaking ? "Omatalk is speaking" : "Omatalk"
+    iconComponent: Component {
+      OpticalGlyph {
+        anchors.fill: parent
+        text: "󰃦"
+        fontFamily: button.fontFamily
+        fontSize: button.fontSize
+        color: root.speaking ? button.activeColor : button.foreground
+
+        Behavior on color {
+          enabled: true
+          ColorAnimation { duration: 160 }
+        }
+      }
+    }
   }
 
   Process {
