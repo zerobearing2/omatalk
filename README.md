@@ -38,10 +38,9 @@ The script downloads the latest release tarball (checksum-verified), then:
    `~/.local/share/omatalk/models/`, skipped if already present.
 4. Installs and enables the `omatalk.service` systemd user unit, so the
    daemon is warm from login and survives relogin.
-5. Puts `omatalk` on `PATH` and installs the Omarchy bar plugin. The installer
-   then prints a copy-paste command that adds the F8
-   binding to `~/.config/hypr/bindings.lua` and reloads Hyprland. The
-   installer never edits your keybindings itself.
+5. Puts `omatalk` on `PATH`, installs the Omarchy bar plugin, and prints a
+   copy-paste command that adds the F8 binding to `~/.config/hypr/bindings.lua`
+   and reloads Hyprland. The installer never edits your keybindings itself.
 
 Every push to `master` tags a new release automatically. Re-running the
 installer picks up whatever is newest.
@@ -101,7 +100,7 @@ Voice previews are on the [project site](https://omatalk.zerobearing.com).
 ```
 
 The hotkey runs a one-shot client that sends a command over the socket; the
-daemon does the rest. Its request verbs (`speak` / `stop` / `status`) and the
+daemon does the rest. Its protocol verbs (`speak` / `stop` / `status`) and the
 streaming `follow` command are the single seam: clients, the bar, tests, and
 any future rewrite all go through it.
 

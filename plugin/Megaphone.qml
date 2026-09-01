@@ -10,11 +10,15 @@ BarWidget {
 
   moduleName: "zerobearing.omatalk"
   property string daemonState: "idle"
+  readonly property string socketOverride: Quickshell.env("OMATALK_SOCKET")
+  readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR")
+  property string userId: ""
   readonly property bool speaking: daemonState === "speaking"
   readonly property string socketPath: {
-    var override = Quickshell.env("OMATALK_SOCKET")
-    if (override !== "") return override
-    return Quickshell.env("XDG_RUNTIME_DIR") + "/omatalk/omatalk.sock"
+    if (socketOverride !== "") return socketOverride
+    if (runtimeDir !== "") return runtimeDir + "/omatalk/omatalk.sock"
+    if (userId !== "") return "/run/user/" + userId + "/omatalk/omatalk.sock"
+    return ""
   }
 
   function applyState(raw) {
@@ -40,6 +44,16 @@ BarWidget {
     useActiveColor: true
     pressable: false
     tooltipText: root.speaking ? "Omatalk is speaking" : "Omatalk"
+  }
+
+  Process {
+    id: userIdProcess
+    command: ["id", "-u"]
+    running: root.socketOverride === "" && root.runtimeDir === ""
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.userId = String(text).trim()
+    }
   }
 
   Component {
