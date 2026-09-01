@@ -56,6 +56,17 @@ curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" "$SITE_BASE/omatalk-src.tar
 curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" "$SITE_BASE/omatalk-src.tar.gz.sha256?ts=$TS"
 (cd "$OMATALK_HOME" && sha256sum -c omatalk-src.tar.gz.sha256 --quiet)
 
+# 3. Models (~185MB, skipped when their checksums match). fp16 half-size
+# export: spectral correlation 0.999 against fp32 — audibly identical.
+# Checksums pin the exact artifacts we validated by listening. Deliberately
+# before the stop: the daemon only reads models at startup, so fetching
+# them while it still runs keeps its downtime to the venv + service swap
+# (and a failed download leaves the old daemon untouched).
+mkdir -p "$OMATALK_HOME/models"
+download_model "$MODEL_FILE" "$MODEL_SHA256"
+download_model "voices-v1.0.bin" "$VOICES_SHA256"
+
+# 4. Stop the daemon before replacing the venv it runs from.
 msg "Stopping the current daemon"
 stop_status=0
 systemctl --user stop omatalk.service 2>/dev/null || stop_status=$?
@@ -68,26 +79,19 @@ mkdir -p "$OMATALK_HOME/src"
 tar -xzf "$OMATALK_HOME/omatalk-src.tar.gz" -C "$OMATALK_HOME/src" --strip-components=1
 rm -f "$OMATALK_HOME/omatalk-src.tar.gz" "$OMATALK_HOME/omatalk-src.tar.gz.sha256"
 
-# 3. Python environment (uv; fast installs, kokoro-onnx bundles its own phonemizer).
+# 5. Python environment (uv; fast installs, kokoro-onnx bundles its own phonemizer).
 # --clear makes reinstalls and version upgrades work over an existing install.
 msg "Setting up Python environment with uv"
 uv venv --quiet --clear "$OMATALK_HOME/venv"
 uv pip install --quiet --python "$OMATALK_HOME/venv/bin/python" "$OMATALK_HOME/src"
 
-# 4. Models (~185MB, skipped when their checksums match). fp16 half-size
-# export: spectral correlation 0.999 against fp32 — audibly identical.
-# Checksums pin the exact artifacts we validated by listening.
-mkdir -p "$OMATALK_HOME/models"
-download_model "$MODEL_FILE" "$MODEL_SHA256"
-download_model "voices-v1.0.bin" "$VOICES_SHA256"
-
-# 5. Client and systemd user unit.
+# 6. Client and systemd user unit.
 msg "Installing systemd user unit"
 mkdir -p "$HOME/.config/systemd/user" "$HOME/.local/bin"
 cp "$OMATALK_HOME/src/systemd/omatalk.service" "$HOME/.config/systemd/user/"
 cp "$OMATALK_HOME/venv/bin/omatalk" "$HOME/.local/bin/omatalk"
 
-# 5b. Bar plugin (Omarchy only).
+# 6b. Bar plugin (Omarchy only).
 if command -v omarchy >/dev/null 2>&1; then
   msg "Installing Omarchy bar plugin"
   mkdir -p "$HOME/.config/omarchy/plugins"

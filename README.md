@@ -61,12 +61,15 @@ The script downloads the latest release tarball (checksum-verified), then:
 1. Checks system dependencies and installs any missing ones via
    `omarchy pkg add` (python, curl, pipewire, wl-clipboard, uv; stock
    Omarchy usually only lacks uv).
-2. Builds a uv-managed venv at `~/.local/share/omatalk/venv/`.
-3. Downloads the Kokoro-82M model and voice files (~185MB) to
-   `~/.local/share/omatalk/models/`, skipped when their checksums match.
-4. Stops any existing daemon, installs and enables a fresh `omatalk.service`
-   systemd user unit, so the new daemon is running before the command exits.
-5. Puts `omatalk` on `PATH`, installs and refreshes the Omarchy bar plugin, and
+2. Downloads the Kokoro-82M model and voice files (~185MB) to
+   `~/.local/share/omatalk/models/`, skipped when their checksums match —
+   deliberately while any existing daemon is still running, since models
+   are only read at startup.
+3. Stops any existing daemon, rebuilds the uv-managed venv at
+   `~/.local/share/omatalk/venv/`, and installs and enables a fresh
+   `omatalk.service` systemd user unit, so the new daemon is running
+   before the command exits.
+4. Puts `omatalk` on `PATH`, installs and refreshes the Omarchy bar plugin, and
    prints a copy-paste command to add the F8 binding when no Omatalk binding is
    present. The installer never edits your keybindings itself.
 
@@ -99,6 +102,11 @@ omatalk upgrade               # install the latest release
 ```
 
 `systemctl --user start|stop|restart omatalk` controls the daemon.
+
+When the daemon is down, `speak` and `stop` raise a desktop notification
+alongside the terminal error — they run from hotkeys, where there may be no
+terminal to read. `status` only prints the error, so scripts and installers
+can poll it silently.
 `journalctl --user -u omatalk -f` shows logs.
 
 ## Troubleshooting

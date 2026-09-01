@@ -80,3 +80,48 @@ def test_upgrade_rejects_extra_arguments(installer_site, tmp_path):
     assert result.returncode == 2
     assert result.stderr.startswith("usage: omatalk")
     assert not requests
+
+
+def make_notify_environment(tmp_path):
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    (fake_bin / "notify-send").write_text(
+        "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$NOTIFY_LOG\"\n"
+    )
+    (fake_bin / "notify-send").chmod(0o755)
+    return {
+        **os.environ,
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "OMATALK_SOCKET": str(tmp_path / "missing.sock"),
+        "NOTIFY_LOG": str(tmp_path / "notify.log"),
+    }
+
+
+def run_cli(command, env):
+    return subprocess.run(
+        [sys.executable, "-m", "omatalk.cli", command],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_status_failure_does_not_notify(tmp_path):
+    env = make_notify_environment(tmp_path)
+
+    result = run_cli("status", env)
+
+    assert result.returncode == 1
+    assert "daemon not running" in result.stderr
+    assert not Path(env["NOTIFY_LOG"]).exists()
+
+
+def test_speak_failure_notifies(tmp_path):
+    env = make_notify_environment(tmp_path)
+
+    result = run_cli("speak", env)
+
+    assert result.returncode == 1
+    assert "daemon not running" in result.stderr
+    assert Path(env["NOTIFY_LOG"]).exists()

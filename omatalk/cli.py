@@ -52,6 +52,19 @@ def upgrade():
             Path(path).unlink(missing_ok=True)
 
 
+def notify_daemon_down():
+    try:
+        subprocess.run(
+            [
+                "notify-send",
+                "Omatalk",
+                "daemon not running — systemctl --user start omatalk",
+            ]
+        )
+    except OSError:
+        pass
+
+
 def main():
     args = sys.argv[1:]
     if args and args[0] == "upgrade":
@@ -71,13 +84,8 @@ def main():
         client.sendall((cmd + "\n").encode())
         print(client.recv(1024).decode().strip())
     except OSError:
-        subprocess.run(
-            [
-                "notify-send",
-                "Omatalk",
-                "daemon not running — systemctl --user start omatalk",
-            ]
-        )
+        if args[0] != "status":
+            notify_daemon_down()
         print("daemon not running", file=sys.stderr)
         sys.exit(1)
 
