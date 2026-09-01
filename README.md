@@ -1,8 +1,8 @@
 # Omatalk
 
-Local text-to-speech for Omarchy. Select text, press a hotkey, hear it read
-back. The reverse of dictation: instead of you talking to the machine, it
-talks to you. Fully local, no network calls at runtime.
+Local text-to-speech for [Omarchy](https://omarchy.org). Select text, press a
+hotkey, hear it read back. The reverse of dictation: instead of you talking to
+the machine, it talks to you. Fully local, no network calls at runtime.
 
 ## How it works
 
@@ -136,6 +136,17 @@ any future rewrite all go through it.
 
 - [Domain language](CONTEXT.md)
 - [ADRs](docs/adr/)
+
+## Credits
+
+The voice is [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) by
+[hexgrad](https://github.com/hexgrad/kokoro). Omatalk runs it through
+[kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) by
+[thewh1teagle](https://github.com/thewh1teagle), the Python ONNX package the
+daemon imports.
+
+Built for [Omarchy](https://omarchy.org) by DHH
+([source](https://github.com/omacom/omarchy)).
 
 ## License
 
