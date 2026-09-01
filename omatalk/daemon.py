@@ -10,6 +10,10 @@ from .config import load, socket_path
 from .engine import Engine
 from .player import play
 
+# The onnxruntime arena grows to fit the longest utterance and never shrinks;
+# an idle recycle lets systemd hand us a fresh process instead.
+IDLE_TIMEOUT = 600
+
 
 class Daemon:
     def __init__(self, cfg: dict):
@@ -42,6 +46,7 @@ class Daemon:
             self._thread.join(timeout=10)
 
     def speak(self, text: str):
+        self.touch()
         text = text.strip() or capture_primary(self.cfg)
         if text and self.state == "speaking" and text == self._current_text:
             self.stop()
@@ -65,8 +70,15 @@ class Daemon:
         self._thread.start()
 
     def stop(self):
+        self.touch()
         self._stop_current()
         self.state = "idle"
+
+    def touch(self):
+        self._last_busy = time.monotonic()
+
+    def idle_seconds(self):
+        return time.monotonic() - self._last_busy
 
     def _run(self, text: str, cancel: threading.Event):
         try:
@@ -97,7 +109,6 @@ class Daemon:
 def handle(daemon: Daemon, line: str) -> str:
     parts = line.split(" ", 1)
     cmd = parts[0]
-    daemon._last_busy = time.monotonic()
     if cmd == "speak":
         daemon.speak(parts[1] if len(parts) > 1 else "")
         return "ok"
@@ -124,20 +135,20 @@ def serve():
             try:
                 conn, _ = server.accept()
             except TimeoutError:
-                idle = time.monotonic() - daemon._last_busy
-                if daemon.state == "idle" and idle > cfg["idle_timeout"]:
-                    print(
-                        f"idle for {int(idle)}s; recycling to release memory",
-                        flush=True,
-                    )
+                idle = daemon.idle_seconds()
+                if daemon.state != "speaking" and idle > IDLE_TIMEOUT:
+                    print(f"idle {int(idle)}s; recycling", flush=True)
                     break
                 continue
-            with conn:
-                line = conn.makefile("r").readline()
-                if not line:
-                    continue
-                reply = handle(daemon, line.strip())
-                conn.sendall((reply + "\n").encode())
+            try:
+                with conn:
+                    line = conn.makefile("r").readline()
+                    if not line:
+                        continue
+                    reply = handle(daemon, line.strip())
+                    conn.sendall((reply + "\n").encode())
+            except (TimeoutError, OSError):
+                continue
     finally:
         path.unlink(missing_ok=True)
 

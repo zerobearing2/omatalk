@@ -8,6 +8,7 @@ SITE_BASE="${SITE_BASE:-https://omatalk.zerobearing.com}"
 MODEL_BASE="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1"
 MODEL_SHA256="f3a290d384fbb27966d462905c71a46cef9e5fd00516b40df32a0b4afe77ac96"
 VOICES_SHA256="bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
+MODEL_FILE="kokoro-v1.0.fp16.onnx"
 
 msg() { printf '\033[1;32m==>\033[0m %s\n' "$1"; }
 
@@ -50,17 +51,16 @@ uv pip install --quiet --python "$OMATALK_HOME/venv/bin/python" "$OMATALK_HOME/s
 
 # 4. Models (~185MB, skipped if already present). fp16 half-size export:
 # spectral correlation 0.999 against fp32 — audibly identical. Checksums
-# pin the exact artifacts we validated by listening — a re-exported
-# "same" model is not the same model.
+# pin the exact artifacts we validated by listening.
 mkdir -p "$OMATALK_HOME/models"
-for f in kokoro-v1.0.fp16.onnx voices-v1.0.bin; do
+for f in "$MODEL_FILE" voices-v1.0.bin; do
   if [ ! -s "$OMATALK_HOME/models/$f" ]; then
     msg "Downloading $f (~185MB total) — this can take a few minutes depending on your connection"
     curl -L --fail --progress-bar -o "$OMATALK_HOME/models/$f" "$MODEL_BASE/$f"
   fi
 done
 msg "Verifying model checksums"
-echo "${MODEL_SHA256}  $OMATALK_HOME/models/kokoro-v1.0.fp16.onnx" | sha256sum -c --quiet
+echo "${MODEL_SHA256}  $OMATALK_HOME/models/$MODEL_FILE" | sha256sum -c --quiet
 echo "${VOICES_SHA256}  $OMATALK_HOME/models/voices-v1.0.bin" | sha256sum -c --quiet
 
 # 5. systemd user service: warm daemon from login.
