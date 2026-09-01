@@ -92,7 +92,7 @@ BarWidget {
   Timer {
     id: retry
     interval: 1000
-    repeat: false
+    repeat: true
     onTriggered: {
       stateSocketLoader.active = false
       reconnect.start()

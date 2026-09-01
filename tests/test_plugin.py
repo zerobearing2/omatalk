@@ -144,6 +144,7 @@ ShellRoot {{
         server.close()
         socket_path.unlink(missing_ok=True)
         output_until(process, "WIDGET_UNAVAILABLE unavailable=true", timeout=6)
+        time.sleep(2)
 
         server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         server.bind(str(socket_path))
