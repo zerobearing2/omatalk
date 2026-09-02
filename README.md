@@ -96,6 +96,7 @@ Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself.
 ```sh
 omatalk speak                       # capture and speak (what the hotkey runs)
 omatalk speak "text here"           # speak given text
+omatalk speak --voice af_bella "hi" # speak once in a voice, default unchanged
 omatalk stop                        # cut off the current utterance
 omatalk status                      # idle | speaking | error
 omatalk upgrade                     # install the latest release
@@ -191,6 +192,11 @@ exposed by the panel or CLI (`lang`, `capture_primary`, `capture_clipboard`,
 `player`, `notify`); those still require `systemctl --user restart omatalk`
 to take effect.
 
+Picking a voice in the panel immediately speaks a short sample in it, so you
+can compare voices without leaving the panel. `omatalk speak --voice <name>
+"text"` does the same from a terminal or a script, for one Utterance, without
+touching your configured default.
+
 ![Omatalk's voice and speed config panel](public/images/omatalk-config-panel.png)
 
 ```toml
@@ -198,7 +204,8 @@ voice = "af_heart"
 speed = 1.0
 ```
 
-Voice previews are on the [project site](https://omatalk.zerobearing.com).
+Prerecorded samples of every voice are on the
+[project site](https://omatalk.zerobearing.com).
 
 ## Architecture
 

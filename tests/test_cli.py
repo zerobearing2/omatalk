@@ -101,9 +101,11 @@ def make_notify_environment(tmp_path):
     }
 
 
-def run_cli(command, env):
+def run_cli(args, env):
+    if isinstance(args, str):
+        args = [args]
     return subprocess.run(
-        [sys.executable, "-m", "omatalk.cli", command],
+        [sys.executable, "-m", "omatalk.cli", *args],
         cwd=ROOT,
         env=env,
         capture_output=True,
@@ -233,6 +235,39 @@ def test_config_set_rejects_unsettable_key(config_environment, key):
 
     assert result.returncode == 1
     assert "not settable via config set" in result.stderr
+
+
+def test_speak_voice_rejects_unknown_voice_before_touching_daemon(config_environment):
+    result = run_cli(["speak", "--voice", "not_a_real_voice", "hi"], config_environment)
+
+    assert result.returncode == 1
+    assert "not_a_real_voice" in result.stderr
+    # The daemon-down codepath (notify_daemon_down / "daemon not running")
+    # must never run: an invalid --voice is rejected before the socket is
+    # touched at all, same as `config set voice <invalid>`.
+    assert "daemon not running" not in result.stderr
+
+
+def test_speak_voice_valid_reaches_the_same_daemon_down_failure_as_plain_speak(
+    config_environment, tmp_path
+):
+    fake_bin = tmp_path / "notify-bin"
+    fake_bin.mkdir()
+    (fake_bin / "notify-send").write_text(
+        "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$NOTIFY_LOG\"\n"
+    )
+    (fake_bin / "notify-send").chmod(0o755)
+    env = {
+        **config_environment,
+        "PATH": f"{fake_bin}:{config_environment['PATH']}",
+        "NOTIFY_LOG": str(tmp_path / "notify.log"),
+    }
+
+    result = run_cli(["speak", "--voice", "af_bella", "hi"], env)
+
+    assert result.returncode == 1
+    assert "daemon not running" in result.stderr
+    assert Path(env["NOTIFY_LOG"]).exists()
 
 
 def test_config_set_round_trip_preserves_untouched_keys(config_environment):

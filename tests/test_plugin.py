@@ -350,6 +350,13 @@ ShellRoot {{
             time.sleep(0.1)
         log_lines = cli_log.read_text().splitlines()
         assert log_lines.count("config set voice bf_test_two") == 1
+        # Selecting a voice also fires an immediate preview, in parallel with
+        # (not sequenced after) the config-set save. The fake binary logs
+        # "$*", which joins argv with plain spaces (no re-quoting), so the
+        # sample-text argument's own spaces are indistinguishable from argv
+        # boundaries here — this still proves the call fired with the right
+        # voice and sample words.
+        assert log_lines.count("speak --voice bf_test_two Hi, I'm test_two.") == 1
 
         # 1.73 is deliberately not a clean tenth, to prove the panel snaps
         # a drag's continuous release value to the nearest 0.1 itself

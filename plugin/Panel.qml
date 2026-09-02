@@ -41,6 +41,19 @@ Panel {
     return false
   }
 
+  // Strips the locale/gender prefix so "af_bella" reads as a name, not a
+  // filename — e.g. "Hi, I'm bella." Every option in voiceOptions passed
+  // isEnglishVoice, so one of englishPrefixes always matches.
+  function sampleTextFor(name) {
+    for (var i = 0; i < englishPrefixes.length; i++) {
+      var prefix = englishPrefixes[i]
+      if (String(name).indexOf(prefix) === 0) {
+        return "Hi, I'm " + String(name).slice(prefix.length) + "."
+      }
+    }
+    return "Hi, I'm " + name + "."
+  }
+
   function refresh() {
     voicesProc.running = true
     getProc.running = true
@@ -52,6 +65,11 @@ Panel {
     root.voice = value
     setVoiceProc.command = ["omatalk", "config", "set", "voice", value]
     setVoiceProc.running = true
+    // Not sequenced after setVoiceProc: the preview never touches
+    // config.toml or waits on the Daemon's reload, so there is nothing to
+    // wait for — it fires in parallel with the save.
+    previewProc.command = ["omatalk", "speak", "--voice", value, root.sampleTextFor(value)]
+    previewProc.running = true
   }
 
   function setSpeed(value) {
@@ -105,6 +123,12 @@ Panel {
       onStreamFinished: root.voiceError = text.trim()
     }
     onExited: function(exitCode) { if (exitCode === 0) root.voiceError = "" }
+  }
+
+  Process {
+    id: previewProc
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector { waitForEnd: true }
   }
 
   Process {

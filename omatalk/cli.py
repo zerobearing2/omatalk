@@ -78,6 +78,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     speak = sub.add_parser("speak", help="speak text, or the current selection/clipboard")
     speak.add_argument("text", nargs="*")
+    speak.add_argument(
+        "--voice", help="speak this one Utterance in a voice, without changing the default"
+    )
 
     sub.add_parser("stop", help="stop speaking")
     sub.add_parser("status", help="print the daemon's state")
@@ -119,6 +122,16 @@ def config_voices(as_json: bool) -> int:
     return 0
 
 
+def known_voice(name: str) -> bool:
+    # Single source of truth for voice validity: `config set voice` and
+    # `speak --voice` both call this instead of keeping two lists that could
+    # drift apart.
+    if name in config.voices():
+        return True
+    print(f"{name}: not a known voice", file=sys.stderr)
+    return False
+
+
 def config_set(key: str, raw_value: str) -> int:
     if key not in CONFIG_SETTABLE:
         print(
@@ -128,8 +141,7 @@ def config_set(key: str, raw_value: str) -> int:
         return 1
 
     if key == "voice":
-        if raw_value not in config.voices():
-            print(f"{raw_value}: not a known voice", file=sys.stderr)
+        if not known_voice(raw_value):
             return 1
         config.set("voice", raw_value)
         return 0
@@ -181,7 +193,12 @@ def main():
 
     if args.command == "speak":
         text = " ".join(args.text)
-        cmd = f"speak {text}" if text else "speak"
+        if args.voice:
+            if not known_voice(args.voice):
+                sys.exit(1)
+            cmd = f"speak --voice {args.voice} {text}" if text else f"speak --voice {args.voice}"
+        else:
+            cmd = f"speak {text}" if text else "speak"
     else:
         cmd = args.command
 
