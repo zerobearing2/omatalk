@@ -1,71 +1,13 @@
 import json
 import os
 import shutil
-import socket
 import subprocess
-import time
 from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parent.parent
 PLUGIN = ROOT / "plugin"
-FAKE_PANEL_VOICES = ["af_test_one", "bf_test_two"]
-FAKE_PANEL_CONFIG = {"voice": "af_test_one", "speed": 1.25}
-
-
-def require_quickshell():
-    quickshell = shutil.which("quickshell")
-    shell_dir = Path("/usr/share/omarchy/shell")
-    if not quickshell or not (shell_dir / "Ui/qmldir").is_file():
-        pytest.skip("requires an installed Omarchy Quickshell shell")
-    if not os.environ.get("WAYLAND_DISPLAY"):
-        pytest.skip("requires a graphical Wayland session")
-    return quickshell, shell_dir
-
-
-def start_quickshell(quickshell, config_dir, env):
-    # Log to a file, not a pipe. readline() on PIPE blocks forever on a
-    # partial line, so the test's timeout loop never runs; a full pipe also
-    # deadlocks Quickshell once the test stops consuming stdout.
-    log_path = Path(config_dir) / "quickshell.log"
-    log = log_path.open("w")
-    process = subprocess.Popen(
-        [quickshell, "-p", str(config_dir)],
-        env=env,
-        stdout=log,
-        stderr=subprocess.STDOUT,
-    )
-    process._test_log = log
-    process._test_log_path = log_path
-    return process
-
-
-def stop_quickshell(process):
-    log = getattr(process, "_test_log", None)
-    if process.poll() is None:
-        process.terminate()
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=5)
-    if log is not None:
-        log.close()
-
-
-def output_until(process, marker: str, timeout: float = 10):
-    deadline = time.monotonic() + timeout
-    text = ""
-    while time.monotonic() < deadline:
-        text = process._test_log_path.read_text()
-        if marker in text:
-            return text.splitlines(keepends=True)
-        if process.poll() is not None:
-            break
-        time.sleep(0.05)
-    raise AssertionError(f"Quickshell output did not contain {marker!r}: {text.splitlines()}")
 
 
 def test_manifest_points_to_bar_widget():
@@ -77,347 +19,39 @@ def test_manifest_points_to_bar_widget():
     assert (PLUGIN / "Panel.qml").is_file()
 
 
-@pytest.mark.parametrize("vertical", [False, True])
-@pytest.mark.parametrize("initially_available", [False, True])
-def test_megaphone_socket_widget_round_trip(
-    tmp_path, vertical, initially_available
-):
-    quickshell, shell_dir = require_quickshell()
-
-    imports = tmp_path / "imports" / "qs"
-    imports.mkdir(parents=True)
-    for module in ("Ui", "Commons"):
-        (imports / module).symlink_to(shell_dir / module, target_is_directory=True)
-
-    socket_path = tmp_path / "omatalk.sock"
-    server = None
-    if initially_available:
-        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        server.bind(str(socket_path))
-        server.listen(1)
-        server.settimeout(10)
-
-    shell = tmp_path / "shell.qml"
-    shell.write_text(
-        f'''import QtQuick
-import Quickshell
-
-ShellRoot {{
-  QtObject {{
-    id: testBar
-    property bool vertical: {str(vertical).lower()}
-    property int barSize: 26
-    property color barForeground: "#dddddd"
-    property color foreground: "#dddddd"
-    property color urgent: "#ff7b72"
-    property string fontFamily: "JetBrainsMono Nerd Font"
-    property bool foregroundAnimationEnabled: true
-    function registerClickTarget() {{}}
-    function unregisterClickTarget() {{}}
-    function showTooltip() {{}}
-    function hideTooltip() {{}}
-  }}
-
-  Loader {{
-    id: widgetLoader
-    source: "{(PLUGIN / "BarWidget.qml").as_uri()}"
-    onLoaded: {{
-      item.bar = testBar
-      console.warn("WIDGET_READY state=" + item.daemonState)
-    }}
-  }}
-
-  Connections {{
-    target: widgetLoader.item
-    ignoreUnknownSignals: true
-    function onDaemonStateChanged() {{
-      console.warn("WIDGET_STATE state=" + widgetLoader.item.daemonState)
-    }}
-    function onDaemonUnavailableChanged() {{
-      console.warn("WIDGET_UNAVAILABLE unavailable=" + widgetLoader.item.daemonUnavailable)
-    }}
-  }}
-}}
-'''
-    )
-
-    env = {
-        **os.environ,
-        "OMATALK_SOCKET": str(socket_path),
-        "QML2_IMPORT_PATH": str(tmp_path / "imports"),
-        "QT_QUICK_BACKEND": "software",
-    }
-    process = start_quickshell(quickshell, tmp_path, env)
-
-    connection = None
-    try:
-        if not initially_available:
-            time.sleep(3)
-            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            server.bind(str(socket_path))
-            server.listen(1)
-            server.settimeout(10)
-        assert server is not None
-        connection, _ = server.accept()
-        connection.settimeout(10)
-        assert connection.recv(64) == b"follow\n"
-        connection.sendall(b"idle\n")
-        if initially_available:
-            output_until(process, "WIDGET_READY state=idle")
-
-        connection.sendall(b"speaking\n")
-        output_until(process, "WIDGET_STATE state=speaking")
-        connection.sendall(b"idle\n")
-        output_until(process, "WIDGET_STATE state=idle")
-
-        connection.sendall(b"speaking\n")
-        output_until(process, "WIDGET_STATE state=speaking")
-        connection.sendall(b"unknown\n")
-        output_until(process, "WIDGET_STATE state=idle")
-        connection.sendall(b"error\n")
-        output_until(process, "WIDGET_UNAVAILABLE unavailable=true")
-        connection.sendall(b"idle\n")
-        output_until(process, "WIDGET_UNAVAILABLE unavailable=false")
-
-        connection.close()
-        connection = None
-        if server is not None:
-            server.close()
-        socket_path.unlink(missing_ok=True)
-        output_until(process, "WIDGET_UNAVAILABLE unavailable=true", timeout=6)
-        time.sleep(2)
-
-        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        server.bind(str(socket_path))
-        server.listen(1)
-        server.settimeout(10)
-        connection, _ = server.accept()
-        connection.settimeout(10)
-        assert connection.recv(64) == b"follow\n"
-        output_until(process, "WIDGET_UNAVAILABLE unavailable=false")
-        connection.sendall(b"speaking\n")
-        output_until(process, "WIDGET_STATE state=speaking")
-    finally:
-        if connection is not None:
-            connection.close()
-        if server is not None:
-            server.close()
-        stop_quickshell(process)
+def qmltestrunner():
+    candidates = [
+        Path("/usr/lib/qt6/bin/qmltestrunner"),
+        shutil.which("qmltestrunner"),
+    ]
+    for path in candidates:
+        if path and Path(path).is_file():
+            return str(path)
+    return None
 
 
-def ipc_call(pid: int, target: str, function: str, *args: str) -> str:
+def test_panel_qml():
+    runner = qmltestrunner()
+    if not runner:
+        pytest.skip("qmltestrunner not installed")
+
     result = subprocess.run(
-        ["quickshell", "ipc", "--pid", str(pid), "call", target, function, *args],
+        [
+            runner,
+            "-input",
+            str(ROOT / "tests" / "qml"),
+            "-import",
+            str(ROOT / "tests" / "qml" / "imports"),
+            "-o",
+            "-,txt",
+        ],
+        env={
+            **os.environ,
+            "QT_QPA_PLATFORM": "offscreen",
+            "QT_QUICK_BACKEND": "software",
+        },
         capture_output=True,
         text=True,
-        timeout=10,
+        timeout=30,
     )
-    assert result.returncode == 0, result.stderr
-    return result.stdout.strip()
-
-
-def wait_for_panel_state(pid: int, timeout: float = 10) -> dict:
-    deadline = time.monotonic() + timeout
-    state = json.loads(ipc_call(pid, "omatalkTestDriver", "state"))
-    while time.monotonic() < deadline and (
-        not state["voiceOptions"] or state.get("version") in (None, "", "unknown")
-    ):
-        time.sleep(0.1)
-        state = json.loads(ipc_call(pid, "omatalkTestDriver", "state"))
-    return state
-
-
-def test_panel_shells_config_cli_for_voice_and_speed(tmp_path):
-    quickshell, shell_dir = require_quickshell()
-
-    imports = tmp_path / "imports" / "qs"
-    imports.mkdir(parents=True)
-    for module in ("Ui", "Commons"):
-        (imports / module).symlink_to(shell_dir / module, target_is_directory=True)
-
-    # Fake `omatalk` binary on PATH: logs every invocation and returns the
-    # same canned JSON `config get`/`config voices` shell out to.
-    fake_bin = tmp_path / "bin"
-    fake_bin.mkdir()
-    cli_log = tmp_path / "cli.log"
-    (fake_bin / "omatalk").write_text(
-        "#!/bin/sh\n"
-        'printf "%s\\n" "$*" >> "$OMATALK_TEST_CLI_LOG"\n'
-        'case "$*" in\n'
-        f"  \"config voices --json\") echo '{json.dumps(FAKE_PANEL_VOICES)}' ;;\n"
-        f"  \"config get --json\") echo '{json.dumps(FAKE_PANEL_CONFIG)}' ;;\n"
-        "  version|--version)\n"
-        "    if [ -f \"$OMATALK_TEST_VERSION_FAIL\" ]; then exit 1; fi\n"
-        "    echo '0.2.1-test' ;;\n"
-        "esac\n"
-        "exit 0\n"
-    )
-    (fake_bin / "omatalk").chmod(0o755)
-
-    shell = tmp_path / "shell.qml"
-    shell.write_text(
-        f'''import QtQuick
-import Quickshell
-import Quickshell.Io
-
-ShellRoot {{
-  QtObject {{
-    id: testBar
-    property bool vertical: false
-    property int barSize: 26
-    property color barForeground: "#dddddd"
-    property color foreground: "#dddddd"
-    property color background: "#1a1a1a"
-    property color urgent: "#ff7b72"
-    property string fontFamily: "JetBrainsMono Nerd Font"
-    property bool foregroundAnimationEnabled: true
-    property string position: "top"
-    property var activePopout: null
-    property var clickTargets: []
-    function registerClickTarget() {{}}
-    function unregisterClickTarget() {{}}
-    function showTooltip() {{}}
-    function hideTooltip() {{}}
-    function requestPopout(key) {{ activePopout = key }}
-    function releasePopout(key) {{ if (activePopout === key) activePopout = null }}
-    function targetBelongsToWindow() {{ return true }}
-  }}
-
-  function panelItem() {{
-    return widgetLoader.item ? widgetLoader.item.panelItem : null
-  }}
-
-  function findByObjectName(item, name) {{
-    if (!item) return null
-    if (item.objectName === name) return item
-    if (!item.children) return null
-    for (var i = 0; i < item.children.length; i++) {{
-      var found = findByObjectName(item.children[i], name)
-      if (found) return found
-    }}
-    return null
-  }}
-
-  Loader {{
-    id: widgetLoader
-    source: "{(PLUGIN / "BarWidget.qml").as_uri()}"
-    onLoaded: {{
-      item.bar = testBar
-      console.warn("WIDGET_READY state=" + item.daemonState)
-    }}
-  }}
-
-  IpcHandler {{
-    target: "omatalkTestDriver"
-    // Drive refresh() directly. togglePanel() maps KeyboardPanel — a
-    // full-screen layer-shell overlay — onto the live Wayland session.
-    // Open still calls refresh() in Panel.qml (onOpenedChanged); this is
-    // that same function without opening a window on the desktop.
-    function refreshPanel(): void {{
-      var p = panelItem()
-      if (p && p.refresh) p.refresh()
-    }}
-    function state(): string {{
-      var p = panelItem()
-      if (!p) return "{{}}"
-      return JSON.stringify({{
-        voiceOptions: p.voiceOptions,
-        voice: p.voice,
-        speed: p.speed,
-        opened: p.opened,
-        version: p.version
-      }})
-    }}
-    function setVoice(v: string): void {{
-      var p = panelItem()
-      var d = p ? findByObjectName(p.contentRoot, "omatalkVoiceDropdown") : null
-      if (d) d.changed(v)
-    }}
-    function dragAndReleaseSpeed(v: string): void {{
-      var p = panelItem()
-      var s = p ? findByObjectName(p.contentRoot, "omatalkSpeedSlider") : null
-      if (!s) return
-      s.moved(0.6)
-      s.moved(0.8)
-      s.released(parseFloat(v))
-    }}
-  }}
-}}
-'''
-    )
-
-    version_fail = tmp_path / "version-fail"
-    env = {
-        **os.environ,
-        "PATH": f"{fake_bin}:{os.environ['PATH']}",
-        "OMATALK_TEST_CLI_LOG": str(cli_log),
-        "OMATALK_TEST_VERSION_FAIL": str(version_fail),
-        "OMATALK_SOCKET": str(tmp_path / "missing.sock"),
-        "QML2_IMPORT_PATH": str(tmp_path / "imports"),
-        "QT_QUICK_BACKEND": "software",
-    }
-    process = start_quickshell(quickshell, tmp_path, env)
-    try:
-        output_until(process, "WIDGET_READY state=idle")
-
-        ipc_call(process.pid, "omatalkTestDriver", "refreshPanel")
-        state = wait_for_panel_state(process.pid)
-
-        # Opening the panel populates the dropdown/slider from the CLI's
-        # canned config, and shells voices/get exactly once each.
-        assert state["voiceOptions"] == FAKE_PANEL_VOICES
-        assert state["voice"] == "af_test_one"
-        assert state["speed"] == 1.25
-        assert state["version"] == "0.2.1-test"
-        log_lines = cli_log.read_text().splitlines()
-        assert log_lines.count("config voices --json") == 1
-        assert log_lines.count("config get --json") == 1
-        assert log_lines.count("version") == 1
-
-        version_fail.touch()
-        ipc_call(process.pid, "omatalkTestDriver", "refreshPanel")
-        deadline = time.monotonic() + 10
-        state = json.loads(ipc_call(process.pid, "omatalkTestDriver", "state"))
-        while time.monotonic() < deadline and state.get("version") != "unknown":
-            time.sleep(0.1)
-            state = json.loads(ipc_call(process.pid, "omatalkTestDriver", "state"))
-        assert state["version"] == "unknown"
-
-        ipc_call(process.pid, "omatalkTestDriver", "setVoice", "bf_test_two")
-        deadline = time.monotonic() + 10
-        while (
-            time.monotonic() < deadline
-            and "config set voice bf_test_two" not in cli_log.read_text()
-        ):
-            time.sleep(0.1)
-        log_lines = cli_log.read_text().splitlines()
-        assert log_lines.count("config set voice bf_test_two") == 1
-        # Selecting a voice also fires an immediate preview, in parallel with
-        # (not sequenced after) the config-set save. The fake binary logs
-        # "$*", which joins argv with plain spaces (no re-quoting), so the
-        # sample-text argument's own spaces are indistinguishable from argv
-        # boundaries here — this still proves the call fired with the right
-        # voice and sample words.
-        assert (
-            log_lines.count("speak --voice bf_test_two Hi, I'm test_two. This is what I sound like.")
-            == 1
-        )
-
-        # 1.73 is deliberately not a clean tenth, to prove the panel snaps
-        # a drag's continuous release value to the nearest 0.1 itself
-        # (PanelSlider's own `step` only affects wheel nudges, not drags).
-        ipc_call(process.pid, "omatalkTestDriver", "dragAndReleaseSpeed", "1.73")
-        deadline = time.monotonic() + 10
-        while (
-            time.monotonic() < deadline
-            and "config set speed 1.7" not in cli_log.read_text()
-        ):
-            time.sleep(0.1)
-        log_lines = cli_log.read_text().splitlines()
-        # Dragging must not have shelled out per-tick — only the release does.
-        assert log_lines.count("config set speed 1.7") == 1
-        assert not any(line.startswith("config set speed 0.6") for line in log_lines)
-        assert not any(line.startswith("config set speed 0.8") for line in log_lines)
-        assert not any(line.startswith("config set speed 1.73") for line in log_lines)
-    finally:
-        stop_quickshell(process)
+    assert result.returncode == 0, result.stdout + result.stderr

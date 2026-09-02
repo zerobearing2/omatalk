@@ -17,9 +17,12 @@ msg() { printf '\033[1;32m==>\033[0m %s\n' "$1"; }
 warn() { printf '\033[1;33m==>\033[0m %s\n' "$1"; }
 
 # Prompts read the terminal when piped via curl | bash; fall back to stdin
-# for scripted runs where /dev/tty is unavailable.
-ASK_FROM=/dev/tty
-{ : < /dev/tty; } 2>/dev/null || ASK_FROM=/dev/stdin
+# for scripted runs where /dev/tty is unavailable. Tests set ASK_FROM to
+# /dev/stdin so `read` cannot steal the developer's tty.
+if [ -z "${ASK_FROM:-}" ]; then
+  ASK_FROM=/dev/tty
+  { : < /dev/tty; } 2>/dev/null || ASK_FROM=/dev/stdin
+fi
 
 download_model() {
   local file="$1"

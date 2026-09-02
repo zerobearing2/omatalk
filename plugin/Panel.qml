@@ -22,12 +22,6 @@ Panel {
   // so both the live label and the committed value round through this.
   function snapSpeed(v) { return Math.round(v * 10) / 10 }
 
-  // Test hook only: `keyCatcher` lives inside KeyboardPanel's separate
-  // PanelWindow surface, so it isn't reachable from outside this document
-  // via the normal Item.children tree. Exposing it lets a headless test
-  // walk down to the voice dropdown / speed slider by objectName.
-  readonly property Item contentRoot: keyCatcher
-
   property var voiceOptions: []
   property string voice: ""
   property real speed: 1.0
