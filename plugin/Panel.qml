@@ -147,7 +147,7 @@ Panel {
 
   Process {
     id: versionProc
-    command: ["omatalk", "--version"]
+    command: ["omatalk", "version"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {

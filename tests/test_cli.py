@@ -114,24 +114,26 @@ def run_cli(args, env):
     )
 
 
-def test_version_prints_installed_package_version_without_a_daemon(tmp_path):
+@pytest.mark.parametrize("args", [["version"], ["--version"]])
+def test_version_prints_installed_package_version_without_a_daemon(args, tmp_path):
     env = {
         **os.environ,
         "OMATALK_SOCKET": str(tmp_path / "missing.sock"),
     }
     expected = importlib.metadata.version("omatalk")
 
-    result = run_cli(["--version"], env)
+    result = run_cli(args, env)
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == expected
     assert result.stderr == ""
 
 
-def test_version_does_not_notify_when_the_daemon_is_down(tmp_path):
+@pytest.mark.parametrize("args", [["version"], ["--version"]])
+def test_version_does_not_notify_when_the_daemon_is_down(args, tmp_path):
     env = make_notify_environment(tmp_path)
 
-    result = run_cli(["--version"], env)
+    result = run_cli(args, env)
 
     assert result.returncode == 0, result.stderr
     assert not Path(env["NOTIFY_LOG"]).exists()

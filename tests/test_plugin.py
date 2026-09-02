@@ -228,7 +228,7 @@ def test_panel_shells_config_cli_for_voice_and_speed(tmp_path):
         'case "$*" in\n'
         f"  \"config voices --json\") echo '{json.dumps(FAKE_PANEL_VOICES)}' ;;\n"
         f"  \"config get --json\") echo '{json.dumps(FAKE_PANEL_CONFIG)}' ;;\n"
-        "  --version)\n"
+        "  version|--version)\n"
         "    if [ -f \"$OMATALK_TEST_VERSION_FAIL\" ]; then exit 1; fi\n"
         "    echo '0.2.1-test' ;;\n"
         "esac\n"
@@ -361,7 +361,7 @@ ShellRoot {{
         log_lines = cli_log.read_text().splitlines()
         assert log_lines.count("config voices --json") == 1
         assert log_lines.count("config get --json") == 1
-        assert log_lines.count("--version") == 1
+        assert log_lines.count("version") == 1
 
         version_fail.touch()
         ipc_call(process.pid, "omatalkTestDriver", "refreshPanel")
