@@ -356,7 +356,10 @@ ShellRoot {{
         # sample-text argument's own spaces are indistinguishable from argv
         # boundaries here — this still proves the call fired with the right
         # voice and sample words.
-        assert log_lines.count("speak --voice bf_test_two Hi, I'm test_two.") == 1
+        assert (
+            log_lines.count("speak --voice bf_test_two Hi, I'm test_two. This is what I sound like.")
+            == 1
+        )
 
         # 1.73 is deliberately not a clean tenth, to prove the panel snaps
         # a drag's continuous release value to the nearest 0.1 itself

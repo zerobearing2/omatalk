@@ -46,12 +46,14 @@ Panel {
   }
 
   // Strips the locale/gender prefix so "af_bella" reads as a name, not a
-  // filename — e.g. "Hi, I'm bella." Every option in voiceOptions passed
-  // isEnglishVoice, so matchedPrefix always finds one.
+  // filename, then adds a second sentence — long enough to actually judge
+  // the voice's tone by ear, not just prove distinctness between voices.
+  // Every option in voiceOptions passed isEnglishVoice, so matchedPrefix
+  // always finds one.
   function sampleTextFor(name) {
     var prefix = root.matchedPrefix(name)
     var stripped = prefix !== null ? String(name).slice(prefix.length) : name
-    return "Hi, I'm " + stripped + "."
+    return "Hi, I'm " + stripped + ". This is what I sound like."
   }
 
   function refresh() {
