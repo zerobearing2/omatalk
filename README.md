@@ -223,7 +223,7 @@ Prerecorded samples of every voice are on the
 │ capture:  wl-paste --primary → wl-paste   │
 │ chunker:  text → sentences                │
 │ engine:   Kokoro-82M · ONNX Runtime · CPU │
-│ player:   pw-play → PipeWire              │
+│ player:   pw-cat → PipeWire (streamed)    │
 └───────────────────────────────────────────┘
 ```
 

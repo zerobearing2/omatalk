@@ -180,7 +180,7 @@ def test_config_get_json_reports_full_effective_config(config_environment):
     cfg = json.loads(result.stdout)
     assert cfg["voice"] == "af_heart"
     assert cfg["speed"] == 1.0
-    assert cfg["player"] == ["pw-play"]
+    assert cfg["player"] == ["pw-cat", "-p", "--raw", "--format", "s16"]
 
 
 def test_config_get_plain_reports_key_value_lines(config_environment):

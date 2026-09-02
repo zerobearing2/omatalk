@@ -8,7 +8,11 @@ DEFAULTS = {
     "lang": "en-us",
     "capture_primary": ["wl-paste", "--primary"],
     "capture_clipboard": ["wl-paste"],
-    "player": ["pw-play"],
+    # Raw PCM piped to stdin, not a file path: `player.play()` appends
+    # `--rate <rate> --channels 1 -` per call, so a custom player here must
+    # accept the same (only pw-cat --raw does; pw-play/aplay/etc. expect a
+    # self-describing container file, not headerless PCM on stdin).
+    "player": ["pw-cat", "-p", "--raw", "--format", "s16"],
     "notify": ["notify-send", "Omatalk"],
 }
 

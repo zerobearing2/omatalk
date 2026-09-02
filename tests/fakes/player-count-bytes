@@ -1,0 +1,6 @@
+#!/bin/sh
+log="$OMATALK_TEST_LOG"
+echo "start $$" >> "$log"
+bytes=$(wc -c | tr -d ' ')
+echo "bytes $bytes" >> "$log"
+echo "end $$" >> "$log"

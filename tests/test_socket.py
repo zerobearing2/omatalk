@@ -3,6 +3,8 @@ import sys
 import time
 from pathlib import Path
 
+from omatalk.daemon import LEAD_SILENCE_SECONDS
+
 from conftest import (
     FAKES,
     REPO,
@@ -223,6 +225,47 @@ def test_playback_failure_notifies_and_daemon_survives(daemon):
     finally:
         fail_proc.terminate()
         fail_proc.wait(timeout=10)
+
+
+def test_only_the_first_sentence_of_an_utterance_gets_lead_silence(daemon):
+    cfg_path = daemon["tmp"] / "config-count-bytes.toml"
+    cfg_path.write_text(
+        f'capture_primary = ["{FAKES}/capture-primary"]\n'
+        f'capture_clipboard = ["{FAKES}/capture-clipboard"]\n'
+        f'player = ["{FAKES}/player-count-bytes"]\n'
+        f'notify = ["{FAKES}/notify"]\n'
+    )
+    env = {
+        **daemon["env"],
+        "OMATALK_CONFIG": str(cfg_path),
+        "OMATALK_SOCKET": str(daemon["tmp"] / "count.sock"),
+    }
+    count_proc = subprocess.Popen([str(REPO / "bin" / "omatalkd")], env=env)
+    deadline = time.time() + 60
+    while not (daemon["tmp"] / "count.sock").exists():
+        assert time.time() < deadline
+        time.sleep(0.1)
+    try:
+        clear_logs(daemon)
+        assert (
+            send(daemon, "speak First sentence. Second sentence.", sock="count.sock")
+            == "ok"
+        )
+        wait_status(daemon, "idle", sock="count.sock", timeout=30)
+        byte_counts = [
+            int(line.split(" ")[1])
+            for line in log(daemon).splitlines()
+            if line.startswith("bytes")
+        ]
+        # FakeEngine always returns 2400 samples at 24000Hz regardless of
+        # sentence content; only the first play() call should carry the
+        # extra LEAD_SILENCE_SECONDS of zero samples.
+        plain_bytes = 2400 * 2
+        padded_bytes = (2400 + int(24000 * LEAD_SILENCE_SECONDS)) * 2
+        assert byte_counts == [padded_bytes, plain_bytes]
+    finally:
+        count_proc.terminate()
+        count_proc.wait(timeout=10)
 
 
 def test_speak_voice_override_uses_override_and_leaves_config_toml_untouched(daemon):
