@@ -1,4 +1,5 @@
 import argparse
+import importlib.metadata
 import json
 import os
 import socket
@@ -74,6 +75,11 @@ def notify_daemon_down():
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="omatalk")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=importlib.metadata.version("omatalk"),
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     speak = sub.add_parser("speak", help="speak text, or the current selection/clipboard")

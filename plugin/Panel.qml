@@ -33,6 +33,7 @@ Panel {
   property real speed: 1.0
   property string voiceError: ""
   property string speedError: ""
+  property string version: "unknown"
 
   function matchedPrefix(name) {
     for (var i = 0; i < englishPrefixes.length; i++) {
@@ -59,6 +60,7 @@ Panel {
   function refresh() {
     voicesProc.running = true
     getProc.running = true
+    versionProc.running = true
   }
 
   onOpenedChanged: if (opened) refresh()
@@ -141,6 +143,22 @@ Panel {
       onStreamFinished: root.speedError = text.trim()
     }
     onExited: function(exitCode) { if (exitCode === 0) root.speedError = "" }
+  }
+
+  Process {
+    id: versionProc
+    command: ["omatalk", "--version"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var next = text.trim()
+        root.version = next !== "" ? next : "unknown"
+      }
+    }
+    // Unlike voices/get, which keep last-known functional state on a bad
+    // reply, version is a label. A failed or empty lookup must not keep
+    // showing a stale release number — "unknown" is the honest fallback.
+    onExited: function(exitCode) { if (exitCode !== 0) root.version = "unknown" }
   }
 
   KeyboardPanel {
@@ -249,6 +267,14 @@ Panel {
         }
 
         PanelSeparator {}
+
+        Text {
+          objectName: "omatalkVersion"
+          text: root.version
+          color: Qt.darker(Color.popups.text, 1.3)
+          font.family: Style.font.family
+          font.pixelSize: Style.font.bodySmall
+        }
       }
     }
   }

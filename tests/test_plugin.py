@@ -16,6 +16,16 @@ FAKE_PANEL_VOICES = ["af_test_one", "bf_test_two"]
 FAKE_PANEL_CONFIG = {"voice": "af_test_one", "speed": 1.25}
 
 
+def require_quickshell():
+    quickshell = shutil.which("quickshell")
+    shell_dir = Path("/usr/share/omarchy/shell")
+    if not quickshell or not (shell_dir / "Ui/qmldir").is_file():
+        pytest.skip("requires an installed Omarchy Quickshell shell")
+    if not os.environ.get("WAYLAND_DISPLAY"):
+        pytest.skip("requires a graphical Wayland session")
+    return quickshell, shell_dir
+
+
 def output_until(process, marker: str, timeout: float = 10):
     deadline = time.monotonic() + timeout
     lines = []
@@ -46,12 +56,7 @@ def test_manifest_points_to_bar_widget():
 def test_megaphone_socket_widget_round_trip(
     tmp_path, vertical, initially_available
 ):
-    quickshell = shutil.which("quickshell")
-    shell_dir = Path("/usr/share/omarchy/shell")
-    if not quickshell or not (shell_dir / "Ui/qmldir").is_file():
-        pytest.skip("requires an installed Omarchy Quickshell shell")
-    if not os.environ.get("WAYLAND_DISPLAY"):
-        pytest.skip("requires a graphical Wayland session")
+    quickshell, shell_dir = require_quickshell()
 
     imports = tmp_path / "imports" / "qs"
     imports.mkdir(parents=True)
@@ -196,19 +201,16 @@ def ipc_call(pid: int, target: str, function: str, *args: str) -> str:
 def wait_for_panel_state(pid: int, timeout: float = 10) -> dict:
     deadline = time.monotonic() + timeout
     state = json.loads(ipc_call(pid, "omatalkTestDriver", "state"))
-    while time.monotonic() < deadline and not state["voiceOptions"]:
+    while time.monotonic() < deadline and (
+        not state["voiceOptions"] or state.get("version") in (None, "", "unknown")
+    ):
         time.sleep(0.1)
         state = json.loads(ipc_call(pid, "omatalkTestDriver", "state"))
     return state
 
 
 def test_panel_shells_config_cli_for_voice_and_speed(tmp_path):
-    quickshell = shutil.which("quickshell")
-    shell_dir = Path("/usr/share/omarchy/shell")
-    if not quickshell or not (shell_dir / "Ui/qmldir").is_file():
-        pytest.skip("requires an installed Omarchy Quickshell shell")
-    if not os.environ.get("WAYLAND_DISPLAY"):
-        pytest.skip("requires a graphical Wayland session")
+    quickshell, shell_dir = require_quickshell()
 
     imports = tmp_path / "imports" / "qs"
     imports.mkdir(parents=True)
@@ -226,6 +228,9 @@ def test_panel_shells_config_cli_for_voice_and_speed(tmp_path):
         'case "$*" in\n'
         f"  \"config voices --json\") echo '{json.dumps(FAKE_PANEL_VOICES)}' ;;\n"
         f"  \"config get --json\") echo '{json.dumps(FAKE_PANEL_CONFIG)}' ;;\n"
+        "  --version)\n"
+        "    if [ -f \"$OMATALK_TEST_VERSION_FAIL\" ]; then exit 1; fi\n"
+        "    echo '0.2.1-test' ;;\n"
         "esac\n"
         "exit 0\n"
     )
@@ -260,6 +265,10 @@ ShellRoot {{
     function targetBelongsToWindow() {{ return true }}
   }}
 
+  function panelItem() {{
+    return widgetLoader.item ? widgetLoader.item.panelItem : null
+  }}
+
   function findByObjectName(item, name) {{
     if (!item) return null
     if (item.objectName === name) return item
@@ -282,23 +291,33 @@ ShellRoot {{
 
   IpcHandler {{
     target: "omatalkTestDriver"
-    function openPanel(): void {{ widgetLoader.item.togglePanel() }}
+    // Drive refresh() directly. togglePanel() maps KeyboardPanel — a
+    // full-screen layer-shell overlay — onto the live Wayland session.
+    // Open still calls refresh() in Panel.qml (onOpenedChanged); this is
+    // that same function without opening a window on the desktop.
+    function refreshPanel(): void {{
+      var p = panelItem()
+      if (p && p.refresh) p.refresh()
+    }}
     function state(): string {{
-      var p = widgetLoader.item ? widgetLoader.item.panelItem : null
+      var p = panelItem()
       if (!p) return "{{}}"
       return JSON.stringify({{
         voiceOptions: p.voiceOptions,
         voice: p.voice,
         speed: p.speed,
-        opened: p.opened
+        opened: p.opened,
+        version: p.version
       }})
     }}
     function setVoice(v: string): void {{
-      var d = findByObjectName(widgetLoader.item.panelItem.contentRoot, "omatalkVoiceDropdown")
+      var p = panelItem()
+      var d = p ? findByObjectName(p.contentRoot, "omatalkVoiceDropdown") : null
       if (d) d.changed(v)
     }}
     function dragAndReleaseSpeed(v: string): void {{
-      var s = findByObjectName(widgetLoader.item.panelItem.contentRoot, "omatalkSpeedSlider")
+      var p = panelItem()
+      var s = p ? findByObjectName(p.contentRoot, "omatalkSpeedSlider") : null
       if (!s) return
       s.moved(0.6)
       s.moved(0.8)
@@ -309,10 +328,12 @@ ShellRoot {{
 '''
     )
 
+    version_fail = tmp_path / "version-fail"
     env = {
         **os.environ,
         "PATH": f"{fake_bin}:{os.environ['PATH']}",
         "OMATALK_TEST_CLI_LOG": str(cli_log),
+        "OMATALK_TEST_VERSION_FAIL": str(version_fail),
         "OMATALK_SOCKET": str(tmp_path / "missing.sock"),
         "QML2_IMPORT_PATH": str(tmp_path / "imports"),
         "QT_QUICK_BACKEND": "software",
@@ -328,18 +349,28 @@ ShellRoot {{
     try:
         output_until(process, "WIDGET_READY state=idle")
 
-        ipc_call(process.pid, "omatalkTestDriver", "openPanel")
+        ipc_call(process.pid, "omatalkTestDriver", "refreshPanel")
         state = wait_for_panel_state(process.pid)
 
         # Opening the panel populates the dropdown/slider from the CLI's
         # canned config, and shells voices/get exactly once each.
-        assert state["opened"] is True
         assert state["voiceOptions"] == FAKE_PANEL_VOICES
         assert state["voice"] == "af_test_one"
         assert state["speed"] == 1.25
+        assert state["version"] == "0.2.1-test"
         log_lines = cli_log.read_text().splitlines()
         assert log_lines.count("config voices --json") == 1
         assert log_lines.count("config get --json") == 1
+        assert log_lines.count("--version") == 1
+
+        version_fail.touch()
+        ipc_call(process.pid, "omatalkTestDriver", "refreshPanel")
+        deadline = time.monotonic() + 10
+        state = json.loads(ipc_call(process.pid, "omatalkTestDriver", "state"))
+        while time.monotonic() < deadline and state.get("version") != "unknown":
+            time.sleep(0.1)
+            state = json.loads(ipc_call(process.pid, "omatalkTestDriver", "state"))
+        assert state["version"] == "unknown"
 
         ipc_call(process.pid, "omatalkTestDriver", "setVoice", "bf_test_two")
         deadline = time.monotonic() + 10

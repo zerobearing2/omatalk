@@ -120,6 +120,7 @@ omatalk speak "text here"           # speak given text
 omatalk speak --voice af_bella "hi" # speak once in a voice, default unchanged
 omatalk stop                        # cut off the current utterance
 omatalk status                      # idle | speaking | error
+omatalk --version                   # print the installed release
 omatalk upgrade                     # install the latest release
 omatalk config get [--json]         # print the effective config
 omatalk config set voice af_bella   # set voice or speed; auto-applies
@@ -144,6 +145,7 @@ three seconds. It does not mean that speech is active.
 Run these commands on the affected machine and keep their output together:
 
 ```sh
+omatalk --version
 omatalk status
 systemctl --user status omatalk.service --no-pager -l
 journalctl --user -u omatalk.service -b --no-pager -n 80
@@ -179,10 +181,11 @@ Debug my Omatalk installation and report the root cause. The symptom is:
 Run the Omatalk troubleshooting commands from README.md. Capture the current
 time and separate these checks:
 
-1. Is omatalk.service active and does `omatalk status` work?
-2. Is the socket present, and is a Quickshell process connected to it?
-3. Is zerobearing.omatalk present, discovered, and enabled?
-4. Do recent systemd or Quickshell logs show a QML/plugin load error?
+1. What does `omatalk --version` print?
+2. Is omatalk.service active and does `omatalk status` work?
+3. Is the socket present, and is a Quickshell process connected to it?
+4. Is zerobearing.omatalk present, discovered, and enabled?
+5. Do recent systemd or Quickshell logs show a QML/plugin load error?
 
 Preserve ~/.config/omatalk/config.toml, ~/.config/hypr/bindings.lua, and the
 Omarchy shell layout. Ask before making changes. Use the smallest targeted
@@ -192,7 +195,7 @@ Do not call the problem fixed without saying what evidence proved it.
 Return this report:
 
 Symptom:
-Observed state:
+Observed state: (include `omatalk --version`)
 Evidence:
 Root cause:
 Commands or files changed:
