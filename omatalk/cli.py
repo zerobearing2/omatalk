@@ -193,12 +193,10 @@ def main():
 
     if args.command == "speak":
         text = " ".join(args.text)
-        if args.voice:
-            if not known_voice(args.voice):
-                sys.exit(1)
-            cmd = f"speak --voice {args.voice} {text}" if text else f"speak --voice {args.voice}"
-        else:
-            cmd = f"speak {text}" if text else "speak"
+        if args.voice and not known_voice(args.voice):
+            sys.exit(1)
+        prefix = f"speak --voice {args.voice}" if args.voice else "speak"
+        cmd = f"{prefix} {text}" if text else prefix
     else:
         cmd = args.command
 

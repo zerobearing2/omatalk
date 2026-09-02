@@ -34,24 +34,24 @@ Panel {
   property string voiceError: ""
   property string speedError: ""
 
-  function isEnglishVoice(name) {
+  function matchedPrefix(name) {
     for (var i = 0; i < englishPrefixes.length; i++) {
-      if (String(name).indexOf(englishPrefixes[i]) === 0) return true
+      if (String(name).indexOf(englishPrefixes[i]) === 0) return englishPrefixes[i]
     }
-    return false
+    return null
+  }
+
+  function isEnglishVoice(name) {
+    return root.matchedPrefix(name) !== null
   }
 
   // Strips the locale/gender prefix so "af_bella" reads as a name, not a
   // filename — e.g. "Hi, I'm bella." Every option in voiceOptions passed
-  // isEnglishVoice, so one of englishPrefixes always matches.
+  // isEnglishVoice, so matchedPrefix always finds one.
   function sampleTextFor(name) {
-    for (var i = 0; i < englishPrefixes.length; i++) {
-      var prefix = englishPrefixes[i]
-      if (String(name).indexOf(prefix) === 0) {
-        return "Hi, I'm " + String(name).slice(prefix.length) + "."
-      }
-    }
-    return "Hi, I'm " + name + "."
+    var prefix = root.matchedPrefix(name)
+    var stripped = prefix !== null ? String(name).slice(prefix.length) : name
+    return "Hi, I'm " + stripped + "."
   }
 
   function refresh() {

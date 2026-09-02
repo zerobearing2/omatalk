@@ -30,7 +30,7 @@ def build_engine(cfg: dict):
             def __init__(self, cfg):
                 self._cfg = cfg
 
-            def synthesize(self, text: str, voice: str = None):
+            def synthesize(self, text: str, voice: str | None = None):
                 log = os.environ.get("OMATALK_TEST_VOICE_LOG")
                 if log:
                     with open(log, "a") as f:
@@ -72,7 +72,7 @@ class Daemon:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=10)
 
-    def speak(self, text: str, voice: str = None):
+    def speak(self, text: str, voice: str | None = None):
         self.touch()
         text = text.strip() or capture_primary(self.cfg)
         if text and self.state == "speaking" and text == self._current_text:
@@ -141,7 +141,7 @@ class Daemon:
         finally:
             conn.close()
 
-    def _run(self, text: str, cancel: threading.Event, voice: str = None):
+    def _run(self, text: str, cancel: threading.Event, voice: str | None = None):
         try:
             proc = None
             for part in sentences(text):

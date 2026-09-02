@@ -11,7 +11,7 @@ class Engine:
         )
         self._cfg = cfg
 
-    def synthesize(self, text: str, voice: str = None):
+    def synthesize(self, text: str, voice: str | None = None):
         samples, rate = self._kokoro.create(
             text,
             voice=voice or self._cfg["voice"],
