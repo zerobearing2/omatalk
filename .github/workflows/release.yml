@@ -23,34 +23,31 @@ jobs:
       - run: uv run --group dev pytest tests/ -q
   release:
     needs: test
-    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    # Manual only: pushes to master run tests but no longer cut a release on
+    # their own, so several PRs can land before anyone decides to ship.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Resolve version (auto-bump patch to the first free tag)
+      - name: Read version from pyproject.toml
         id: ver
         run: |
-          # The tag is the version record; nothing is committed back to the
-          # branch, so pushes never race the bot. Bump the patch until the
-          # tag is free — a single bump can land on an existing tag after a
-          # reset, wedging every future release.
+          # pyproject.toml's committed version is the single source of
+          # truth — bump it with `make bump` (which also commits) before
+          # triggering this workflow. Refusing a stale/reused version here
+          # catches the "forgot to bump" case instead of silently reusing or
+          # clobbering a prior release's tag.
           version=$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml | head -1)
-          major=$(echo "$version" | cut -d. -f1)
-          minor=$(echo "$version" | cut -d. -f2)
-          patch=$(echo "$version" | cut -d. -f3)
-          while git ls-remote --tags origin "refs/tags/v$version" | grep -q "refs/tags/v$version"; do
-            patch=$((patch + 1))
-            version="$major.$minor.$patch"
-          done
+          if git ls-remote --tags origin "refs/tags/v$version" | grep -q "refs/tags/v$version"; then
+            echo "v$version already exists — bump pyproject.toml's version first (make bump)" >&2
+            exit 1
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Pack source tarball
         run: |
           # Runtime minimum only: package, service unit, build metadata,
           # README (referenced by pyproject), uninstaller, bar plugin.
-          # No site, tests, docs, or CI config. The resolved version is
-          # written into the packed pyproject so the tarball self-describes.
-          sed "s/^version = \".*\"/version = \"${{ steps.ver.outputs.version }}\"/" \
-            pyproject.toml > /tmp/pyproject.toml && mv /tmp/pyproject.toml pyproject.toml
+          # No site, tests, docs, or CI config.
           tar --transform "s,^,omatalk/," \
             -czf omatalk-src.tar.gz \
             omatalk systemd plugin pyproject.toml README.md uninstall.sh
@@ -61,7 +58,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="v$VERSION"
+          # install.sh/uninstall.sh are also uploaded standalone (not just
+          # inside the tarball) so the site's thin dispatcher
+          # (public/install.sh, public/uninstall.sh) can fetch
+          # releases/latest/download/<script> directly — pinning the
+          # installer's own logic to the release it ships, not to master.
           gh release create "$tag" --title "$tag" --generate-notes \
-            omatalk-src.tar.gz omatalk-src.tar.gz.sha256 \
+            omatalk-src.tar.gz omatalk-src.tar.gz.sha256 install.sh uninstall.sh \
             || gh release upload "$tag" --clobber \
-              omatalk-src.tar.gz omatalk-src.tar.gz.sha256
+              omatalk-src.tar.gz omatalk-src.tar.gz.sha256 install.sh uninstall.sh

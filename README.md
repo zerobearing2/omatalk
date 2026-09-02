@@ -71,11 +71,31 @@ The script downloads the latest release tarball (checksum-verified), then:
    before the command exits.
 4. Puts `omatalk` on `PATH`, installs and refreshes the Omarchy bar plugin, and
    prints a copy-paste command to add the F8 binding when no Omatalk binding is
-   present. The installer never edits your keybindings itself.
+   present. The installer never edits your keybindings itself. If the plugin
+   was already installed (i.e. this is an upgrade, not a first install), it
+   asks whether to restart the Omarchy shell — a running shell can keep an
+   already-loaded plugin's old UI in memory even after its files change on
+   disk, and a shell restart is the only reliable fix, so it's confirmed
+   rather than done silently. Declining just leaves the bar icon possibly
+   stale until you run `omarchy restart shell` yourself.
 
-Every push to `master` tags a new release automatically. Re-running the
+Releases are cut manually (GitHub Actions → Release → Run workflow) so
+several PRs can land on `master` before anyone ships. Re-running the
 installer picks up whatever is newest. After the first run of this installer,
 `omatalk upgrade` fetches and runs the same latest installer.
+
+The script at that URL is a small dispatcher: by default it fetches and runs
+the installer that shipped with the latest release, so the installer's own
+logic and the source it installs are always a matched pair. To test an
+unreleased branch instead, set `OMATALK_REF`:
+
+```sh
+OMATALK_REF=my-branch curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
+```
+
+This skips checksum verification for that install — a branch is a moving
+target, so there's nothing to pin the checksum to — and trusts HTTPS/GitHub
+instead, same as any other dev install.
 
 Upgrades never create, merge, rewrite, or delete `~/.config/omatalk/config.toml`.
 An existing config stays byte-for-byte unchanged, and an absent config stays
@@ -89,16 +109,22 @@ curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
 
 Stops and removes the systemd unit, the launcher, the source, and the
 Omarchy bar plugin. Asks before deleting the models (~185MB) and your config.
+Also a thin dispatcher; `OMATALK_REF` works the same way here as for install.
 Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself.
 
 ## Usage
 
 ```sh
-omatalk speak                # capture and speak (what the hotkey runs)
-omatalk speak "text here"    # speak given text
-omatalk stop                 # cut off the current utterance
-omatalk status                # idle | speaking | error
-omatalk upgrade               # install the latest release
+omatalk speak                       # capture and speak (what the hotkey runs)
+omatalk speak "text here"           # speak given text
+omatalk speak --voice af_bella "hi" # speak once in a voice, default unchanged
+omatalk stop                        # cut off the current utterance
+omatalk status                      # idle | speaking | error
+omatalk upgrade                     # install the latest release
+omatalk config get [--json]         # print the effective config
+omatalk config set voice af_bella   # set voice or speed; auto-applies
+omatalk config set speed 1.25       # (0.5-2.0)
+omatalk config voices [--json]      # list available voice names
 ```
 
 `systemctl --user start|stop|restart omatalk` controls the daemon.
@@ -123,7 +149,7 @@ systemctl --user status omatalk.service --no-pager -l
 journalctl --user -u omatalk.service -b --no-pager -n 80
 stat -c '%A %U:%G %n' "${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk/omatalk.sock" \
   ~/.config/omarchy/plugins/zerobearing.omatalk/manifest.json \
-  ~/.config/omarchy/plugins/zerobearing.omatalk/Megaphone.qml
+  ~/.config/omarchy/plugins/zerobearing.omatalk/BarWidget.qml
 ss -xap | grep -E 'omatalk|quickshell'
 omarchy plugin list --json | grep -C 3 'zerobearing.omatalk'
 omarchy-shell shell listPlugins | grep -C 3 'zerobearing.omatalk'
@@ -177,17 +203,68 @@ Redact credentials, tokens, and unrelated private log content before sharing
 the report.
 ```
 
+### Clipped start of speech
+
+If the very first fraction of a second is sometimes missing or muffled, but an
+immediate replay never clips, this is a PipeWire/WirePlumber issue, not
+Omatalk's: idle audio sinks suspend after a few seconds (`session.suspend-timeout-seconds`),
+and resuming from suspend takes real time — for Bluetooth outputs specifically,
+the A2DP transport has to be reauthorized with BlueZ, which can take a second
+or more. Whatever text is spoken first after that gap can start before the
+device is actually live. This was confirmed on Omatalk's own daemon by
+recording the actual PipeWire signal and comparing it byte-for-byte against
+what the daemon sent to the player: the audio data is always complete, so a
+truncation fix on Omatalk's side can't help — there's nothing to fix in the
+data.
+
+The known mitigation is a WirePlumber rule disabling suspend for the affected
+sink, e.g. in `~/.config/wireplumber/wireplumber.conf.d/51-disable-suspend.conf`:
+
+```
+monitor.alsa.rules = [
+  {
+    matches = [ { node.name = "~alsa_output.*" } ]
+    actions = { update-props = { session.suspend-timeout-seconds = 0 } }
+  }
+]
+monitor.bluez.rules = [
+  {
+    matches = [ { node.name = "~bluez_output.*" } ]
+    actions = { update-props = { session.suspend-timeout-seconds = 0, node.suspend-on-idle = false } }
+  }
+]
+```
+
+Setting only the timeout wasn't enough in reports from other affected users —
+`node.suspend-on-idle = false` was also needed for the Bluetooth case. This is
+a deliberate default, not a bug: it saves power by letting idle audio devices
+sleep, which matters on a laptop. Disabling it trades that power saving for
+never hitting this gap.
+
 ## Config
 
-`~/.config/omatalk/config.toml`:
+Click the bar icon to open the voice/speed panel, or use `omatalk config`
+(see Usage above) — both auto-save to `~/.config/omatalk/config.toml` and the
+already-running daemon picks up the change on its own within about a second,
+no restart needed. The file is still hand-editable for the settings not yet
+exposed by the panel or CLI (`lang`, `capture_primary`, `capture_clipboard`,
+`player`, `notify`); those still require `systemctl --user restart omatalk`
+to take effect.
+
+Picking a voice in the panel immediately speaks a short sample in it, so you
+can compare voices without leaving the panel. `omatalk speak --voice <name>
+"text"` does the same from a terminal or a script, for one Utterance, without
+touching your configured default.
+
+![Omatalk's voice and speed config panel](public/images/omatalk-config-panel.png)
 
 ```toml
 voice = "af_heart"
 speed = 1.0
 ```
 
-Restart the daemon after changing it (`systemctl --user restart omatalk`).
-Voice previews are on the [project site](https://omatalk.zerobearing.com).
+Prerecorded samples of every voice are on the
+[project site](https://omatalk.zerobearing.com).
 
 ## Architecture
 
@@ -205,7 +282,7 @@ Voice previews are on the [project site](https://omatalk.zerobearing.com).
 │ capture:  wl-paste --primary → wl-paste   │
 │ chunker:  text → sentences                │
 │ engine:   Kokoro-82M · ONNX Runtime · CPU │
-│ player:   pw-play → PipeWire              │
+│ player:   pw-cat → PipeWire (streamed)    │
 └───────────────────────────────────────────┘
 ```
 

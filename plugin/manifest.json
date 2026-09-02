@@ -10,7 +10,7 @@
     "bar-widget"
   ],
   "entryPoints": {
-    "barWidget": "Megaphone.qml"
+    "barWidget": "BarWidget.qml"
   },
   "barWidget": {
     "displayName": "Omatalk",

@@ -7,7 +7,7 @@ import traceback
 
 from .capture import capture_clipboard, capture_primary
 from .chunker import sentences
-from .config import load, socket_path
+from .config import config_path, load, socket_path
 from .engine import Engine
 from .player import play
 
@@ -15,15 +15,29 @@ from .player import play
 # an idle recycle lets systemd hand us a fresh process instead.
 IDLE_TIMEOUT = 600
 
+# config.toml is CLI-owned (see `omatalk config`); the Daemon only watches it
+# and reloads. This poll interval rides the socket-accept timeout in serve()'s
+# existing loop for free rather than adding a second wakeup source.
+CONFIG_POLL_INTERVAL = 1.0
+
 
 def build_engine(cfg: dict):
-    # Tests run without the 183MB model via a fake synthesizer.
+    # Tests run without the 183MB model via a fake synthesizer that logs the
+    # (voice, speed) it was called with, so a reload can be asserted
+    # behaviorally without reaching into daemon.cfg.
     if os.environ.get("OMATALK_TEST_FAKE_ENGINE"):
         class FakeEngine:
-            def synthesize(self, text: str):
+            def __init__(self, cfg):
+                self._cfg = cfg
+
+            def synthesize(self, text: str, voice: str | None = None):
+                log = os.environ.get("OMATALK_TEST_VOICE_LOG")
+                if log:
+                    with open(log, "a") as f:
+                        f.write(f"{voice or self._cfg['voice']} {self._cfg['speed']}\n")
                 return [0.0] * 2400, 24000
 
-        return FakeEngine()
+        return FakeEngine(cfg)
     return Engine(cfg)
 
 
@@ -58,7 +72,7 @@ class Daemon:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=10)
 
-    def speak(self, text: str):
+    def speak(self, text: str, voice: str | None = None):
         self.touch()
         text = text.strip() or capture_primary(self.cfg)
         if text and self.state == "speaking" and text == self._current_text:
@@ -78,7 +92,7 @@ class Daemon:
         self._current_text = text
         self._set_state("speaking")
         self._thread = threading.Thread(
-            target=self._run, args=(text, cancel), daemon=True
+            target=self._run, args=(text, cancel, voice), daemon=True
         )
         self._thread.start()
 
@@ -127,13 +141,13 @@ class Daemon:
         finally:
             conn.close()
 
-    def _run(self, text: str, cancel: threading.Event):
+    def _run(self, text: str, cancel: threading.Event, voice: str | None = None):
         try:
             proc = None
             for part in sentences(text):
                 if cancel.is_set():
                     return
-                samples, rate = self.engine.synthesize(part)
+                samples, rate = self.engine.synthesize(part, voice=voice)
                 if cancel.is_set():
                     return
                 if proc:
@@ -157,7 +171,15 @@ def handle(daemon: Daemon, line: str) -> str:
     parts = line.split(" ", 1)
     cmd = parts[0]
     if cmd == "speak":
-        daemon.speak(parts[1] if len(parts) > 1 else "")
+        payload = parts[1] if len(parts) > 1 else ""
+        voice = None
+        # Not a new verb (see ADR-0002): a `--voice <token> ` prefix on
+        # speak's own payload is a per-call override, extracted here rather
+        # than in Daemon.speak so the wire format for ordinary speak stays
+        # byte-for-byte unchanged.
+        if payload.startswith("--voice "):
+            voice, _, payload = payload[len("--voice "):].partition(" ")
+        daemon.speak(payload, voice=voice)
         return "ok"
     if cmd == "stop":
         daemon.stop()
@@ -176,21 +198,37 @@ def _client_closed(conn: socket.socket) -> bool:
         return True
 
 
+def _config_mtime() -> float:
+    try:
+        return config_path().stat().st_mtime
+    except OSError:
+        return 0.0
+
+
 def serve():
     cfg = load()
     daemon = Daemon(cfg)
+    cfg_mtime = _config_mtime()
     path = socket_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.unlink(missing_ok=True)
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     server.bind(str(path))
     server.listen(8)
-    server.settimeout(1.0)
+    server.settimeout(CONFIG_POLL_INTERVAL)
     try:
         while True:
             try:
                 conn, _ = server.accept()
             except TimeoutError:
+                mtime = _config_mtime()
+                if mtime != cfg_mtime:
+                    cfg_mtime = mtime
+                    # In place: Daemon.cfg and Engine._cfg are the same dict
+                    # object (see Daemon.__init__/build_engine), so a plain
+                    # `daemon.cfg = load()` reassignment would orphan the
+                    # Engine's reference on stale config forever.
+                    daemon.cfg.update(load())
                 idle = daemon.idle_seconds()
                 if daemon.state != "speaking" and idle > IDLE_TIMEOUT:
                     print(f"idle {int(idle)}s; recycling", flush=True)

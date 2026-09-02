@@ -4,6 +4,9 @@
 set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
+# Set to a branch name to install unreleased source for testing, bypassing
+# the pinned-checksum release path entirely (see step 2 below).
+OMATALK_REF="${OMATALK_REF:-}"
 RELEASE_BASE="${RELEASE_BASE:-https://github.com/zerobearing2/omatalk/releases/latest/download}"
 MODEL_BASE="${MODEL_BASE:-https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1}"
 MODEL_SHA256="${MODEL_SHA256:-f3a290d384fbb27966d462905c71a46cef9e5fd00516b40df32a0b4afe77ac96}"
@@ -11,6 +14,12 @@ VOICES_SHA256="${VOICES_SHA256:-bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9
 MODEL_FILE="kokoro-v1.0.fp16.onnx"
 
 msg() { printf '\033[1;32m==>\033[0m %s\n' "$1"; }
+warn() { printf '\033[1;33m==>\033[0m %s\n' "$1"; }
+
+# Prompts read the terminal when piped via curl | bash; fall back to stdin
+# for scripted runs where /dev/tty is unavailable.
+ASK_FROM=/dev/tty
+{ : < /dev/tty; } 2>/dev/null || ASK_FROM=/dev/stdin
 
 download_model() {
   local file="$1"
@@ -45,13 +54,22 @@ else
   done
 fi
 
-# 2. Source: always the latest GitHub release tarball and checksum.
-msg "Downloading latest release from GitHub"
-TS=$(date +%s)
+# 2. Source: a specific branch when testing (OMATALK_REF), otherwise always
+# the latest GitHub release tarball and its checksum.
 mkdir -p "$OMATALK_HOME"
-curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" "$RELEASE_BASE/omatalk-src.tar.gz?ts=$TS"
-curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" "$RELEASE_BASE/omatalk-src.tar.gz.sha256?ts=$TS"
-(cd "$OMATALK_HOME" && sha256sum -c omatalk-src.tar.gz.sha256 --quiet)
+if [ -n "$OMATALK_REF" ]; then
+  # A branch is a moving target, so there is no checksum to pin it to —
+  # this path trusts HTTPS/GitHub instead, same as any other dev install.
+  msg "Downloading branch '$OMATALK_REF' from GitHub (unreleased, unverified)"
+  curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" \
+    "https://github.com/zerobearing2/omatalk/archive/refs/heads/$OMATALK_REF.tar.gz"
+else
+  msg "Downloading latest release from GitHub"
+  TS=$(date +%s)
+  curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" "$RELEASE_BASE/omatalk-src.tar.gz?ts=$TS"
+  curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" "$RELEASE_BASE/omatalk-src.tar.gz.sha256?ts=$TS"
+  (cd "$OMATALK_HOME" && sha256sum -c omatalk-src.tar.gz.sha256 --quiet)
+fi
 
 # 3. Models (~185MB, skipped when their checksums match). fp16 half-size
 # export: spectral correlation 0.999 against fp32 — audibly identical.
@@ -127,12 +145,15 @@ fi
 if command -v omarchy >/dev/null 2>&1; then
   msg "Installing Omarchy bar plugin"
   plugins_dir="$HOME/.config/omarchy/plugins"
+  plugin_dir="$plugins_dir/zerobearing.omatalk"
+  plugin_existed=0
+  [ -d "$plugin_dir" ] && plugin_existed=1
   stage="$plugins_dir/.omatalk.add.$$"
   mkdir -p "$plugins_dir"
   rm -rf "$stage"
   cp -r "$OMATALK_HOME/src/plugin" "$stage"
-  rm -rf "$plugins_dir/zerobearing.omatalk"
-  mv "$stage" "$plugins_dir/zerobearing.omatalk"
+  rm -rf "$plugin_dir"
+  mv "$stage" "$plugin_dir"
   omarchy-shell shell rescanPlugins >/dev/null
 
   plugin_seen=0
@@ -152,6 +173,27 @@ if command -v omarchy >/dev/null 2>&1; then
   if ! omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1; then
     msg "Could not enable the Omarchy bar plugin; run: omarchy plugin enable zerobearing.omatalk"
     exit 1
+  fi
+
+  # A plugin the shell already had loaded can keep running its old QML from
+  # memory even after these files change on disk: rescanPlugins/enable
+  # reliably pick up a plugin's QML the first time a shell discovers it, but
+  # not on a later change to one it already has loaded — confirmed by
+  # testing disable/enable cycles and even a full `omarchy plugin remove` +
+  # re-add, both of which left the widget on stale QML with no error. Only
+  # actually restarting the Quickshell process clears it, and that closes
+  # the bar and any open panels for a moment, so ask rather than do it
+  # silently.
+  if (( plugin_existed )); then
+    warn "The bar plugin was already installed before this run — its icon may need a shell restart to show the update."
+    # A closed/non-interactive stdin (no answer to read) must not abort the
+    # rest of the install under set -e — default to declining the restart.
+    read -r -p "Restart the Omarchy shell now to apply it? [y/N] " answer < "$ASK_FROM" || answer="n"
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+      omarchy restart shell
+    else
+      warn "Skipped. If the bar icon looks stale, run: omarchy restart shell"
+    fi
   fi
 fi
 

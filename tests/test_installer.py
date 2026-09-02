@@ -165,11 +165,12 @@ printf 'omarchy-shell %s\\n' "$*" >> "$FAKE_LOG"
     return env, state, log
 
 
-def run_install(env):
+def run_install(env, answer=None):
     return subprocess.run(
         ["bash", str(ROOT / "install.sh")],
         cwd=ROOT,
         env=env,
+        input=answer,
         capture_output=True,
         text=True,
     )
@@ -244,6 +245,47 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     assert len(rescans) == 3
     assert start < rescans[-1] < listed[-1] < plugin
     assert not any("omarchy restart shell" in line for line in lines)
+
+
+def test_fresh_install_never_prompts_to_restart_shell(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+
+    result = run_install(env)
+
+    assert result.returncode == 0, result.stderr
+    assert "already installed before this run" not in result.stdout
+    assert not any(
+        "omarchy restart shell" in line for line in log.read_text().splitlines()
+    )
+
+
+def test_upgrade_restarts_shell_when_user_agrees(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+    assert run_install(env).returncode == 0
+
+    result = run_install(env, answer="y\n")
+
+    assert result.returncode == 0, result.stderr
+    assert "already installed before this run" in result.stdout
+    assert any(
+        "omarchy restart shell" in line for line in log.read_text().splitlines()
+    )
+
+
+def test_upgrade_skips_shell_restart_when_user_declines(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+    assert run_install(env).returncode == 0
+
+    result = run_install(env, answer="n\n")
+
+    assert result.returncode == 0, result.stderr
+    assert "Skipped" in result.stdout
+    assert not any(
+        "omarchy restart shell" in line for line in log.read_text().splitlines()
+    )
 
 
 def test_installer_tolerates_missing_unit(site, tmp_path):

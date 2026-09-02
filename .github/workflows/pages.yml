@@ -5,8 +5,6 @@ on:
     branches: [master]
     paths:
       - public/**
-      - install.sh
-      - uninstall.sh
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -28,8 +26,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      - name: Mirror installer scripts
-        run: cp install.sh uninstall.sh public/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
