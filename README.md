@@ -79,7 +79,8 @@ The script downloads the latest release tarball (checksum-verified), then:
    rather than done silently. Declining just leaves the bar icon possibly
    stale until you run `omarchy restart shell` yourself.
 
-Every push to `master` tags a new release automatically. Re-running the
+Releases are cut manually (GitHub Actions → Release → Run workflow) so
+several PRs can land on `master` before anyone ships. Re-running the
 installer picks up whatever is newest. After the first run of this installer,
 `omatalk upgrade` fetches and runs the same latest installer.
 
