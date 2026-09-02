@@ -1,6 +1,5 @@
 import json
 import os
-import select
 import shutil
 import socket
 import subprocess
@@ -26,20 +25,47 @@ def require_quickshell():
     return quickshell, shell_dir
 
 
+def start_quickshell(quickshell, config_dir, env):
+    # Log to a file, not a pipe. readline() on PIPE blocks forever on a
+    # partial line, so the test's timeout loop never runs; a full pipe also
+    # deadlocks Quickshell once the test stops consuming stdout.
+    log_path = Path(config_dir) / "quickshell.log"
+    log = log_path.open("w")
+    process = subprocess.Popen(
+        [quickshell, "-p", str(config_dir)],
+        env=env,
+        stdout=log,
+        stderr=subprocess.STDOUT,
+    )
+    process._test_log = log
+    process._test_log_path = log_path
+    return process
+
+
+def stop_quickshell(process):
+    log = getattr(process, "_test_log", None)
+    if process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5)
+    if log is not None:
+        log.close()
+
+
 def output_until(process, marker: str, timeout: float = 10):
     deadline = time.monotonic() + timeout
-    lines = []
+    text = ""
     while time.monotonic() < deadline:
+        text = process._test_log_path.read_text()
+        if marker in text:
+            return text.splitlines(keepends=True)
         if process.poll() is not None:
             break
-        ready, _, _ = select.select([process.stdout], [], [], 0.1)
-        if not ready:
-            continue
-        line = process.stdout.readline()
-        lines.append(line)
-        if marker in line:
-            return lines
-    raise AssertionError(f"Quickshell output did not contain {marker!r}: {lines}")
+        time.sleep(0.05)
+    raise AssertionError(f"Quickshell output did not contain {marker!r}: {text.splitlines()}")
 
 
 def test_manifest_points_to_bar_widget():
@@ -121,14 +147,7 @@ ShellRoot {{
         "QML2_IMPORT_PATH": str(tmp_path / "imports"),
         "QT_QUICK_BACKEND": "software",
     }
-    process = subprocess.Popen(
-        [quickshell, "-p", str(tmp_path)],
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-    )
+    process = start_quickshell(quickshell, tmp_path, env)
 
     connection = None
     try:
@@ -183,8 +202,7 @@ ShellRoot {{
             connection.close()
         if server is not None:
             server.close()
-        process.terminate()
-        process.wait(timeout=10)
+        stop_quickshell(process)
 
 
 def ipc_call(pid: int, target: str, function: str, *args: str) -> str:
@@ -338,14 +356,7 @@ ShellRoot {{
         "QML2_IMPORT_PATH": str(tmp_path / "imports"),
         "QT_QUICK_BACKEND": "software",
     }
-    process = subprocess.Popen(
-        [quickshell, "-p", str(tmp_path)],
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-    )
+    process = start_quickshell(quickshell, tmp_path, env)
     try:
         output_until(process, "WIDGET_READY state=idle")
 
@@ -409,5 +420,4 @@ ShellRoot {{
         assert not any(line.startswith("config set speed 0.8") for line in log_lines)
         assert not any(line.startswith("config set speed 1.73") for line in log_lines)
     finally:
-        process.terminate()
-        process.wait(timeout=10)
+        stop_quickshell(process)
