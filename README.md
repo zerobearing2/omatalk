@@ -96,6 +96,7 @@ Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself.
 ```sh
 omatalk speak                       # capture and speak (what the hotkey runs)
 omatalk speak "text here"           # speak given text
+omatalk speak --voice af_bella "hi" # speak once in a voice, default unchanged
 omatalk stop                        # cut off the current utterance
 omatalk status                      # idle | speaking | error
 omatalk upgrade                     # install the latest release
@@ -181,6 +182,44 @@ Redact credentials, tokens, and unrelated private log content before sharing
 the report.
 ```
 
+### Clipped start of speech
+
+If the very first fraction of a second is sometimes missing or muffled, but an
+immediate replay never clips, this is a PipeWire/WirePlumber issue, not
+Omatalk's: idle audio sinks suspend after a few seconds (`session.suspend-timeout-seconds`),
+and resuming from suspend takes real time — for Bluetooth outputs specifically,
+the A2DP transport has to be reauthorized with BlueZ, which can take a second
+or more. Whatever text is spoken first after that gap can start before the
+device is actually live. This was confirmed on Omatalk's own daemon by
+recording the actual PipeWire signal and comparing it byte-for-byte against
+what the daemon sent to the player: the audio data is always complete, so a
+truncation fix on Omatalk's side can't help — there's nothing to fix in the
+data.
+
+The known mitigation is a WirePlumber rule disabling suspend for the affected
+sink, e.g. in `~/.config/wireplumber/wireplumber.conf.d/51-disable-suspend.conf`:
+
+```
+monitor.alsa.rules = [
+  {
+    matches = [ { node.name = "~alsa_output.*" } ]
+    actions = { update-props = { session.suspend-timeout-seconds = 0 } }
+  }
+]
+monitor.bluez.rules = [
+  {
+    matches = [ { node.name = "~bluez_output.*" } ]
+    actions = { update-props = { session.suspend-timeout-seconds = 0, node.suspend-on-idle = false } }
+  }
+]
+```
+
+Setting only the timeout wasn't enough in reports from other affected users —
+`node.suspend-on-idle = false` was also needed for the Bluetooth case. This is
+a deliberate default, not a bug: it saves power by letting idle audio devices
+sleep, which matters on a laptop. Disabling it trades that power saving for
+never hitting this gap.
+
 ## Config
 
 Click the bar icon to open the voice/speed panel, or use `omatalk config`
@@ -191,6 +230,11 @@ exposed by the panel or CLI (`lang`, `capture_primary`, `capture_clipboard`,
 `player`, `notify`); those still require `systemctl --user restart omatalk`
 to take effect.
 
+Picking a voice in the panel immediately speaks a short sample in it, so you
+can compare voices without leaving the panel. `omatalk speak --voice <name>
+"text"` does the same from a terminal or a script, for one Utterance, without
+touching your configured default.
+
 ![Omatalk's voice and speed config panel](public/images/omatalk-config-panel.png)
 
 ```toml
@@ -198,7 +242,8 @@ voice = "af_heart"
 speed = 1.0
 ```
 
-Voice previews are on the [project site](https://omatalk.zerobearing.com).
+Prerecorded samples of every voice are on the
+[project site](https://omatalk.zerobearing.com).
 
 ## Architecture
 
@@ -216,7 +261,7 @@ Voice previews are on the [project site](https://omatalk.zerobearing.com).
 │ capture:  wl-paste --primary → wl-paste   │
 │ chunker:  text → sentences                │
 │ engine:   Kokoro-82M · ONNX Runtime · CPU │
-│ player:   pw-play → PipeWire              │
+│ player:   pw-cat → PipeWire (streamed)    │
 └───────────────────────────────────────────┘
 ```
 

@@ -48,6 +48,7 @@ dev-plugin-reload:
 	rm -rf "$(PLUGIN_DIR)"
 	cp -r "$(REPO)/plugin" "$(PLUGIN_DIR)"
 	omarchy restart shell
+	omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1 || true
 
 # Undo dev-install: restore the official released build.
 dev-uninstall:

@@ -34,11 +34,26 @@ Panel {
   property string voiceError: ""
   property string speedError: ""
 
-  function isEnglishVoice(name) {
+  function matchedPrefix(name) {
     for (var i = 0; i < englishPrefixes.length; i++) {
-      if (String(name).indexOf(englishPrefixes[i]) === 0) return true
+      if (String(name).indexOf(englishPrefixes[i]) === 0) return englishPrefixes[i]
     }
-    return false
+    return null
+  }
+
+  function isEnglishVoice(name) {
+    return root.matchedPrefix(name) !== null
+  }
+
+  // Strips the locale/gender prefix so "af_bella" reads as a name, not a
+  // filename, then adds a second sentence — long enough to actually judge
+  // the voice's tone by ear, not just prove distinctness between voices.
+  // Every option in voiceOptions passed isEnglishVoice, so matchedPrefix
+  // always finds one.
+  function sampleTextFor(name) {
+    var prefix = root.matchedPrefix(name)
+    var stripped = prefix !== null ? String(name).slice(prefix.length) : name
+    return "Hi, I'm " + stripped + ". This is what I sound like."
   }
 
   function refresh() {
@@ -52,6 +67,11 @@ Panel {
     root.voice = value
     setVoiceProc.command = ["omatalk", "config", "set", "voice", value]
     setVoiceProc.running = true
+    // Not sequenced after setVoiceProc: the preview never touches
+    // config.toml or waits on the Daemon's reload, so there is nothing to
+    // wait for — it fires in parallel with the save.
+    previewProc.command = ["omatalk", "speak", "--voice", value, root.sampleTextFor(value)]
+    previewProc.running = true
   }
 
   function setSpeed(value) {
@@ -105,6 +125,12 @@ Panel {
       onStreamFinished: root.voiceError = text.trim()
     }
     onExited: function(exitCode) { if (exitCode === 0) root.voiceError = "" }
+  }
+
+  Process {
+    id: previewProc
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector { waitForEnd: true }
   }
 
   Process {

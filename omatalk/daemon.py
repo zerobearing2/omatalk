@@ -30,11 +30,11 @@ def build_engine(cfg: dict):
             def __init__(self, cfg):
                 self._cfg = cfg
 
-            def synthesize(self, text: str):
+            def synthesize(self, text: str, voice: str | None = None):
                 log = os.environ.get("OMATALK_TEST_VOICE_LOG")
                 if log:
                     with open(log, "a") as f:
-                        f.write(f"{self._cfg['voice']} {self._cfg['speed']}\n")
+                        f.write(f"{voice or self._cfg['voice']} {self._cfg['speed']}\n")
                 return [0.0] * 2400, 24000
 
         return FakeEngine(cfg)
@@ -72,7 +72,7 @@ class Daemon:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=10)
 
-    def speak(self, text: str):
+    def speak(self, text: str, voice: str | None = None):
         self.touch()
         text = text.strip() or capture_primary(self.cfg)
         if text and self.state == "speaking" and text == self._current_text:
@@ -92,7 +92,7 @@ class Daemon:
         self._current_text = text
         self._set_state("speaking")
         self._thread = threading.Thread(
-            target=self._run, args=(text, cancel), daemon=True
+            target=self._run, args=(text, cancel, voice), daemon=True
         )
         self._thread.start()
 
@@ -141,13 +141,13 @@ class Daemon:
         finally:
             conn.close()
 
-    def _run(self, text: str, cancel: threading.Event):
+    def _run(self, text: str, cancel: threading.Event, voice: str | None = None):
         try:
             proc = None
             for part in sentences(text):
                 if cancel.is_set():
                     return
-                samples, rate = self.engine.synthesize(part)
+                samples, rate = self.engine.synthesize(part, voice=voice)
                 if cancel.is_set():
                     return
                 if proc:
@@ -171,7 +171,15 @@ def handle(daemon: Daemon, line: str) -> str:
     parts = line.split(" ", 1)
     cmd = parts[0]
     if cmd == "speak":
-        daemon.speak(parts[1] if len(parts) > 1 else "")
+        payload = parts[1] if len(parts) > 1 else ""
+        voice = None
+        # Not a new verb (see ADR-0002): a `--voice <token> ` prefix on
+        # speak's own payload is a per-call override, extracted here rather
+        # than in Daemon.speak so the wire format for ordinary speak stays
+        # byte-for-byte unchanged.
+        if payload.startswith("--voice "):
+            voice, _, payload = payload[len("--voice "):].partition(" ")
+        daemon.speak(payload, voice=voice)
         return "ok"
     if cmd == "stop":
         daemon.stop()
