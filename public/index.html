@@ -672,6 +672,23 @@
   }
   .config-grid .code-card { margin-top: 16px; }
 
+  .config-panel-figure {
+    margin: 20px 0 0;
+    padding: 20px;
+    max-width: 320px;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: 0 24px 60px -30px rgba(0,0,0,0.5);
+  }
+  .config-panel-figure img { display: block; width: 100%; height: auto; border-radius: 8px; }
+  .config-panel-figure figcaption {
+    margin-top: 12px;
+    color: var(--muted);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.78rem;
+  }
+
   .inline-code {
     font-family: "JetBrains Mono", monospace;
     font-size: 0.92em;
@@ -922,7 +939,14 @@
   <section id="config">
     <div class="eyebrow">config</div>
     <h2>The whole configuration surface</h2>
-    <p class="prose" style="margin-top:14px;">No flags, no dashboard, nothing to click through. Two files, edited by hand.</p>
+    <p class="prose" style="margin-top:14px;">Click the bar icon for voice and speed — it auto-saves, no restart
+      needed. <code class="inline-code">omatalk config get/set/voices</code> does the same from a terminal or a
+      script. Everything else is two files, edited by hand.</p>
+
+    <figure class="config-panel-figure">
+      <img src="images/omatalk-config-panel.png" alt="Omatalk's voice and speed config panel, opened from the bar icon" width="438" height="310" loading="lazy" decoding="async">
+      <figcaption>Voice picker + speed slider. Selecting a voice or releasing the slider saves immediately.</figcaption>
+    </figure>
 
     <div class="config-grid">
       <div>
@@ -1090,11 +1114,11 @@
   <section id="roadmap">
     <div class="eyebrow">roadmap</div>
     <h2>Shipped and next</h2>
-    <p class="prose">The MVP scope stayed narrow on purpose. Two pieces have shipped; the remaining work is next, in roughly the order it will land.</p>
+    <p class="prose">The MVP scope stayed narrow on purpose. Three pieces have shipped; the remaining work is next, in roughly the order it will land.</p>
     <div class="manifest">
       <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Quickshell widget <span class="roadmap-status">shipped</span></div><div class="why">A megaphone status indicator in Omarchy's own shell. It follows the daemon over a Unix socket, uses the theme accent while speaking, and shows the shell urgent color after a 3-second disconnect grace period.</div></div>
       <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Half-size model <span class="roadmap-status">shipped</span></div><div class="why">The installer now ships the fp16 export (~185MB download, spectral correlation 0.999 against fp32 — audibly identical). Measured honestly: resident memory is a wash (~equal on short utterances, slightly higher under sustained long synthesis) — the win is the halved download, not RAM. A low-resource engine choice (Piper, int8) for potato-class machines remains open.</div></div>
-      <div class="row"><div class="name">Voice picker UI</div><div class="why">Switching voices today means editing <code class="mono" style="background:none;border:none;padding:0;">config.toml</code> and restarting the daemon. A picker removes both steps.</div></div>
+      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Voice + speed panel <span class="roadmap-status">shipped</span></div><div class="why">Click the bar icon for a voice picker and speed slider, both auto-saving to <code class="mono" style="background:none;border:none;padding:0;">config.toml</code> — the already-running daemon picks the change up on its own, no restart. The same surface is scriptable: <code class="mono" style="background:none;border:none;padding:0;">omatalk config get/set/voices</code>.</div></div>
       <div class="row"><div class="name">Media ducking</div><div class="why">Automatically lower other audio while Omatalk is speaking, opt-in via config.</div></div>
       <div class="row"><div class="name">More languages</div><div class="why">Kokoro-82M ships packs for nine languages. Omatalk speaks English only for now.</div></div>
     </div>

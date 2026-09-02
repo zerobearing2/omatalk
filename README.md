@@ -191,6 +191,8 @@ exposed by the panel or CLI (`lang`, `capture_primary`, `capture_clipboard`,
 `player`, `notify`); those still require `systemctl --user restart omatalk`
 to take effect.
 
+![Omatalk's voice and speed config panel](public/images/omatalk-config-panel.png)
+
 ```toml
 voice = "af_heart"
 speed = 1.0
