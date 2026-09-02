@@ -11,6 +11,12 @@ VOICES_SHA256="${VOICES_SHA256:-bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9
 MODEL_FILE="kokoro-v1.0.fp16.onnx"
 
 msg() { printf '\033[1;32m==>\033[0m %s\n' "$1"; }
+warn() { printf '\033[1;33m==>\033[0m %s\n' "$1"; }
+
+# Prompts read the terminal when piped via curl | bash; fall back to stdin
+# for scripted runs where /dev/tty is unavailable.
+ASK_FROM=/dev/tty
+{ : < /dev/tty; } 2>/dev/null || ASK_FROM=/dev/stdin
 
 download_model() {
   local file="$1"
@@ -127,12 +133,15 @@ fi
 if command -v omarchy >/dev/null 2>&1; then
   msg "Installing Omarchy bar plugin"
   plugins_dir="$HOME/.config/omarchy/plugins"
+  plugin_dir="$plugins_dir/zerobearing.omatalk"
+  plugin_existed=0
+  [ -d "$plugin_dir" ] && plugin_existed=1
   stage="$plugins_dir/.omatalk.add.$$"
   mkdir -p "$plugins_dir"
   rm -rf "$stage"
   cp -r "$OMATALK_HOME/src/plugin" "$stage"
-  rm -rf "$plugins_dir/zerobearing.omatalk"
-  mv "$stage" "$plugins_dir/zerobearing.omatalk"
+  rm -rf "$plugin_dir"
+  mv "$stage" "$plugin_dir"
   omarchy-shell shell rescanPlugins >/dev/null
 
   plugin_seen=0
@@ -152,6 +161,27 @@ if command -v omarchy >/dev/null 2>&1; then
   if ! omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1; then
     msg "Could not enable the Omarchy bar plugin; run: omarchy plugin enable zerobearing.omatalk"
     exit 1
+  fi
+
+  # A plugin the shell already had loaded can keep running its old QML from
+  # memory even after these files change on disk: rescanPlugins/enable
+  # reliably pick up a plugin's QML the first time a shell discovers it, but
+  # not on a later change to one it already has loaded — confirmed by
+  # testing disable/enable cycles and even a full `omarchy plugin remove` +
+  # re-add, both of which left the widget on stale QML with no error. Only
+  # actually restarting the Quickshell process clears it, and that closes
+  # the bar and any open panels for a moment, so ask rather than do it
+  # silently.
+  if (( plugin_existed )); then
+    warn "The bar plugin was already installed before this run — its icon may need a shell restart to show the update."
+    # A closed/non-interactive stdin (no answer to read) must not abort the
+    # rest of the install under set -e — default to declining the restart.
+    read -r -p "Restart the Omarchy shell now to apply it? [y/N] " answer < "$ASK_FROM" || answer="n"
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+      omarchy restart shell
+    else
+      warn "Skipped. If the bar icon looks stale, run: omarchy restart shell"
+    fi
   fi
 fi
 

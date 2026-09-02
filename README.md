@@ -71,7 +71,13 @@ The script downloads the latest release tarball (checksum-verified), then:
    before the command exits.
 4. Puts `omatalk` on `PATH`, installs and refreshes the Omarchy bar plugin, and
    prints a copy-paste command to add the F8 binding when no Omatalk binding is
-   present. The installer never edits your keybindings itself.
+   present. The installer never edits your keybindings itself. If the plugin
+   was already installed (i.e. this is an upgrade, not a first install), it
+   asks whether to restart the Omarchy shell — a running shell can keep an
+   already-loaded plugin's old UI in memory even after its files change on
+   disk, and a shell restart is the only reliable fix, so it's confirmed
+   rather than done silently. Declining just leaves the bar icon possibly
+   stale until you run `omarchy restart shell` yourself.
 
 Every push to `master` tags a new release automatically. Re-running the
 installer picks up whatever is newest. After the first run of this installer,
