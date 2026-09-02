@@ -4,9 +4,7 @@ import threading
 import numpy as np
 
 
-def play(cfg: dict, samples, rate: int, lead_silence: float = 0.0):
-    if lead_silence > 0:
-        samples = np.concatenate([np.zeros(int(rate * lead_silence)), np.asarray(samples)])
+def play(cfg: dict, samples, rate: int):
     pcm = (np.clip(np.asarray(samples), -1.0, 1.0) * 32767).astype(np.int16)
     proc = subprocess.Popen(
         [*cfg["player"], "--rate", str(rate), "--channels", "1", "-"],

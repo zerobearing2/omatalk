@@ -20,12 +20,6 @@ IDLE_TIMEOUT = 600
 # existing loop for free rather than adding a second wakeup source.
 CONFIG_POLL_INTERVAL = 1.0
 
-# Unconfirmed root cause (some audio hardware/drivers — e.g. an HDMI receiver
-# resyncing after being idle — can eat the first fraction of a second of
-# playback), but a lead-in of silence is a cheap hedge regardless of cause.
-# Paid once per Utterance, before its first sentence only — see _run().
-LEAD_SILENCE_SECONDS = 0.2
-
 
 def build_engine(cfg: dict):
     # Tests run without the 183MB model via a fake synthesizer that logs the
@@ -156,17 +150,11 @@ class Daemon:
                 samples, rate = self.engine.synthesize(part, voice=voice)
                 if cancel.is_set():
                     return
-                is_first_sentence = proc is None
                 if proc:
                     proc.wait()
                     if cancel.is_set():
                         return
-                proc = play(
-                    self.cfg,
-                    samples,
-                    rate,
-                    lead_silence=LEAD_SILENCE_SECONDS if is_first_sentence else 0.0,
-                )
+                proc = play(self.cfg, samples, rate)
                 self._proc = proc
             if proc:
                 proc.wait()

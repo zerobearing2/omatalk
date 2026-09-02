@@ -33,27 +33,6 @@ def test_play_streams_raw_pcm_via_stdin_with_rate_and_channel_args(tmp_path):
     assert args_log.read_text().strip() == "--rate 24000 --channels 1 -"
 
 
-def test_play_prepends_lead_silence_only_when_requested(tmp_path):
-    cfg, captured, _ = make_echo_player(tmp_path)
-    samples = [1.0, -1.0]
-
-    proc = play(cfg, samples, 1000, lead_silence=0.01)
-    proc.wait(timeout=5)
-
-    pad = [0.0] * int(1000 * 0.01)
-    assert captured.read_bytes() == pcm_bytes(pad + samples)
-
-
-def test_play_omits_lead_silence_by_default(tmp_path):
-    cfg, captured, _ = make_echo_player(tmp_path)
-    samples = [1.0, -1.0]
-
-    proc = play(cfg, samples, 1000)
-    proc.wait(timeout=5)
-
-    assert captured.read_bytes() == pcm_bytes(samples)
-
-
 def test_play_returns_without_waiting_for_a_slow_reader(tmp_path):
     script = tmp_path / "slow-player"
     captured = tmp_path / "captured.bin"
