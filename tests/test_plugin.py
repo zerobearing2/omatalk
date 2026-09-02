@@ -351,18 +351,22 @@ ShellRoot {{
         log_lines = cli_log.read_text().splitlines()
         assert log_lines.count("config set voice bf_test_two") == 1
 
-        ipc_call(process.pid, "omatalkTestDriver", "dragAndReleaseSpeed", "1.75")
+        # 1.73 is deliberately not a clean tenth, to prove the panel snaps
+        # a drag's continuous release value to the nearest 0.1 itself
+        # (PanelSlider's own `step` only affects wheel nudges, not drags).
+        ipc_call(process.pid, "omatalkTestDriver", "dragAndReleaseSpeed", "1.73")
         deadline = time.monotonic() + 10
         while (
             time.monotonic() < deadline
-            and "config set speed 1.75" not in cli_log.read_text()
+            and "config set speed 1.7" not in cli_log.read_text()
         ):
             time.sleep(0.1)
         log_lines = cli_log.read_text().splitlines()
         # Dragging must not have shelled out per-tick — only the release does.
-        assert log_lines.count("config set speed 1.75") == 1
+        assert log_lines.count("config set speed 1.7") == 1
         assert not any(line.startswith("config set speed 0.6") for line in log_lines)
         assert not any(line.startswith("config set speed 0.8") for line in log_lines)
+        assert not any(line.startswith("config set speed 1.73") for line in log_lines)
     finally:
         process.terminate()
         process.wait(timeout=10)

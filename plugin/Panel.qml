@@ -17,6 +17,11 @@ Panel {
 
   readonly property var englishPrefixes: ["af_", "am_", "bf_", "bm_"]
 
+  // PanelSlider only snaps `step` for wheel nudges — dragging reports
+  // continuous precision, snapping is the caller's job per its own docs —
+  // so both the live label and the committed value round through this.
+  function snapSpeed(v) { return Math.round(v * 10) / 10 }
+
   // Test hook only: `keyCatcher` lives inside KeyboardPanel's separate
   // PanelWindow surface, so it isn't reachable from outside this document
   // via the normal Item.children tree. Exposing it lets a headless test
@@ -179,14 +184,16 @@ Panel {
             width: parent.width - speedLabel.width - Style.space(12)
             minimum: 0.5
             maximum: 2.0
-            step: 0.05
+            step: 0.1
             value: root.speed
-            onReleased: function(v) { root.setSpeed(v) }
+            tickCount: 16
+            tickColor: Color.popups.background
+            onReleased: function(v) { root.setSpeed(root.snapSpeed(v)) }
           }
 
           Text {
             id: speedLabel
-            text: speedSlider.liveValue.toFixed(2) + "x"
+            text: root.snapSpeed(speedSlider.liveValue).toFixed(1) + "x"
             color: Color.popups.text
             font.family: Style.font.family
             font.pixelSize: Style.font.body
