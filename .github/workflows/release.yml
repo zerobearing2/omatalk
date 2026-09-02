@@ -58,7 +58,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="v$VERSION"
+          # install.sh/uninstall.sh are also uploaded standalone (not just
+          # inside the tarball) so the site's thin dispatcher
+          # (public/install.sh, public/uninstall.sh) can fetch
+          # releases/latest/download/<script> directly — pinning the
+          # installer's own logic to the release it ships, not to master.
           gh release create "$tag" --title "$tag" --generate-notes \
-            omatalk-src.tar.gz omatalk-src.tar.gz.sha256 \
+            omatalk-src.tar.gz omatalk-src.tar.gz.sha256 install.sh uninstall.sh \
             || gh release upload "$tag" --clobber \
-              omatalk-src.tar.gz omatalk-src.tar.gz.sha256
+              omatalk-src.tar.gz omatalk-src.tar.gz.sha256 install.sh uninstall.sh

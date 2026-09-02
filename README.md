@@ -84,6 +84,19 @@ several PRs can land on `master` before anyone ships. Re-running the
 installer picks up whatever is newest. After the first run of this installer,
 `omatalk upgrade` fetches and runs the same latest installer.
 
+The script at that URL is a small dispatcher: by default it fetches and runs
+the installer that shipped with the latest release, so the installer's own
+logic and the source it installs are always a matched pair. To test an
+unreleased branch instead, set `OMATALK_REF`:
+
+```sh
+OMATALK_REF=my-branch curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
+```
+
+This skips checksum verification for that install — a branch is a moving
+target, so there's nothing to pin the checksum to — and trusts HTTPS/GitHub
+instead, same as any other dev install.
+
 Upgrades never create, merge, rewrite, or delete `~/.config/omatalk/config.toml`.
 An existing config stays byte-for-byte unchanged, and an absent config stays
 absent.
@@ -96,6 +109,7 @@ curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
 
 Stops and removes the systemd unit, the launcher, the source, and the
 Omarchy bar plugin. Asks before deleting the models (~185MB) and your config.
+Also a thin dispatcher; `OMATALK_REF` works the same way here as for install.
 Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself.
 
 ## Usage

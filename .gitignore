@@ -26,6 +26,3 @@ models/
 .vscode/
 .DS_Store
 .pytest_cache/
-
-# Copied into place by .github/workflows/pages.yml at deploy time
-public/install.sh

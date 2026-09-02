@@ -4,6 +4,9 @@
 set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
+# Set to a branch name to install unreleased source for testing, bypassing
+# the pinned-checksum release path entirely (see step 2 below).
+OMATALK_REF="${OMATALK_REF:-}"
 RELEASE_BASE="${RELEASE_BASE:-https://github.com/zerobearing2/omatalk/releases/latest/download}"
 MODEL_BASE="${MODEL_BASE:-https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1}"
 MODEL_SHA256="${MODEL_SHA256:-f3a290d384fbb27966d462905c71a46cef9e5fd00516b40df32a0b4afe77ac96}"
@@ -51,13 +54,22 @@ else
   done
 fi
 
-# 2. Source: always the latest GitHub release tarball and checksum.
-msg "Downloading latest release from GitHub"
-TS=$(date +%s)
+# 2. Source: a specific branch when testing (OMATALK_REF), otherwise always
+# the latest GitHub release tarball and its checksum.
 mkdir -p "$OMATALK_HOME"
-curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" "$RELEASE_BASE/omatalk-src.tar.gz?ts=$TS"
-curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" "$RELEASE_BASE/omatalk-src.tar.gz.sha256?ts=$TS"
-(cd "$OMATALK_HOME" && sha256sum -c omatalk-src.tar.gz.sha256 --quiet)
+if [ -n "$OMATALK_REF" ]; then
+  # A branch is a moving target, so there is no checksum to pin it to —
+  # this path trusts HTTPS/GitHub instead, same as any other dev install.
+  msg "Downloading branch '$OMATALK_REF' from GitHub (unreleased, unverified)"
+  curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" \
+    "https://github.com/zerobearing2/omatalk/archive/refs/heads/$OMATALK_REF.tar.gz"
+else
+  msg "Downloading latest release from GitHub"
+  TS=$(date +%s)
+  curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" "$RELEASE_BASE/omatalk-src.tar.gz?ts=$TS"
+  curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" "$RELEASE_BASE/omatalk-src.tar.gz.sha256?ts=$TS"
+  (cd "$OMATALK_HOME" && sha256sum -c omatalk-src.tar.gz.sha256 --quiet)
+fi
 
 # 3. Models (~185MB, skipped when their checksums match). fp16 half-size
 # export: spectral correlation 0.999 against fp32 — audibly identical.
