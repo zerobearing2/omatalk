@@ -28,7 +28,7 @@ if command -v omarchy >/dev/null 2>&1 && [ -d "$HOME/.config/omarchy/plugins/zer
   rm -rf "$HOME/.config/omarchy/plugins"/.zerobearing.omatalk.bak.*
 fi
 rm -rf "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
-msg "Daemon stopped and removed; stray daemons killed; launcher and bar plugin removed"
+msg "Daemon stopped and removed; stray Daemons killed; launcher and bar plugin removed"
 
 if [ -d "$OMATALK_HOME" ]; then
   read -r -p "Remove $OMATALK_HOME (source, venv, ~340MB models)? [y/N] " answer < "$ASK_FROM"

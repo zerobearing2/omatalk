@@ -128,6 +128,7 @@ if [ "$1" = plugin ] && [ "$2" = add ]; then
   exit 0
 fi
 if [ "$1" = plugin ] && [ "$2" = remove ]; then
+  if [ "${FAKE_PLUGIN_REMOVE_FAIL:-0}" = 1 ]; then exit 1; fi
   rm -rf "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
   exit 0
 fi
@@ -372,6 +373,23 @@ def test_legacy_copy_is_replaced_via_plugin_remove_and_add(site, tmp_path):
         in lines
     )
     assert not any("omarchy restart shell" in line for line in lines)
+
+
+def test_legacy_copy_is_left_when_plugin_remove_fails(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+    seed_copy_plugin(env)
+    env["FAKE_PLUGIN_REMOVE_FAIL"] = "1"
+
+    result = run_install(env)
+
+    assert result.returncode == 0, result.stderr
+    path = plugin_dir(env)
+    assert (path / "old.txt").is_file()
+    assert not (path / ".git").exists()
+    lines = command_log(log)
+    assert any("omarchy plugin remove zerobearing.omatalk --yes" in line for line in lines)
+    assert not any("omarchy plugin add" in line for line in lines)
 
 
 def test_installer_requires_omarchy(site, tmp_path):

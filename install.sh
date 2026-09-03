@@ -124,20 +124,26 @@ fi
 # only: add when missing, remove-then-add to convert a legacy copy into a
 # git checkout, leave an existing git checkout for `omarchy plugin update`.
 # A failed add does not fail the Daemon install.
+add_bar_plugin() {
+  if omarchy plugin add "$PLUGIN_REPO" --enable --yes >/dev/null 2>&1; then
+    return
+  fi
+  warn "Could not add $PLUGIN_REPO; F8 still speaks. Add the plugin with: omarchy plugin add $PLUGIN_REPO --enable"
+}
+
 plugin_dir="$HOME/.config/omarchy/plugins/zerobearing.omatalk"
 if [ -e "$plugin_dir/.git" ]; then
   msg "Omarchy bar plugin is a git checkout; leaving it in place"
 elif [ -d "$plugin_dir" ]; then
   msg "Replacing copy-based Omarchy bar plugin with $PLUGIN_REPO"
-  omarchy plugin remove zerobearing.omatalk --yes >/dev/null 2>&1 || rm -rf "$plugin_dir"
-  if ! omarchy plugin add "$PLUGIN_REPO" --enable --yes >/dev/null 2>&1; then
-    warn "Could not add $PLUGIN_REPO; F8 still speaks. Add the plugin with: omarchy plugin add $PLUGIN_REPO --enable"
+  if omarchy plugin remove zerobearing.omatalk --yes >/dev/null 2>&1; then
+    add_bar_plugin
+  else
+    warn "Could not remove the copy-based plugin; F8 still speaks. Convert it with: omarchy plugin remove zerobearing.omatalk --yes && omarchy plugin add $PLUGIN_REPO --enable"
   fi
 else
   msg "Installing Omarchy bar plugin"
-  if ! omarchy plugin add "$PLUGIN_REPO" --enable --yes >/dev/null 2>&1; then
-    warn "Could not add $PLUGIN_REPO; F8 still speaks. Add the plugin with: omarchy plugin add $PLUGIN_REPO --enable"
-  fi
+  add_bar_plugin
 fi
 
 "$HOME/.local/bin/omatalk" speak "Welcome to omatalk!" >/dev/null 2>&1

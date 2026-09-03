@@ -37,7 +37,7 @@ release:
 	gh workflow run release.yml
 	@echo "Triggered. Watch with: gh run watch \$$(gh run list --workflow=release.yml -L1 --json databaseId -q '.[0].databaseId')"
 
-# Point the installed daemon at this checkout instead of the last released
+# Point the installed Daemon at this checkout instead of the last released
 # tarball. Keeps the existing venv/models — swaps in an editable package
 # install, so `dev-restart` is all that's needed after that for ordinary
 # Python edits. The bar plugin is the other repo
@@ -46,9 +46,9 @@ dev-install:
 	systemctl --user stop omatalk.service
 	uv pip install --quiet --python "$(OMATALK_HOME)/venv/bin/python" -e "$(REPO)"
 	systemctl --user start omatalk.service
-	@echo "Dev install active: daemon runs from $(REPO)"
+	@echo "Dev install active: Daemon runs from $(REPO)"
 
-# After editing daemon/*.py: restart the daemon to pick up the change.
+# After editing daemon/*.py: restart the Daemon to pick up the change.
 # No reinstall needed — dev-install's editable install already points here.
 dev-restart:
 	systemctl --user restart omatalk.service

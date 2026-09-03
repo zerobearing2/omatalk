@@ -920,8 +920,10 @@
       </div>
       <pre>~/.local/share/omatalk/src/uninstall.sh</pre>
     </div>
-    <p class="prose" style="margin-top:14px; max-width:66ch;">Stops the systemd user unit, kills any stray Daemon, and
-      removes the launcher, then asks before deleting the models and your config. It won't touch the
+    <p class="prose" style="margin-top:14px; max-width:66ch;">Stops the systemd user unit, kills any stray Daemon,
+      removes the launcher, and removes the bar plugin
+      (<code class="inline-code">omarchy plugin remove</code>). That is full teardown, not plugin remove alone.
+      It then asks before deleting the models and your config. It won't touch the
       <code class="inline-code">o.bind</code> line in <code class="inline-code">bindings.lua</code>; remove that yourself.</p>
   </section>
 

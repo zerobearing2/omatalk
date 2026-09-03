@@ -35,7 +35,7 @@ The live bar context is softened around the Omatalk glyph so the state colors ar
 
 ### Idle
 
-The daemon is ready and the icon uses the normal bar color.
+The Daemon is ready and the icon uses the normal bar color.
 
 ![Omatalk bar widget in its idle state](public/images/omatalk-bar-idle.png)
 
@@ -47,7 +47,7 @@ Omatalk is reading the current selection in the theme accent color.
 
 ### Unavailable
 
-The daemon has been disconnected long enough to show the urgent color.
+The Daemon has been disconnected long enough to show the urgent color.
 
 ![Omatalk bar widget in its unavailable state](public/images/omatalk-bar-unavailable.png)
 
@@ -77,11 +77,11 @@ The script downloads the latest release tarball (checksum-verified), then:
    Omarchy usually only lacks uv).
 2. Downloads the Kokoro-82M model and voice files (~185MB) to
    `~/.local/share/omatalk/models/`, skipped when their checksums match —
-   deliberately while any existing daemon is still running, since models
+   deliberately while any existing Daemon is still running, since models
    are only read at startup.
-3. Stops any existing daemon, rebuilds the uv-managed venv at
+3. Stops any existing Daemon, rebuilds the uv-managed venv at
    `~/.local/share/omatalk/venv/`, and installs and enables a fresh
-   `omatalk.service` systemd user unit, so the new daemon is running
+   `omatalk.service` systemd user unit, so the new Daemon is running
    before the command exits.
 4. Puts `omatalk` on `PATH`, then runs `omarchy plugin add` for
    https://github.com/zerobearing2/omarchy-omatalk-plugin if the plugin is
