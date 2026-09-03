@@ -2,6 +2,7 @@ import hashlib
 import http.server
 import io
 import os
+import shutil
 import subprocess
 import tarfile
 import threading
@@ -176,6 +177,32 @@ printf 'omarchy-shell %s\\n' "$*" >> "$FAKE_LOG"
     return env, state, log
 
 
+def without_omarchy(env):
+    fake_bin = Path(env["PATH"].split(":")[0])
+    (fake_bin / "omarchy").unlink(missing_ok=True)
+    for tool in (
+        "curl",
+        "tar",
+        "sha256sum",
+        "mkdir",
+        "rm",
+        "cp",
+        "mv",
+        "grep",
+        "cat",
+        "chmod",
+        "date",
+        "bash",
+        "touch",
+    ):
+        src = shutil.which(tool)
+        dest = fake_bin / tool
+        if src and not dest.exists():
+            dest.symlink_to(src)
+    env["PATH"] = str(fake_bin)
+    return env
+
+
 def run_install(env, answer=""):
     return subprocess.run(
         ["bash", str(ROOT / "install.sh")],
@@ -345,6 +372,21 @@ def test_legacy_copy_is_replaced_via_plugin_remove_and_add(site, tmp_path):
         in lines
     )
     assert not any("omarchy restart shell" in line for line in lines)
+
+
+def test_installer_requires_omarchy(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+    without_omarchy(env)
+
+    result = run_install(env)
+
+    assert result.returncode != 0
+    combined = result.stdout + result.stderr
+    assert "Omarchy" in combined
+    assert "pacman" not in combined
+    if log.exists():
+        assert not any("pacman" in line for line in command_log(log))
 
 
 def test_installer_tolerates_missing_unit(site, tmp_path):

@@ -60,7 +60,7 @@ def test_upgrade_fetches_installer_without_connecting_to_daemon(
     }
 
     result = subprocess.run(
-        [sys.executable, "-m", "omatalk.cli", "upgrade"],
+        [sys.executable, "-m", "daemon.cli", "upgrade"],
         cwd=ROOT,
         env=env,
         capture_output=True,
@@ -75,7 +75,7 @@ def test_upgrade_fetches_installer_without_connecting_to_daemon(
 def test_upgrade_rejects_extra_arguments(installer_site, tmp_path):
     site, requests = installer_site
     result = subprocess.run(
-        [sys.executable, "-m", "omatalk.cli", "upgrade", "now"],
+        [sys.executable, "-m", "daemon.cli", "upgrade", "now"],
         cwd=ROOT,
         env={**os.environ, "SITE_BASE": site},
         capture_output=True,
@@ -106,7 +106,7 @@ def run_cli(args, env):
     if isinstance(args, str):
         args = [args]
     return subprocess.run(
-        [sys.executable, "-m", "omatalk.cli", *args],
+        [sys.executable, "-m", "daemon.cli", *args],
         cwd=ROOT,
         env=env,
         capture_output=True,
@@ -177,7 +177,7 @@ def config_environment(tmp_path):
 
 def run_config(args, env):
     return subprocess.run(
-        [sys.executable, "-m", "omatalk.cli", "config", *args],
+        [sys.executable, "-m", "daemon.cli", "config", *args],
         cwd=ROOT,
         env=env,
         capture_output=True,

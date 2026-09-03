@@ -33,22 +33,17 @@ download_model() {
   echo "$sha256  $path" | sha256sum -c --quiet
 }
 
-# 1. System dependencies. On Omarchy, check and install via the omarchy CLI.
+# 1. System dependencies. Omarchy only — omarchy pkg add, never pacman.
+if ! command -v omarchy >/dev/null 2>&1; then
+  msg "Omatalk requires Omarchy. Install Omarchy, then rerun."
+  exit 1
+fi
 PKG_DEPS=(python curl pipewire wl-clipboard uv)
-if command -v omarchy >/dev/null 2>&1; then
-  if omarchy pkg present "${PKG_DEPS[@]}"; then
-    msg "System dependencies present: ${PKG_DEPS[*]}"
-  else
-    msg "Installing missing packages via omarchy pkg add"
-    omarchy pkg add "${PKG_DEPS[@]}"
-  fi
+if omarchy pkg present "${PKG_DEPS[@]}"; then
+  msg "System dependencies present: ${PKG_DEPS[*]}"
 else
-  for pkg in "${PKG_DEPS[@]}"; do
-    pacman -Q "$pkg" >/dev/null 2>&1 || {
-      msg "Missing: $pkg — install it (pacman -S $pkg) and rerun."
-      exit 1
-    }
-  done
+  msg "Installing missing packages via omarchy pkg add"
+  omarchy pkg add "${PKG_DEPS[@]}"
 fi
 
 # 2. Source: a specific branch when testing (OMATALK_REF), otherwise always
@@ -125,25 +120,23 @@ if ! "$HOME/.local/bin/omatalk" status >/dev/null 2>&1; then
   exit 1
 fi
 
-# 9. Bar plugin (Omarchy only). QML lives in PLUGIN_REPO, not this tarball.
-# Official tools only: add when missing, remove-then-add to convert a legacy
-# copy into a git checkout, leave an existing git checkout for
-# `omarchy plugin update`. A failed add does not fail the Daemon install.
-if command -v omarchy >/dev/null 2>&1; then
-  plugin_dir="$HOME/.config/omarchy/plugins/zerobearing.omatalk"
-  if [ -e "$plugin_dir/.git" ]; then
-    msg "Omarchy bar plugin is a git checkout; leaving it in place"
-  elif [ -d "$plugin_dir" ]; then
-    msg "Replacing copy-based Omarchy bar plugin with $PLUGIN_REPO"
-    omarchy plugin remove zerobearing.omatalk --yes >/dev/null 2>&1 || rm -rf "$plugin_dir"
-    if ! omarchy plugin add "$PLUGIN_REPO" --enable --yes >/dev/null 2>&1; then
-      warn "Could not add $PLUGIN_REPO; F8 still speaks. Add the plugin with: omarchy plugin add $PLUGIN_REPO --enable"
-    fi
-  else
-    msg "Installing Omarchy bar plugin"
-    if ! omarchy plugin add "$PLUGIN_REPO" --enable --yes >/dev/null 2>&1; then
-      warn "Could not add $PLUGIN_REPO; F8 still speaks. Add the plugin with: omarchy plugin add $PLUGIN_REPO --enable"
-    fi
+# 9. Bar plugin. QML lives in PLUGIN_REPO, not this tarball. Official tools
+# only: add when missing, remove-then-add to convert a legacy copy into a
+# git checkout, leave an existing git checkout for `omarchy plugin update`.
+# A failed add does not fail the Daemon install.
+plugin_dir="$HOME/.config/omarchy/plugins/zerobearing.omatalk"
+if [ -e "$plugin_dir/.git" ]; then
+  msg "Omarchy bar plugin is a git checkout; leaving it in place"
+elif [ -d "$plugin_dir" ]; then
+  msg "Replacing copy-based Omarchy bar plugin with $PLUGIN_REPO"
+  omarchy plugin remove zerobearing.omatalk --yes >/dev/null 2>&1 || rm -rf "$plugin_dir"
+  if ! omarchy plugin add "$PLUGIN_REPO" --enable --yes >/dev/null 2>&1; then
+    warn "Could not add $PLUGIN_REPO; F8 still speaks. Add the plugin with: omarchy plugin add $PLUGIN_REPO --enable"
+  fi
+else
+  msg "Installing Omarchy bar plugin"
+  if ! omarchy plugin add "$PLUGIN_REPO" --enable --yes >/dev/null 2>&1; then
+    warn "Could not add $PLUGIN_REPO; F8 still speaks. Add the plugin with: omarchy plugin add $PLUGIN_REPO --enable"
   fi
 fi
 

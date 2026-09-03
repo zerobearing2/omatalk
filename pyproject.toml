@@ -17,8 +17,8 @@ dependencies = [
 dev = ["pytest>=8"]
 
 [project.scripts]
-omatalk = "omatalk.cli:main"
-omatalkd = "omatalk.daemon:serve"
+omatalk = "daemon.cli:main"
+omatalkd = "daemon.daemon:serve"
 
 [tool.setuptools]
-packages = ["omatalk"]
+packages = ["daemon"]

@@ -83,7 +83,7 @@ The script downloads the latest release tarball (checksum-verified), then:
    `~/.local/share/omatalk/venv/`, and installs and enables a fresh
    `omatalk.service` systemd user unit, so the new daemon is running
    before the command exits.
-4. Puts `omatalk` on `PATH`. On Omarchy it runs `omarchy plugin add` for
+4. Puts `omatalk` on `PATH`, then runs `omarchy plugin add` for
    https://github.com/zerobearing2/omarchy-omatalk-plugin if the plugin is
    missing, or converts a leftover file copy the same way. An existing git
    checkout is left alone. QML is not in this tarball. It prints a copy-paste

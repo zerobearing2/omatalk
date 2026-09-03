@@ -21,7 +21,7 @@ Single-context repo:
 │   ├── 0002-python-daemon.md
 │   ├── 0003-primary-selection-capture.md
 │   └── 0004-plugin-own-repo.md
-└── omatalk/
+└── daemon/
 ```
 
 ## Use the glossary's vocabulary

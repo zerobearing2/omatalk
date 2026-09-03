@@ -51,7 +51,7 @@ jobs:
           # zerobearing2/omarchy-omatalk-plugin).
           tar --transform "s,^,omatalk/," \
             -czf omatalk-src.tar.gz \
-            omatalk systemd pyproject.toml README.md uninstall.sh
+            daemon systemd pyproject.toml README.md uninstall.sh
           sha256sum omatalk-src.tar.gz > omatalk-src.tar.gz.sha256
       - name: Create or update release
         env:

@@ -20,6 +20,7 @@ systemctl --user disable --now omatalk.service 2>/dev/null || true
 rm -f "$UNIT"
 systemctl --user daemon-reload
 pkill -f "[o]matalk.daemon" 2>/dev/null || true
+pkill -f "[d]aemon.daemon" 2>/dev/null || true
 rm -rf "${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk"
 rm -f "$HOME/.local/bin/omatalk" "$HOME/.local/bin/omatalkd"
 if command -v omarchy >/dev/null 2>&1 && [ -d "$HOME/.config/omarchy/plugins/zerobearing.omatalk" ]; then
