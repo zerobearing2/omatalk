@@ -1,8 +1,0 @@
-module qs.Ui
-Panel 1.0 Panel.qml
-KeyboardPanel 1.0 KeyboardPanel.qml
-PanelKeyCatcher 1.0 PanelKeyCatcher.qml
-PanelSeparator 1.0 PanelSeparator.qml
-PanelSectionHeader 1.0 PanelSectionHeader.qml
-SearchableDropdown 1.0 SearchableDropdown.qml
-PanelSlider 1.0 PanelSlider.qml

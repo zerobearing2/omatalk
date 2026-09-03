@@ -83,17 +83,12 @@ The script downloads the latest release tarball (checksum-verified), then:
    `~/.local/share/omatalk/venv/`, and installs and enables a fresh
    `omatalk.service` systemd user unit, so the new daemon is running
    before the command exits.
-4. Puts `omatalk` on `PATH`, then the Omarchy bar plugin: a git checkout
-   (store add) is left alone so `omarchy plugin update` still works; a missing
-   plugin is added from the public plugin git repo; a legacy copy is replaced
-   from the tarball. It prints a copy-paste command to add the F8 binding when
-   no Omatalk binding is present. The installer never edits your keybindings
-   itself. Replacing a copy-based plugin asks whether to restart the Omarchy
-   shell — a running shell can keep replaced QML in memory, and a shell restart
-   is the only reliable fix, so it's confirmed rather than done silently.
-   Declining just leaves the bar icon possibly stale until you run
-   `omarchy restart shell` yourself. A git checkout is not rewritten, so that
-   prompt does not run.
+4. Puts `omatalk` on `PATH`. On Omarchy it runs `omarchy plugin add` for
+   https://github.com/zerobearing2/omarchy-omatalk-plugin if the plugin is
+   missing, or converts a leftover file copy the same way. An existing git
+   checkout is left alone. QML is not in this tarball. It prints a copy-paste
+   command to add the F8 binding when no Omatalk binding is present. The
+   installer never edits your keybindings itself.
 
 Releases are cut manually (GitHub Actions → Release → Run workflow) so
 several PRs can land on `master` before anyone ships. Re-running the
@@ -117,6 +112,7 @@ Upgrades never create, merge, rewrite, or delete `~/.config/omatalk/config.toml`
 An existing config stays byte-for-byte unchanged, and an absent config stays
 absent.
 
+The bar widget lives in [omarchy-omatalk-plugin](https://github.com/zerobearing2/omarchy-omatalk-plugin).
 `omarchy plugin update zerobearing.omatalk` updates QML only. Daemon updates
 stay `omatalk upgrade` (or the site curl). `omarchy plugin remove
 zerobearing.omatalk` unloads the megaphone and deletes the plugin checkout; it

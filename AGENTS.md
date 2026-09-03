@@ -3,6 +3,9 @@
 Local text-to-speech for Omarchy: hotkey → the machine speaks your selected text.
 See `CONTEXT.md` for domain language.
 
+This repository is the Daemon, CLI, and site. The bar plugin is
+https://github.com/zerobearing2/omarchy-omatalk-plugin.
+
 ## Agent skills
 
 ### Issue tracker

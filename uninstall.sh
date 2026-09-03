@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Omatalk uninstaller: stops and removes the service, launcher, source, and
-# optionally models and config. Safe to run via curl | bash (prompts read
+# Omatalk uninstaller: stops and removes the unit, launcher, source, and
+# optionally models and config. The bar plugin is removed with
+# `omarchy plugin remove`. Safe to run via curl | bash (prompts read
 # the terminal, not the pipe).
 set -euo pipefail
 

@@ -46,11 +46,12 @@ jobs:
       - name: Pack source tarball
         run: |
           # Runtime minimum only: package, service unit, build metadata,
-          # README (referenced by pyproject), uninstaller, bar plugin.
-          # No site, tests, docs, or CI config.
+          # README (referenced by pyproject), uninstaller.
+          # No site, tests, docs, CI config, or bar plugin (that is
+          # zerobearing2/omarchy-omatalk-plugin).
           tar --transform "s,^,omatalk/," \
             -czf omatalk-src.tar.gz \
-            omatalk systemd plugin pyproject.toml README.md uninstall.sh
+            omatalk systemd pyproject.toml README.md uninstall.sh
           sha256sum omatalk-src.tar.gz > omatalk-src.tar.gz.sha256
       - name: Create or update release
         env:

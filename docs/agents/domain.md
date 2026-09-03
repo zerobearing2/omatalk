@@ -19,8 +19,9 @@ Single-context repo:
 ├── docs/adr/
 │   ├── 0001-kokoro-onnx-cpu.md
 │   ├── 0002-python-daemon.md
-│   └── 0003-primary-selection-capture.md
-└── src/
+│   ├── 0003-primary-selection-capture.md
+│   └── 0004-plugin-own-repo.md
+└── omatalk/
 ```
 
 ## Use the glossary's vocabulary

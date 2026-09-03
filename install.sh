@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Omatalk installer: system deps (omarchy-approved), latest GitHub release,
-# venv, models, systemd user service, PATH launcher, keybinding line.
+# venv, models, systemd user unit, PATH launcher. The bar plugin is
+# `omarchy plugin add` of PLUGIN_REPO, not files from this tarball.
 set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
@@ -16,14 +17,6 @@ MODEL_FILE="kokoro-v1.0.fp16.onnx"
 
 msg() { printf '\033[1;32m==>\033[0m %s\n' "$1"; }
 warn() { printf '\033[1;33m==>\033[0m %s\n' "$1"; }
-
-# Prompts read the terminal when piped via curl | bash; fall back to stdin
-# for scripted runs where /dev/tty is unavailable. Tests set ASK_FROM to
-# /dev/stdin so `read` cannot steal the developer's tty.
-if [ -z "${ASK_FROM:-}" ]; then
-  ASK_FROM=/dev/tty
-  { : < /dev/tty; } 2>/dev/null || ASK_FROM=/dev/stdin
-fi
 
 download_model() {
   local file="$1"
@@ -132,77 +125,24 @@ if ! "$HOME/.local/bin/omatalk" status >/dev/null 2>&1; then
   exit 1
 fi
 
-# 9. Bar plugin (Omarchy only). A git checkout (store add) is left alone so
-# `omarchy plugin update` keeps working. A legacy copy is still replaced from
-# the tarball the way `omarchy plugin add` stages files: one rename, then
-# rescan, wait until the shell reports the plugin, then enable. A missing
-# directory is `omarchy plugin add`; if that fails, the tarball copy is the
-# fallback.
-stage_plugin_from_tarball() {
-  local plugins_dir="$1"
-  local plugin_dir="$2"
-  local stage="$plugins_dir/.omatalk.add.$$"
-  mkdir -p "$plugins_dir"
-  rm -rf "$stage"
-  cp -r "$OMATALK_HOME/src/plugin" "$stage"
-  rm -rf "$plugin_dir"
-  mv "$stage" "$plugin_dir"
-}
-
-discover_and_enable_plugin() {
-  omarchy-shell shell rescanPlugins >/dev/null
-
-  local plugin_seen=0
-  for _ in $(seq 1 40); do
-    if omarchy plugin list --json |
-      jq -e 'any(.[]; .id == "zerobearing.omatalk")' >/dev/null 2>&1; then
-      plugin_seen=1
-      break
-    fi
-    sleep 0.05
-  done
-  if (( ! plugin_seen )); then
-    msg "Omarchy did not discover the bar plugin; run: omarchy plugin enable zerobearing.omatalk"
-    exit 1
-  fi
-
-  if ! omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1; then
-    msg "Could not enable the Omarchy bar plugin; run: omarchy plugin enable zerobearing.omatalk"
-    exit 1
-  fi
-}
-
-prompt_plugin_shell_restart() {
-  warn "The bar plugin was already installed before this run — its icon may need a shell restart to show the update."
-  # A closed/non-interactive stdin (no answer to read) must not abort the
-  # rest of the install under set -e — default to declining the restart.
-  local answer
-  read -r -p "Restart the Omarchy shell now to apply it? [y/N] " answer < "$ASK_FROM" || answer="n"
-  if [[ "$answer" =~ ^[Yy]$ ]]; then
-    omarchy restart shell
-  else
-    warn "Skipped. If the bar icon looks stale, run: omarchy restart shell"
-  fi
-}
-
+# 9. Bar plugin (Omarchy only). QML lives in PLUGIN_REPO, not this tarball.
+# Official tools only: add when missing, remove-then-add to convert a legacy
+# copy into a git checkout, leave an existing git checkout for
+# `omarchy plugin update`. A failed add does not fail the Daemon install.
 if command -v omarchy >/dev/null 2>&1; then
-  plugins_dir="$HOME/.config/omarchy/plugins"
-  plugin_dir="$plugins_dir/zerobearing.omatalk"
+  plugin_dir="$HOME/.config/omarchy/plugins/zerobearing.omatalk"
   if [ -e "$plugin_dir/.git" ]; then
     msg "Omarchy bar plugin is a git checkout; leaving it in place"
   elif [ -d "$plugin_dir" ]; then
-    msg "Replacing copy-based Omarchy bar plugin"
-    stage_plugin_from_tarball "$plugins_dir" "$plugin_dir"
-    discover_and_enable_plugin
-    prompt_plugin_shell_restart
+    msg "Replacing copy-based Omarchy bar plugin with $PLUGIN_REPO"
+    omarchy plugin remove zerobearing.omatalk --yes >/dev/null 2>&1 || rm -rf "$plugin_dir"
+    if ! omarchy plugin add "$PLUGIN_REPO" --enable --yes >/dev/null 2>&1; then
+      warn "Could not add $PLUGIN_REPO; F8 still speaks. Add the plugin with: omarchy plugin add $PLUGIN_REPO --enable"
+    fi
   else
     msg "Installing Omarchy bar plugin"
-    if omarchy plugin add "$PLUGIN_REPO" --enable --yes >/dev/null 2>&1; then
-      :
-    else
-      warn "Could not add $PLUGIN_REPO; installing from the release tarball"
-      stage_plugin_from_tarball "$plugins_dir" "$plugin_dir"
-      discover_and_enable_plugin
+    if ! omarchy plugin add "$PLUGIN_REPO" --enable --yes >/dev/null 2>&1; then
+      warn "Could not add $PLUGIN_REPO; F8 still speaks. Add the plugin with: omarchy plugin add $PLUGIN_REPO --enable"
     fi
   fi
 fi

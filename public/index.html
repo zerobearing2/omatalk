@@ -865,8 +865,9 @@
       That script checks system dependencies, pulls the latest tagged release from this site (checksum-verified), and
       builds a uv-managed venv. Then it downloads the ~185MB Kokoro-82M model (checksum-verified against the exact files
       the benchmark was run on), stops the current Daemon, and starts a fresh
-      <code class="inline-code">omatalk.service</code> systemd user unit before the command exits. A git plugin checkout
-      is left in place. It only <em>prints</em> the bindings.lua line when no Omatalk binding is present; your
+      <code class="inline-code">omatalk.service</code> systemd user unit before the command exits. The bar plugin is
+      added with <code class="inline-code">omarchy plugin add</code>; QML is not in this tarball. It only
+      <em>prints</em> the bindings.lua line when no Omatalk binding is present; your
       keybindings stay yours to edit.</p>
 
     <div class="code-card">
@@ -892,7 +893,7 @@
     </div>
 
     <p class="prose" style="margin-top:26px; max-width:66ch;">Re-run the site command any time to update the Daemon. It re-fetches
-      the latest release and skips models whose checksums still match. A git-managed plugin is not rewritten —
+      the latest release and skips models whose checksums still match. This installer does not rewrite the plugin —
       <code class="inline-code">omarchy plugin update zerobearing.omatalk</code> updates QML.
       <code class="inline-code">omarchy plugin remove</code> hides the icon and leaves the Daemon.
       Your config and keybindings are never edited or created. After this first bootstrap, use <code class="inline-code">omatalk upgrade</code>
