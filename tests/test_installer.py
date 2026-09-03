@@ -2,6 +2,7 @@ import hashlib
 import http.server
 import io
 import os
+import shutil
 import subprocess
 import tarfile
 import threading
@@ -60,12 +61,10 @@ def site(tmp_path):
         thread.join(timeout=5)
 
 
-def make_source(stale=False, plugin="old plugin"):
+def make_source(stale=False):
     files = {
         "pyproject.toml": "[project]\nname = 'omatalk'\n",
         "systemd/omatalk.service": "[Service]\nExecStart=fake\n",
-        "plugin/Megaphone.qml": plugin,
-        "plugin/manifest.json": '{"id": "zerobearing.omatalk"}',
         "current.py": "new source\n",
     }
     if stale:
@@ -120,8 +119,20 @@ esac
 set -eu
 printf 'omarchy %s\\n' "$*" >> "$FAKE_LOG"
 if [ "$1" = pkg ] && [ "$2" = present ]; then exit 0; fi
+if [ "$1" = plugin ] && [ "$2" = add ]; then
+  if [ "${FAKE_PLUGIN_ADD_FAIL:-0}" = 1 ]; then exit 1; fi
+  plugin_dir="$HOME/.config/omarchy/plugins/zerobearing.omatalk"
+  if [ -e "$plugin_dir" ]; then exit 1; fi
+  mkdir -p "$plugin_dir/.git"
+  printf '{"id":"zerobearing.omatalk"}\n' > "$plugin_dir/manifest.json"
+  exit 0
+fi
+if [ "$1" = plugin ] && [ "$2" = remove ]; then
+  if [ "${FAKE_PLUGIN_REMOVE_FAIL:-0}" = 1 ]; then exit 1; fi
+  rm -rf "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
+  exit 0
+fi
 if [ "$1" = plugin ] && [ "$2" = list ]; then
-  # The shell only reports a plugin once its files are in place.
   if [ -f "$HOME/.config/omarchy/plugins/zerobearing.omatalk/manifest.json" ]; then
     printf '[{"id":"zerobearing.omatalk"}]\n'
   else
@@ -161,9 +172,36 @@ printf 'omarchy-shell %s\\n' "$*" >> "$FAKE_LOG"
         "FAKE_LOG": str(log),
         "FAKE_STATE": str(state),
         "ASK_FROM": "/dev/stdin",
+        "PLUGIN_REPO": "https://example.test/omarchy-omatalk-plugin.git",
     }
     Path(env["HOME"]).mkdir()
     return env, state, log
+
+
+def without_omarchy(env):
+    fake_bin = Path(env["PATH"].split(":")[0])
+    (fake_bin / "omarchy").unlink(missing_ok=True)
+    for tool in (
+        "curl",
+        "tar",
+        "sha256sum",
+        "mkdir",
+        "rm",
+        "cp",
+        "mv",
+        "grep",
+        "cat",
+        "chmod",
+        "date",
+        "bash",
+        "touch",
+    ):
+        src = shutil.which(tool)
+        dest = fake_bin / tool
+        if src and not dest.exists():
+            dest.symlink_to(src)
+    env["PATH"] = str(fake_bin)
+    return env
 
 
 def run_install(env, answer=""):
@@ -182,6 +220,22 @@ def model_requests(site, filename):
         request.split("?", 1)[0] == f"/models/{filename}"
         for request in site.requests
     )
+
+
+def plugin_dir(env):
+    return Path(env["HOME"]) / ".config/omarchy/plugins/zerobearing.omatalk"
+
+
+def command_log(log):
+    return log.read_text().splitlines()
+
+
+def seed_copy_plugin(env):
+    path = plugin_dir(env)
+    path.mkdir(parents=True)
+    (path / "manifest.json").write_text('{"id": "zerobearing.omatalk"}\n')
+    (path / "old.txt").write_text("legacy copy\n")
+    return path
 
 
 def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
@@ -206,12 +260,13 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     bindings.write_text('o.bind("F8", "Omatalk", "omatalk speak")\n')
     config_before = config.read_bytes()
 
-    site.publish(make_source(plugin="new plugin"))
+    site.publish(make_source())
     second = run_install(env)
 
     assert second.returncode == 0, second.stderr
     assert not (install_home / "src/stale.py").exists()
-    assert (install_home / "src/plugin/Megaphone.qml").read_text() == "new plugin"
+    assert (install_home / "src/current.py").read_text() == "new source\n"
+    assert not (install_home / "src/plugin").exists()
     assert config.read_bytes() == config_before
     assert bindings.read_text() == 'o.bind("F8", "Omatalk", "omatalk speak")\n'
     assert "To bind F8" not in second.stdout
@@ -231,24 +286,23 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
 
     assert bad_download.returncode != 0
 
-    lines = log.read_text().splitlines()
+    lines = command_log(log)
     stop = max(i for i, line in enumerate(lines) if "systemctl --user stop" in line)
     clear = max(i for i, line in enumerate(lines) if "uv venv --quiet --clear" in line)
-    plugin = max(i for i, line in enumerate(lines) if "omarchy plugin enable" in line)
     start = max(i for i, line in enumerate(lines) if "systemctl --user enable --now" in line)
-    assert stop < clear
-    # Same sequence as `omarchy plugin add`: one rescan, then wait for the
-    # shell to report the plugin discovered, then enable it once. The shell
-    # refuses to enable a plugin it has not scanned, so the discovery gate is
-    # what makes the enable safe -- not a sleep, and not a second rescan.
-    rescans = [i for i, line in enumerate(lines) if "omarchy-shell shell rescanPlugins" in line]
-    listed = [i for i, line in enumerate(lines) if "omarchy plugin list" in line]
-    assert len(rescans) == 3
-    assert start < rescans[-1] < listed[-1] < plugin
+    assert stop < clear < start
+    adds = [line for line in lines if "omarchy plugin add" in line]
+    assert adds == [
+        "omarchy plugin add https://example.test/omarchy-omatalk-plugin.git --enable --yes"
+    ]
+    assert (plugin_dir(env) / ".git").is_dir()
+    assert not any("omarchy plugin remove" in line for line in lines)
     assert not any("omarchy restart shell" in line for line in lines)
 
 
-def test_fresh_install_never_prompts_to_restart_shell(site, tmp_path):
+def test_fresh_install_adds_plugin_repo_and_never_prompts_to_restart_shell(
+    site, tmp_path
+):
     site.publish(make_source())
     env, _state, log = fake_environment(site, tmp_path)
 
@@ -256,37 +310,101 @@ def test_fresh_install_never_prompts_to_restart_shell(site, tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert "already installed before this run" not in result.stdout
-    assert not any(
-        "omarchy restart shell" in line for line in log.read_text().splitlines()
+    lines = command_log(log)
+    assert (
+        "omarchy plugin add https://example.test/omarchy-omatalk-plugin.git --enable --yes"
+        in lines
     )
+    assert not any("omarchy restart shell" in line for line in lines)
+    assert (plugin_dir(env) / ".git").is_dir()
 
 
-def test_upgrade_restarts_shell_when_user_agrees(site, tmp_path):
+def test_git_plugin_checkout_is_left_alone(site, tmp_path):
     site.publish(make_source())
     env, _state, log = fake_environment(site, tmp_path)
-    assert run_install(env).returncode == 0
+    path = plugin_dir(env)
+    path.mkdir(parents=True)
+    (path / ".git").mkdir()
+    (path / "keep.txt").write_text("store checkout\n")
 
-    result = run_install(env, answer="y\n")
+    result = run_install(env)
 
     assert result.returncode == 0, result.stderr
-    assert "already installed before this run" in result.stdout
-    assert any(
-        "omarchy restart shell" in line for line in log.read_text().splitlines()
-    )
+    assert (path / "keep.txt").read_text() == "store checkout\n"
+    assert (path / ".git").is_dir()
+    lines = command_log(log)
+    assert not any("omarchy plugin add" in line for line in lines)
+    assert not any("omarchy plugin remove" in line for line in lines)
+    assert not any("omarchy plugin enable" in line for line in lines)
+    assert not any("omarchy restart shell" in line for line in lines)
 
 
-def test_upgrade_skips_shell_restart_when_user_declines(site, tmp_path):
+def test_plugin_add_failure_still_installs_the_daemon(site, tmp_path):
     site.publish(make_source())
     env, _state, log = fake_environment(site, tmp_path)
-    assert run_install(env).returncode == 0
+    env["FAKE_PLUGIN_ADD_FAIL"] = "1"
 
-    result = run_install(env, answer="n\n")
+    result = run_install(env)
 
     assert result.returncode == 0, result.stderr
-    assert "Skipped" in result.stdout
-    assert not any(
-        "omarchy restart shell" in line for line in log.read_text().splitlines()
+    assert Path(env["HOME"], ".local/bin/omatalk").is_file()
+    assert not plugin_dir(env).exists()
+    lines = command_log(log)
+    assert any("omarchy plugin add" in line for line in lines)
+    assert not any("omarchy plugin enable" in line for line in lines)
+    assert not any("omarchy restart shell" in line for line in lines)
+
+
+def test_legacy_copy_is_replaced_via_plugin_remove_and_add(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+    seed_copy_plugin(env)
+
+    result = run_install(env)
+
+    assert result.returncode == 0, result.stderr
+    path = plugin_dir(env)
+    assert (path / ".git").is_dir()
+    assert not (path / "old.txt").exists()
+    lines = command_log(log)
+    assert any("omarchy plugin remove zerobearing.omatalk --yes" in line for line in lines)
+    assert (
+        "omarchy plugin add https://example.test/omarchy-omatalk-plugin.git --enable --yes"
+        in lines
     )
+    assert not any("omarchy restart shell" in line for line in lines)
+
+
+def test_legacy_copy_is_left_when_plugin_remove_fails(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+    seed_copy_plugin(env)
+    env["FAKE_PLUGIN_REMOVE_FAIL"] = "1"
+
+    result = run_install(env)
+
+    assert result.returncode == 0, result.stderr
+    path = plugin_dir(env)
+    assert (path / "old.txt").is_file()
+    assert not (path / ".git").exists()
+    lines = command_log(log)
+    assert any("omarchy plugin remove zerobearing.omatalk --yes" in line for line in lines)
+    assert not any("omarchy plugin add" in line for line in lines)
+
+
+def test_installer_requires_omarchy(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+    without_omarchy(env)
+
+    result = run_install(env)
+
+    assert result.returncode != 0
+    combined = result.stdout + result.stderr
+    assert "Omarchy" in combined
+    assert "pacman" not in combined
+    if log.exists():
+        assert not any("pacman" in line for line in command_log(log))
 
 
 def test_installer_tolerates_missing_unit(site, tmp_path):

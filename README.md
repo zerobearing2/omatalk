@@ -24,15 +24,18 @@ the active color while Omatalk is speaking.
 
 The bar keeps one megaphone icon in the same spot and changes its color:
 
-- `idle`: normal bar color; the daemon is ready.
+- `not installed`: normal bar color; tooltip says Omatalk is not installed.
+  Open the panel for Install Omatalk.
+- `idle`: normal bar color; the Daemon is ready.
 - `speaking`: theme accent; selected text is being read.
-- `unavailable`: urgent color after a 3-second disconnect grace period.
+- `unavailable`: urgent color after a 3-second disconnect grace period, only
+  once the Daemon has been installed.
 
 The live bar context is softened around the Omatalk glyph so the state colors are easy to spot.
 
 ### Idle
 
-The daemon is ready and the icon uses the normal bar color.
+The Daemon is ready and the icon uses the normal bar color.
 
 ![Omatalk bar widget in its idle state](public/images/omatalk-bar-idle.png)
 
@@ -44,13 +47,24 @@ Omatalk is reading the current selection in the theme accent color.
 
 ### Unavailable
 
-The daemon has been disconnected long enough to show the urgent color.
+The Daemon has been disconnected long enough to show the urgent color.
 
 ![Omatalk bar widget in its unavailable state](public/images/omatalk-bar-unavailable.png)
 
 ## Install
 
-On an Omarchy machine:
+Two doors, one installer.
+
+**Plugin store.** Add the megaphone, then install the Daemon from the panel if
+it is missing:
+
+```sh
+omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable
+```
+
+Click the megaphone and choose Install Omatalk. Models are about 185MB.
+
+**Site.** The same installer from a terminal:
 
 ```sh
 curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
@@ -63,21 +77,18 @@ The script downloads the latest release tarball (checksum-verified), then:
    Omarchy usually only lacks uv).
 2. Downloads the Kokoro-82M model and voice files (~185MB) to
    `~/.local/share/omatalk/models/`, skipped when their checksums match —
-   deliberately while any existing daemon is still running, since models
+   deliberately while any existing Daemon is still running, since models
    are only read at startup.
-3. Stops any existing daemon, rebuilds the uv-managed venv at
+3. Stops any existing Daemon, rebuilds the uv-managed venv at
    `~/.local/share/omatalk/venv/`, and installs and enables a fresh
-   `omatalk.service` systemd user unit, so the new daemon is running
+   `omatalk.service` systemd user unit, so the new Daemon is running
    before the command exits.
-4. Puts `omatalk` on `PATH`, installs and refreshes the Omarchy bar plugin, and
-   prints a copy-paste command to add the F8 binding when no Omatalk binding is
-   present. The installer never edits your keybindings itself. If the plugin
-   was already installed (i.e. this is an upgrade, not a first install), it
-   asks whether to restart the Omarchy shell — a running shell can keep an
-   already-loaded plugin's old UI in memory even after its files change on
-   disk, and a shell restart is the only reliable fix, so it's confirmed
-   rather than done silently. Declining just leaves the bar icon possibly
-   stale until you run `omarchy restart shell` yourself.
+4. Puts `omatalk` on `PATH`, then runs `omarchy plugin add` for
+   https://github.com/zerobearing2/omarchy-omatalk-plugin if the plugin is
+   missing, or converts a leftover file copy the same way. An existing git
+   checkout is left alone. QML is not in this tarball. It prints a copy-paste
+   command to add the F8 binding when no Omatalk binding is present. The
+   installer never edits your keybindings itself.
 
 Releases are cut manually (GitHub Actions → Release → Run workflow) so
 several PRs can land on `master` before anyone ships. Re-running the
@@ -87,10 +98,11 @@ installer picks up whatever is newest. After the first run of this installer,
 The script at that URL is a small dispatcher: by default it fetches and runs
 the installer that shipped with the latest release, so the installer's own
 logic and the source it installs are always a matched pair. To test an
-unreleased branch instead, set `OMATALK_REF`:
+unreleased branch instead, put `OMATALK_REF` in the environment of the
+`bash` that runs the dispatcher (a prefix on `curl` alone is ignored):
 
 ```sh
-OMATALK_REF=my-branch curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
+OMATALK_REF=my-branch bash -c 'curl -fsSL https://omatalk.zerobearing.com/install.sh | bash'
 ```
 
 This skips checksum verification for that install — a branch is a moving
@@ -101,6 +113,12 @@ Upgrades never create, merge, rewrite, or delete `~/.config/omatalk/config.toml`
 An existing config stays byte-for-byte unchanged, and an absent config stays
 absent.
 
+The bar widget lives in [omarchy-omatalk-plugin](https://github.com/zerobearing2/omarchy-omatalk-plugin).
+`omarchy plugin update zerobearing.omatalk` updates QML only. Daemon updates
+stay `omatalk upgrade` (or the site curl). `omarchy plugin remove
+zerobearing.omatalk` unloads the megaphone and deletes the plugin checkout; it
+leaves the Daemon, venv, models, and config. F8 still speaks.
+
 ## Uninstall
 
 ```sh
@@ -110,7 +128,8 @@ curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
 Stops and removes the systemd unit, the launcher, the source, and the
 Omarchy bar plugin. Asks before deleting the models (~185MB) and your config.
 Also a thin dispatcher; `OMATALK_REF` works the same way here as for install.
-Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself.
+Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself. Plugin
+remove is not uninstall.
 
 ## Usage
 

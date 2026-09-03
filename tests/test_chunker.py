@@ -1,4 +1,4 @@
-from omatalk.chunker import sentences
+from daemon.chunker import sentences
 
 
 def test_basic_split():

@@ -2,7 +2,7 @@ import time
 
 import numpy as np
 
-from omatalk.player import play
+from daemon.player import play
 
 
 def make_echo_player(tmp_path):

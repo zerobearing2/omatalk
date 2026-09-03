@@ -3,6 +3,10 @@
 Local text-to-speech for Omarchy: hotkey → the machine speaks your selected text.
 See `CONTEXT.md` for domain language.
 
+This repository is the Daemon, CLI, and site. Python lives in `daemon/`.
+The installed CLI is still `omatalk` / `omatalkd`. The bar plugin is
+https://github.com/zerobearing2/omarchy-omatalk-plugin.
+
 ## Agent skills
 
 ### Issue tracker

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Omatalk uninstaller: stops and removes the service, launcher, source, and
-# optionally models and config. Safe to run via curl | bash (prompts read
+# Omatalk uninstaller: stops and removes the unit, launcher, source, and
+# optionally models and config. The bar plugin is removed with
+# `omarchy plugin remove`. Safe to run via curl | bash (prompts read
 # the terminal, not the pipe).
 set -euo pipefail
 
@@ -19,6 +20,7 @@ systemctl --user disable --now omatalk.service 2>/dev/null || true
 rm -f "$UNIT"
 systemctl --user daemon-reload
 pkill -f "[o]matalk.daemon" 2>/dev/null || true
+pkill -f "[d]aemon.omatalkd" 2>/dev/null || true
 rm -rf "${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk"
 rm -f "$HOME/.local/bin/omatalk" "$HOME/.local/bin/omatalkd"
 if command -v omarchy >/dev/null 2>&1 && [ -d "$HOME/.config/omarchy/plugins/zerobearing.omatalk" ]; then
@@ -26,7 +28,7 @@ if command -v omarchy >/dev/null 2>&1 && [ -d "$HOME/.config/omarchy/plugins/zer
   rm -rf "$HOME/.config/omarchy/plugins"/.zerobearing.omatalk.bak.*
 fi
 rm -rf "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
-msg "Daemon stopped and removed; stray daemons killed; launcher and bar plugin removed"
+msg "Daemon stopped and removed; stray Daemons killed; launcher and bar plugin removed"
 
 if [ -d "$OMATALK_HOME" ]; then
   read -r -p "Remove $OMATALK_HOME (source, venv, ~340MB models)? [y/N] " answer < "$ASK_FROM"

@@ -38,3 +38,7 @@ _Avoid_: server, service (the systemd unit wraps the Daemon but is not the term)
 **Stream**:
 Speaking a Utterance sentence-by-sentence, starting playback before all audio
 is synthesized.
+
+The Omarchy bar widget (megaphone, setup/config panel) lives in
+https://github.com/zerobearing2/omarchy-omatalk-plugin. This repository does
+not contain QML. See `docs/adr/0004-plugin-own-repo.md`.

@@ -30,7 +30,7 @@ def test_status_idle(daemon):
 
 def test_cli_rejects_follow(daemon):
     result = subprocess.run(
-        [sys.executable, "-m", "omatalk.cli", "status", "--follow"],
+        [sys.executable, "-m", "daemon.cli", "status", "--follow"],
         cwd=REPO,
         env=daemon["env"],
         capture_output=True,
