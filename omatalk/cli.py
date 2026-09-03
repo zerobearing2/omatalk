@@ -1,4 +1,5 @@
 import argparse
+import importlib.metadata
 import json
 import os
 import socket
@@ -59,6 +60,10 @@ def upgrade():
             Path(path).unlink(missing_ok=True)
 
 
+def installed_version() -> str:
+    return importlib.metadata.version("omatalk")
+
+
 def notify_daemon_down():
     try:
         subprocess.run(
@@ -74,7 +79,15 @@ def notify_daemon_down():
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="omatalk")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=installed_version(),
+        help="same as the version command",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("version", help="print the installed release")
 
     speak = sub.add_parser("speak", help="speak text, or the current selection/clipboard")
     speak.add_argument("text", nargs="*")
@@ -177,6 +190,10 @@ def send_daemon_command(cmd: str, command: str) -> int:
 def main():
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.command == "version":
+        print(installed_version())
+        return
 
     if args.command == "upgrade":
         upgrade()

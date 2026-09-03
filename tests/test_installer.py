@@ -160,12 +160,13 @@ printf 'omarchy-shell %s\\n' "$*" >> "$FAKE_LOG"
         "VOICES_SHA256": hashlib.sha256(voices).hexdigest(),
         "FAKE_LOG": str(log),
         "FAKE_STATE": str(state),
+        "ASK_FROM": "/dev/stdin",
     }
     Path(env["HOME"]).mkdir()
     return env, state, log
 
 
-def run_install(env, answer=None):
+def run_install(env, answer=""):
     return subprocess.run(
         ["bash", str(ROOT / "install.sh")],
         cwd=ROOT,
