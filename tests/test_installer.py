@@ -120,6 +120,13 @@ esac
 set -eu
 printf 'omarchy %s\\n' "$*" >> "$FAKE_LOG"
 if [ "$1" = pkg ] && [ "$2" = present ]; then exit 0; fi
+if [ "$1" = plugin ] && [ "$2" = add ]; then
+  if [ "${FAKE_PLUGIN_ADD_FAIL:-0}" = 1 ]; then exit 1; fi
+  plugin_dir="$HOME/.config/omarchy/plugins/zerobearing.omatalk"
+  mkdir -p "$plugin_dir/.git"
+  printf '{"id":"zerobearing.omatalk"}\n' > "$plugin_dir/manifest.json"
+  exit 0
+fi
 if [ "$1" = plugin ] && [ "$2" = list ]; then
   # The shell only reports a plugin once its files are in place.
   if [ -f "$HOME/.config/omarchy/plugins/zerobearing.omatalk/manifest.json" ]; then
@@ -161,6 +168,7 @@ printf 'omarchy-shell %s\\n' "$*" >> "$FAKE_LOG"
         "FAKE_LOG": str(log),
         "FAKE_STATE": str(state),
         "ASK_FROM": "/dev/stdin",
+        "PLUGIN_REPO": "https://example.test/omarchy-omatalk-plugin.git",
     }
     Path(env["HOME"]).mkdir()
     return env, state, log
@@ -182,6 +190,22 @@ def model_requests(site, filename):
         request.split("?", 1)[0] == f"/models/{filename}"
         for request in site.requests
     )
+
+
+def plugin_dir(env):
+    return Path(env["HOME"]) / ".config/omarchy/plugins/zerobearing.omatalk"
+
+
+def command_log(log):
+    return log.read_text().splitlines()
+
+
+def seed_copy_plugin(env):
+    path = plugin_dir(env)
+    path.mkdir(parents=True)
+    (path / "manifest.json").write_text('{"id": "zerobearing.omatalk"}\n')
+    (path / "old.txt").write_text("legacy copy\n")
+    return path
 
 
 def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
@@ -231,24 +255,23 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
 
     assert bad_download.returncode != 0
 
-    lines = log.read_text().splitlines()
+    lines = command_log(log)
     stop = max(i for i, line in enumerate(lines) if "systemctl --user stop" in line)
     clear = max(i for i, line in enumerate(lines) if "uv venv --quiet --clear" in line)
-    plugin = max(i for i, line in enumerate(lines) if "omarchy plugin enable" in line)
     start = max(i for i, line in enumerate(lines) if "systemctl --user enable --now" in line)
-    assert stop < clear
-    # Same sequence as `omarchy plugin add`: one rescan, then wait for the
-    # shell to report the plugin discovered, then enable it once. The shell
-    # refuses to enable a plugin it has not scanned, so the discovery gate is
-    # what makes the enable safe -- not a sleep, and not a second rescan.
-    rescans = [i for i, line in enumerate(lines) if "omarchy-shell shell rescanPlugins" in line]
-    listed = [i for i, line in enumerate(lines) if "omarchy plugin list" in line]
-    assert len(rescans) == 3
-    assert start < rescans[-1] < listed[-1] < plugin
+    assert stop < clear < start
+    adds = [line for line in lines if "omarchy plugin add" in line]
+    assert adds == [
+        "omarchy plugin add https://example.test/omarchy-omatalk-plugin.git --enable --yes"
+    ]
+    assert (plugin_dir(env) / ".git").is_dir()
+    assert not any("omarchy-shell shell rescanPlugins" in line for line in lines)
     assert not any("omarchy restart shell" in line for line in lines)
 
 
-def test_fresh_install_never_prompts_to_restart_shell(site, tmp_path):
+def test_fresh_install_adds_plugin_repo_and_never_prompts_to_restart_shell(
+    site, tmp_path
+):
     site.publish(make_source())
     env, _state, log = fake_environment(site, tmp_path)
 
@@ -256,37 +279,75 @@ def test_fresh_install_never_prompts_to_restart_shell(site, tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert "already installed before this run" not in result.stdout
-    assert not any(
-        "omarchy restart shell" in line for line in log.read_text().splitlines()
+    lines = command_log(log)
+    assert (
+        "omarchy plugin add https://example.test/omarchy-omatalk-plugin.git --enable --yes"
+        in lines
     )
+    assert not any("omarchy restart shell" in line for line in lines)
+    assert (plugin_dir(env) / ".git").is_dir()
+
+
+def test_git_plugin_checkout_is_left_alone(site, tmp_path):
+    site.publish(make_source(plugin="new plugin"))
+    env, _state, log = fake_environment(site, tmp_path)
+    path = plugin_dir(env)
+    path.mkdir(parents=True)
+    (path / ".git").mkdir()
+    (path / "keep.txt").write_text("store checkout\n")
+
+    result = run_install(env)
+
+    assert result.returncode == 0, result.stderr
+    assert (path / "keep.txt").read_text() == "store checkout\n"
+    assert (path / ".git").is_dir()
+    lines = command_log(log)
+    assert not any("omarchy plugin add" in line for line in lines)
+    assert not any("omarchy plugin enable" in line for line in lines)
+    assert not any("omarchy restart shell" in line for line in lines)
+
+
+def test_plugin_add_failure_falls_back_to_tarball_copy(site, tmp_path):
+    site.publish(make_source(plugin="fallback plugin"))
+    env, _state, log = fake_environment(site, tmp_path)
+    env["FAKE_PLUGIN_ADD_FAIL"] = "1"
+
+    result = run_install(env)
+
+    assert result.returncode == 0, result.stderr
+    path = plugin_dir(env)
+    assert (path / "Megaphone.qml").read_text() == "fallback plugin"
+    assert not (path / ".git").exists()
+    lines = command_log(log)
+    assert any("omarchy plugin add" in line for line in lines)
+    assert any("omarchy plugin enable" in line for line in lines)
+    assert not any("omarchy restart shell" in line for line in lines)
 
 
 def test_upgrade_restarts_shell_when_user_agrees(site, tmp_path):
     site.publish(make_source())
     env, _state, log = fake_environment(site, tmp_path)
-    assert run_install(env).returncode == 0
+    seed_copy_plugin(env)
 
     result = run_install(env, answer="y\n")
 
     assert result.returncode == 0, result.stderr
     assert "already installed before this run" in result.stdout
-    assert any(
-        "omarchy restart shell" in line for line in log.read_text().splitlines()
-    )
+    assert any("omarchy restart shell" in line for line in command_log(log))
+    assert not (plugin_dir(env) / "old.txt").exists()
+    assert (plugin_dir(env) / "Megaphone.qml").read_text() == "old plugin"
 
 
 def test_upgrade_skips_shell_restart_when_user_declines(site, tmp_path):
     site.publish(make_source())
     env, _state, log = fake_environment(site, tmp_path)
-    assert run_install(env).returncode == 0
+    seed_copy_plugin(env)
 
     result = run_install(env, answer="n\n")
 
     assert result.returncode == 0, result.stderr
     assert "Skipped" in result.stdout
-    assert not any(
-        "omarchy restart shell" in line for line in log.read_text().splitlines()
-    )
+    assert not any("omarchy restart shell" in line for line in command_log(log))
 
 
 def test_installer_tolerates_missing_unit(site, tmp_path):

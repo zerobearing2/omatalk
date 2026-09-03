@@ -24,9 +24,12 @@ the active color while Omatalk is speaking.
 
 The bar keeps one megaphone icon in the same spot and changes its color:
 
-- `idle`: normal bar color; the daemon is ready.
+- `not installed`: normal bar color; tooltip says Omatalk is not installed.
+  Open the panel for Install Omatalk.
+- `idle`: normal bar color; the Daemon is ready.
 - `speaking`: theme accent; selected text is being read.
-- `unavailable`: urgent color after a 3-second disconnect grace period.
+- `unavailable`: urgent color after a 3-second disconnect grace period, only
+  once the Daemon has been installed.
 
 The live bar context is softened around the Omatalk glyph so the state colors are easy to spot.
 
@@ -50,7 +53,18 @@ The daemon has been disconnected long enough to show the urgent color.
 
 ## Install
 
-On an Omarchy machine:
+Two doors, one installer.
+
+**Plugin store.** Add the megaphone, then install the Daemon from the panel if
+it is missing:
+
+```sh
+omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable
+```
+
+Click the megaphone and choose Install Omatalk. Models are about 185MB.
+
+**Site.** The same installer from a terminal:
 
 ```sh
 curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
@@ -69,15 +83,17 @@ The script downloads the latest release tarball (checksum-verified), then:
    `~/.local/share/omatalk/venv/`, and installs and enables a fresh
    `omatalk.service` systemd user unit, so the new daemon is running
    before the command exits.
-4. Puts `omatalk` on `PATH`, installs and refreshes the Omarchy bar plugin, and
-   prints a copy-paste command to add the F8 binding when no Omatalk binding is
-   present. The installer never edits your keybindings itself. If the plugin
-   was already installed (i.e. this is an upgrade, not a first install), it
-   asks whether to restart the Omarchy shell — a running shell can keep an
-   already-loaded plugin's old UI in memory even after its files change on
-   disk, and a shell restart is the only reliable fix, so it's confirmed
-   rather than done silently. Declining just leaves the bar icon possibly
-   stale until you run `omarchy restart shell` yourself.
+4. Puts `omatalk` on `PATH`, then the Omarchy bar plugin: a git checkout
+   (store add) is left alone so `omarchy plugin update` still works; a missing
+   plugin is added from the public plugin git repo; a legacy copy is replaced
+   from the tarball. It prints a copy-paste command to add the F8 binding when
+   no Omatalk binding is present. The installer never edits your keybindings
+   itself. Replacing a copy-based plugin asks whether to restart the Omarchy
+   shell — a running shell can keep replaced QML in memory, and a shell restart
+   is the only reliable fix, so it's confirmed rather than done silently.
+   Declining just leaves the bar icon possibly stale until you run
+   `omarchy restart shell` yourself. A git checkout is not rewritten, so that
+   prompt does not run.
 
 Releases are cut manually (GitHub Actions → Release → Run workflow) so
 several PRs can land on `master` before anyone ships. Re-running the
@@ -101,6 +117,11 @@ Upgrades never create, merge, rewrite, or delete `~/.config/omatalk/config.toml`
 An existing config stays byte-for-byte unchanged, and an absent config stays
 absent.
 
+`omarchy plugin update zerobearing.omatalk` updates QML only. Daemon updates
+stay `omatalk upgrade` (or the site curl). `omarchy plugin remove
+zerobearing.omatalk` unloads the megaphone and deletes the plugin checkout; it
+leaves the Daemon, venv, models, and config. F8 still speaks.
+
 ## Uninstall
 
 ```sh
@@ -110,7 +131,8 @@ curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
 Stops and removes the systemd unit, the launcher, the source, and the
 Omarchy bar plugin. Asks before deleting the models (~185MB) and your config.
 Also a thin dispatcher; `OMATALK_REF` works the same way here as for install.
-Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself.
+Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself. Plugin
+remove is not uninstall.
 
 ## Usage
 

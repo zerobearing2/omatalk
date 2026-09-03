@@ -8,6 +8,7 @@ OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
 # the pinned-checksum release path entirely (see step 2 below).
 OMATALK_REF="${OMATALK_REF:-}"
 RELEASE_BASE="${RELEASE_BASE:-https://github.com/zerobearing2/omatalk/releases/latest/download}"
+PLUGIN_REPO="${PLUGIN_REPO:-https://github.com/zerobearing2/omarchy-omatalk-plugin.git}"
 MODEL_BASE="${MODEL_BASE:-https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1}"
 MODEL_SHA256="${MODEL_SHA256:-f3a290d384fbb27966d462905c71a46cef9e5fd00516b40df32a0b4afe77ac96}"
 VOICES_SHA256="${VOICES_SHA256:-bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d}"
@@ -131,35 +132,27 @@ if ! "$HOME/.local/bin/omatalk" status >/dev/null 2>&1; then
   exit 1
 fi
 
-# 9. Bar plugin (Omarchy only). This mirrors what `omarchy plugin add` does
-# (/usr/share/omarchy/bin/omarchy-plugin-add): stage the files, move them into
-# place with one rename, rescan, wait until the shell reports the plugin
-# discovered, then enable it once.
-#
-# The rename is the part that matters. Copying file by file into the live
-# plugins directory fires an inotify event per file, and the shell debounces a
-# reload 150ms after any of them, so a copy slower than that gets scanned while
-# it is half written. Staging outside the directory keeps the plugin whole:
-# absent, then complete, never partial.
-#
-# Waiting for discovery replaces guesswork about how long a reload takes. The
-# shell refuses to enable a plugin it has not scanned yet
-# (PluginRegistry.setEnabled), so asking it what it knows is the signal.
-if command -v omarchy >/dev/null 2>&1; then
-  msg "Installing Omarchy bar plugin"
-  plugins_dir="$HOME/.config/omarchy/plugins"
-  plugin_dir="$plugins_dir/zerobearing.omatalk"
-  plugin_existed=0
-  [ -d "$plugin_dir" ] && plugin_existed=1
-  stage="$plugins_dir/.omatalk.add.$$"
+# 9. Bar plugin (Omarchy only). A git checkout (store add) is left alone so
+# `omarchy plugin update` keeps working. A legacy copy is still replaced from
+# the tarball the way `omarchy plugin add` stages files: one rename, then
+# rescan, wait until the shell reports the plugin, then enable. A missing
+# directory is `omarchy plugin add`; if that fails, the tarball copy is the
+# fallback.
+stage_plugin_from_tarball() {
+  local plugins_dir="$1"
+  local plugin_dir="$2"
+  local stage="$plugins_dir/.omatalk.add.$$"
   mkdir -p "$plugins_dir"
   rm -rf "$stage"
   cp -r "$OMATALK_HOME/src/plugin" "$stage"
   rm -rf "$plugin_dir"
   mv "$stage" "$plugin_dir"
+}
+
+discover_and_enable_plugin() {
   omarchy-shell shell rescanPlugins >/dev/null
 
-  plugin_seen=0
+  local plugin_seen=0
   for _ in $(seq 1 40); do
     if omarchy plugin list --json |
       jq -e 'any(.[]; .id == "zerobearing.omatalk")' >/dev/null 2>&1; then
@@ -177,25 +170,39 @@ if command -v omarchy >/dev/null 2>&1; then
     msg "Could not enable the Omarchy bar plugin; run: omarchy plugin enable zerobearing.omatalk"
     exit 1
   fi
+}
 
-  # A plugin the shell already had loaded can keep running its old QML from
-  # memory even after these files change on disk: rescanPlugins/enable
-  # reliably pick up a plugin's QML the first time a shell discovers it, but
-  # not on a later change to one it already has loaded — confirmed by
-  # testing disable/enable cycles and even a full `omarchy plugin remove` +
-  # re-add, both of which left the widget on stale QML with no error. Only
-  # actually restarting the Quickshell process clears it, and that closes
-  # the bar and any open panels for a moment, so ask rather than do it
-  # silently.
-  if (( plugin_existed )); then
-    warn "The bar plugin was already installed before this run — its icon may need a shell restart to show the update."
-    # A closed/non-interactive stdin (no answer to read) must not abort the
-    # rest of the install under set -e — default to declining the restart.
-    read -r -p "Restart the Omarchy shell now to apply it? [y/N] " answer < "$ASK_FROM" || answer="n"
-    if [[ "$answer" =~ ^[Yy]$ ]]; then
-      omarchy restart shell
+prompt_plugin_shell_restart() {
+  warn "The bar plugin was already installed before this run — its icon may need a shell restart to show the update."
+  # A closed/non-interactive stdin (no answer to read) must not abort the
+  # rest of the install under set -e — default to declining the restart.
+  local answer
+  read -r -p "Restart the Omarchy shell now to apply it? [y/N] " answer < "$ASK_FROM" || answer="n"
+  if [[ "$answer" =~ ^[Yy]$ ]]; then
+    omarchy restart shell
+  else
+    warn "Skipped. If the bar icon looks stale, run: omarchy restart shell"
+  fi
+}
+
+if command -v omarchy >/dev/null 2>&1; then
+  plugins_dir="$HOME/.config/omarchy/plugins"
+  plugin_dir="$plugins_dir/zerobearing.omatalk"
+  if [ -e "$plugin_dir/.git" ]; then
+    msg "Omarchy bar plugin is a git checkout; leaving it in place"
+  elif [ -d "$plugin_dir" ]; then
+    msg "Replacing copy-based Omarchy bar plugin"
+    stage_plugin_from_tarball "$plugins_dir" "$plugin_dir"
+    discover_and_enable_plugin
+    prompt_plugin_shell_restart
+  else
+    msg "Installing Omarchy bar plugin"
+    if omarchy plugin add "$PLUGIN_REPO" --enable --yes >/dev/null 2>&1; then
+      :
     else
-      warn "Skipped. If the bar icon looks stale, run: omarchy restart shell"
+      warn "Could not add $PLUGIN_REPO; installing from the release tarball"
+      stage_plugin_from_tarball "$plugins_dir" "$plugin_dir"
+      discover_and_enable_plugin
     fi
   fi
 fi

@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "Zerobearing",
   "license": "MIT",
-  "description": "Megaphone icon in the Omarchy bar while Omatalk is speaking.",
+  "description": "Local text-to-speech: select text, press F8, the machine reads it back.",
   "kinds": [
     "bar-widget"
   ],
