@@ -893,7 +893,9 @@
     </div>
 
     <p class="prose" style="margin-top:26px; max-width:66ch;">Re-run the site command any time to update the Daemon. It re-fetches
-      the latest release and skips models whose checksums still match. This installer does not rewrite the plugin —
+      the latest release and skips models whose checksums still match. A git plugin checkout is left alone;
+      a leftover file copy is converted with <code class="inline-code">omarchy plugin remove</code> then
+      <code class="inline-code">add</code>. After that,
       <code class="inline-code">omarchy plugin update zerobearing.omatalk</code> updates QML.
       <code class="inline-code">omarchy plugin remove</code> hides the icon and leaves the Daemon.
       Your config and keybindings are never edited or created. After this first bootstrap, use <code class="inline-code">omatalk upgrade</code>

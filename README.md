@@ -98,10 +98,11 @@ installer picks up whatever is newest. After the first run of this installer,
 The script at that URL is a small dispatcher: by default it fetches and runs
 the installer that shipped with the latest release, so the installer's own
 logic and the source it installs are always a matched pair. To test an
-unreleased branch instead, set `OMATALK_REF`:
+unreleased branch instead, put `OMATALK_REF` in the environment of the
+`bash` that runs the dispatcher (a prefix on `curl` alone is ignored):
 
 ```sh
-OMATALK_REF=my-branch curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
+OMATALK_REF=my-branch bash -c 'curl -fsSL https://omatalk.zerobearing.com/install.sh | bash'
 ```
 
 This skips checksum verification for that install — a branch is a moving
