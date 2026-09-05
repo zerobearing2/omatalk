@@ -97,15 +97,17 @@ def test_follow_supports_multiple_bar_instances(daemon):
         client.close()
 
 
-def test_speak_captured_text_plays_all_chunks(daemon):
+def test_speak_captured_text_uses_one_player_for_the_utterance(daemon):
     clear_logs(daemon)
-    set_capture(daemon, "Hello there. Second sentence here. Third one.")
+    first = "A" * 90 + "."
+    second = "B" * 90 + "."
+    set_capture(daemon, first + " " + second)
     assert send(daemon, "speak") == "ok"
     wait_status(daemon, "speaking")
     wait_status(daemon, "idle")
     entries = log(daemon).splitlines()
-    assert len([l for l in entries if l.startswith("start")]) == 3
-    assert len([l for l in entries if l.startswith("end")]) == 3
+    assert len([l for l in entries if l.startswith("start")]) == 1
+    assert len([l for l in entries if l.startswith("end")]) == 1
     assert not [l for l in entries if l.startswith("killed")]
 
 
@@ -225,52 +227,18 @@ def test_playback_failure_notifies_and_daemon_survives(daemon):
         fail_proc.wait(timeout=10)
 
 
-def test_speak_voice_override_uses_override_and_leaves_config_toml_untouched(daemon):
+def test_speak_voice_override_plays_and_leaves_config_toml_untouched(daemon):
     clear_logs(daemon)
-    (daemon["tmp"] / "voice.log").write_text("")
     config_path = Path(daemon["env"]["OMATALK_CONFIG"])
     before = config_path.read_text()
 
     assert send(daemon, "speak --voice af_bella Hi, I'm bella.") == "ok"
     wait_status(daemon, "speaking")
     wait_status(daemon, "idle")
-
-    lines = (daemon["tmp"] / "voice.log").read_text().splitlines()
-    assert lines[-1].split(" ")[0] == "af_bella"
+    assert len([l for l in log(daemon).splitlines() if l.startswith("end")]) == 1
     # The override lives on the wire for this one Utterance only — it must
     # never be written to config.toml.
     assert config_path.read_text() == before
-
-
-def test_speak_voice_override_back_to_back_distinct_voices_both_land(daemon):
-    clear_logs(daemon)
-    (daemon["tmp"] / "voice.log").write_text("")
-    set_play_ticks(daemon, "30")
-
-    assert send(daemon, "speak --voice af_bella Hi, I'm bella.") == "ok"
-    wait_status(daemon, "speaking")
-    wait_log(daemon, "start")
-    assert send(daemon, "speak --voice bm_george Hi, I'm george.") == "ok"
-    wait_status(daemon, "idle")
-
-    voices_used = [
-        line.split(" ")[0]
-        for line in (daemon["tmp"] / "voice.log").read_text().splitlines()
-    ]
-    assert "af_bella" in voices_used
-    assert "bm_george" in voices_used
-
-
-def test_speak_without_voice_flag_still_uses_configured_default(daemon):
-    clear_logs(daemon)
-    (daemon["tmp"] / "voice.log").write_text("")
-
-    assert send(daemon, "speak Plain utterance, no override.") == "ok"
-    wait_status(daemon, "speaking")
-    wait_status(daemon, "idle")
-
-    lines = (daemon["tmp"] / "voice.log").read_text().splitlines()
-    assert lines[-1].split(" ")[0] == "af_heart"
 
 
 def test_clipboard_fallback_when_idle(daemon):

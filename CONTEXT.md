@@ -21,8 +21,19 @@ The Wayland clipboard contents, used only when the Selection is empty.
 
 **Utterance**:
 One unit of speech requested by a hotkey press: a Source resolved to text,
-synthesized and played. A new Utterance replaces the currently playing one.
+synthesized in a Voice at a Speed and played. A new Utterance replaces the
+currently playing one.
 _Avoid_: request, job, playback
+
+**Voice**:
+Which voice pack an Utterance is spoken in. Bound when the Utterance starts,
+from the Daemon's default or a one-shot override.
+_Avoid_: speaker, persona
+
+**Speed**:
+How fast an Utterance is spoken. Bound when the Utterance starts, from the
+Daemon's default.
+_Avoid_: rate (that's the audio sample rate)
 
 **Interrupt**:
 Pressing the hotkey while speech is playing: the playing Utterance is cut off
@@ -31,13 +42,15 @@ Utterance begins; if the Selection is unchanged or empty, speech simply stops.
 _Avoid_: cancel (for stop, which implies speech ends without a new Utterance)
 
 **Daemon**:
-The always-running local process that holds the TTS model warm, receives
-Utterance requests, and plays audio. Starts at login.
+The always-running local process that holds the TTS model warm, holds the
+default Voice and Speed, receives Utterance requests, and plays audio. Starts
+at login.
 _Avoid_: server, service (the systemd unit wraps the Daemon but is not the term)
 
 **Stream**:
-Speaking a Utterance sentence-by-sentence, starting playback before all audio
-is synthesized.
+Speaking a Utterance in sentence-first chunks, starting playback before all
+audio is synthesized. A part over the chunk cap is split at a clause or word
+so the engine never sees the rest of the text.
 
 The Omarchy bar widget (megaphone, setup/config panel) lives in
 https://github.com/zerobearing2/omarchy-omatalk-plugin. This repository does

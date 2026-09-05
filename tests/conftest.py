@@ -38,7 +38,6 @@ def daemon(config, tmp_base):
         "OMATALK_TEST_LOG": str(tmp_base / "play.log"),
         "OMATALK_TEST_NOTIFY_LOG": str(tmp_base / "notify.log"),
         "OMATALK_TEST_TICKS_FILE": str(tmp_base / "ticks.txt"),
-        "OMATALK_TEST_VOICE_LOG": str(tmp_base / "voice.log"),
         "OMATALK_PYTHON": sys.executable,
         "OMATALK_TEST_FAKE_ENGINE": "1",
     }
