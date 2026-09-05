@@ -2,7 +2,15 @@ import time
 
 import numpy as np
 
-from daemon.player import close_stdin, feed, start
+from daemon.player import (
+    RATE,
+    WAKE_MS,
+    close_stdin,
+    feed,
+    start,
+    wake,
+    wake_pcm,
+)
 
 
 def make_echo_player(tmp_path):
@@ -71,3 +79,15 @@ def test_feed_returns_without_waiting_for_a_slow_reader(tmp_path):
     close_stdin(proc)
     proc.wait(timeout=5)
     assert captured.read_bytes() == pcm_bytes(samples)
+
+
+def test_wake_writes_one_quantum_of_silence(tmp_path):
+    cfg, captured, args_log = make_echo_player(tmp_path)
+    proc = wake(cfg)
+    close_stdin(proc)
+    proc.wait(timeout=5)
+
+    n = int(RATE * WAKE_MS / 1000)
+    assert captured.read_bytes() == np.zeros(n, dtype=np.int16).tobytes()
+    assert args_log.read_text().strip() == f"--rate {RATE} --channels 1 -"
+    assert len(wake_pcm()) == n

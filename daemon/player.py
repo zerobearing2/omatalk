@@ -3,6 +3,11 @@ import threading
 
 import numpy as np
 
+# One PipeWire quantum of zeros: shorter does not link, and a tone at
+# 24 kHz would be audible.
+RATE = 24000
+WAKE_MS = 48
+
 
 def start(cfg: dict, rate: int):
     return subprocess.Popen(
@@ -11,6 +16,27 @@ def start(cfg: dict, rate: int):
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+
+
+def wake_pcm(rate=RATE):
+    return np.zeros(int(rate * WAKE_MS / 1000), dtype=np.float64)
+
+
+def wake(cfg):
+    proc = start(cfg, RATE)
+    feed(proc, wake_pcm()).join()
+    return proc
+
+
+def reap(proc):
+    if proc is None or proc.poll() is not None:
+        return
+    close_stdin(proc)
+    proc.terminate()
+    try:
+        proc.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        proc.kill()
 
 
 def feed(proc, samples):

@@ -116,6 +116,31 @@ def test_next_utterance_binds_new_config(binding_env):
     assert engine.calls[1] == ("Second utterance.", "af_bella", 1.5, "en-gb")
 
 
+def test_wake_starts_without_waiting_for_synthesize(binding_env):
+    started = threading.Event()
+
+    class HoldSynth(RecordingEngine):
+        def synthesize(self, text, voice, speed, lang):
+            started.set()
+            self._release.wait(timeout=10)
+            return super().synthesize(text, voice, speed, lang)
+
+    engine = HoldSynth()
+    engine.hold_after_first()
+    daemon = Daemon(engine)
+    daemon.speak("One sentence.")
+    assert started.wait(timeout=10)
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        if daemon._wake_proc is not None:
+            break
+        time.sleep(0.01)
+    assert daemon._wake_proc is not None
+    assert daemon._proc is None
+    engine.release()
+    wait_state(daemon, "idle")
+
+
 def test_in_flight_stream_keeps_bound_voice_speed_lang(binding_env):
     engine = RecordingEngine()
     engine.hold_after_first()
@@ -165,6 +190,23 @@ def test_player_exit_mid_utterance_sets_error(binding_env, tmp_path):
     daemon.speak(first + " " + second)
     wait_state(daemon, "error")
     assert "error: player exited" in (binding_env.parent / "notify.log").read_text()
+
+
+def test_first_chunk_error_reaps_wake(binding_env):
+    class BoomFirst(RecordingEngine):
+        def synthesize(self, text, voice, speed, lang):
+            deadline = time.monotonic() + 2
+            while time.monotonic() < deadline:
+                if daemon._wake_proc is not None:
+                    break
+                time.sleep(0.01)
+            raise RuntimeError("boom")
+
+    daemon = Daemon(BoomFirst())
+    daemon.speak("One sentence.")
+    wait_state(daemon, "error")
+    assert daemon._wake_proc is None
+    assert "error: boom" in (binding_env.parent / "notify.log").read_text()
 
 
 def test_synthesize_error_reaps_player(binding_env):

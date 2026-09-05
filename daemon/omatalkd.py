@@ -9,7 +9,7 @@ from .capture import capture_clipboard, capture_primary
 from .chunker import chunks
 from .config import load, socket_path
 from .engine import Engine, FakeEngine
-from .player import close_stdin, feed, start
+from .player import close_stdin, feed, reap, start, wake
 
 # The onnxruntime arena grows to fit the longest utterance and never shrinks;
 # an idle recycle lets systemd hand us a fresh process instead.
@@ -31,6 +31,11 @@ class Daemon:
         self.engine = engine
         self._cancel = None
         self._proc = None
+        self._wake_proc = None
+        self._wake_alive = False
+        self._wake_gen = 0
+        self._kick_thread = None
+        self._wake_lock = threading.Lock()
         self._thread = None
         self._current_text = ""
         self._last_busy = time.monotonic()
@@ -54,6 +59,36 @@ class Daemon:
                 self._proc.kill()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=10)
+        self._stop_wake()
+
+    def _stop_wake(self):
+        with self._wake_lock:
+            self._wake_alive = False
+            self._wake_gen += 1
+            proc = self._wake_proc
+            self._wake_proc = None
+            kick = self._kick_thread
+            self._kick_thread = None
+        reap(proc)
+        if kick is not None and kick.is_alive() and kick is not threading.current_thread():
+            kick.join(timeout=2)
+        with self._wake_lock:
+            leftover = self._wake_proc
+            self._wake_proc = None
+        reap(leftover)
+
+    def _kick_sink(self, cfg: dict, gen: int):
+        try:
+            proc = wake(cfg)
+        except OSError:
+            return
+        with self._wake_lock:
+            if gen != self._wake_gen or not self._wake_alive:
+                reap(proc)
+                return
+            old = self._wake_proc
+            self._wake_proc = proc
+        reap(old)
 
     def speak(self, text: str, voice: str | None = None):
         self.touch()
@@ -75,6 +110,18 @@ class Daemon:
         self._cancel = cancel
         self._current_text = text
         self._set_state("speaking")
+        with self._wake_lock:
+            self._wake_alive = True
+            gen = self._wake_gen
+        kick = threading.Thread(
+            target=self._kick_sink,
+            args=(cfg, gen),
+            daemon=True,
+            name="omatalk-wake",
+        )
+        with self._wake_lock:
+            self._kick_thread = kick
+        kick.start()
         self._thread = threading.Thread(
             target=self._run,
             args=(text, cancel, voice or cfg["voice"], cfg["speed"], cfg["lang"], cfg),
@@ -141,6 +188,7 @@ class Daemon:
                 if proc is None:
                     proc = start(cfg, rate)
                     self._proc = proc
+                    self._stop_wake()
                 else:
                     # Join the previous write so PCM is not interleaved, but
                     # do not wait() the player: that would tear the device
@@ -172,6 +220,7 @@ class Daemon:
                 self._notify(cfg, f"error: {e}")
                 self._set_state("error")
         finally:
+            self._stop_wake()
             if proc is None:
                 return
             if cancel.is_set() and self._proc is proc:
