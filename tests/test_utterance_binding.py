@@ -4,7 +4,7 @@ import time
 import pytest
 
 from conftest import FAKES
-from daemon.omatalkd import Daemon
+from daemon.omatalkd import Daemon, handle
 
 
 class RecordingEngine:
@@ -75,6 +75,15 @@ def test_speak_voice_override_binds_override_and_configured_speed(binding_env):
     engine = RecordingEngine()
     daemon = Daemon(engine)
     daemon.speak("Hi, I'm bella.", voice="af_bella")
+    wait_state(daemon, "idle")
+
+    assert engine.calls == [("Hi, I'm bella.", "af_bella", 1.0, "en-us")]
+
+
+def test_handle_speak_voice_prefix_binds_override(binding_env):
+    engine = RecordingEngine()
+    daemon = Daemon(engine)
+    assert handle(daemon, "speak --voice af_bella Hi, I'm bella.") == "ok"
     wait_state(daemon, "idle")
 
     assert engine.calls == [("Hi, I'm bella.", "af_bella", 1.0, "en-us")]
