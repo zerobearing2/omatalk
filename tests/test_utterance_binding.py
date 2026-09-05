@@ -116,19 +116,28 @@ def test_next_utterance_binds_new_config(binding_env):
     assert engine.calls[1] == ("Second utterance.", "af_bella", 1.5, "en-gb")
 
 
-def test_player_starts_before_first_synthesize(binding_env):
+def test_wake_starts_without_waiting_for_synthesize(binding_env):
     started = threading.Event()
 
-    class WakeFirst(RecordingEngine):
+    class HoldSynth(RecordingEngine):
         def synthesize(self, text, voice, speed, lang):
-            assert daemon._proc is not None
-            assert daemon._proc.poll() is None
             started.set()
+            self._release.wait(timeout=10)
             return super().synthesize(text, voice, speed, lang)
 
-    daemon = Daemon(WakeFirst())
+    engine = HoldSynth()
+    engine.hold_after_first()
+    daemon = Daemon(engine)
     daemon.speak("One sentence.")
     assert started.wait(timeout=10)
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        if daemon._wake_proc is not None:
+            break
+        time.sleep(0.01)
+    assert daemon._wake_proc is not None
+    assert daemon._proc is None
+    engine.release()
     wait_state(daemon, "idle")
 
 

@@ -3,12 +3,14 @@ import threading
 
 import numpy as np
 
-# Some sinks (A2DP, HDMI) drop the start of a new stream as they wake.
-# Analog does not, but detecting sink type is more code than 400ms of
-# silence. Kokoro is always 24 kHz; we start the player at that rate
-# before the first create() so the sink can wake during synthesis.
+# Kokoro is always 24 kHz. A 1ms chirp is 24 samples — below a PipeWire
+# quantum — so the wake burst is one quantum of silence. Zeros unsuspend
+# the sink; a tone at this rate would be ≤12 kHz and audible. The wake
+# stream is a throwaway pw-cat, not the Utterance player: a new stream
+# still drops its own start if the sink is SUSPENDED, but not if it is
+# already RUNNING (the SoundCore + Brave case).
 RATE = 24000
-PREROLL_MS = 400
+WAKE_MS = 48
 
 
 def start(cfg: dict, rate: int):
@@ -20,11 +22,29 @@ def start(cfg: dict, rate: int):
     )
 
 
-def feed(proc, samples, preroll_ms=0, rate=RATE):
+def wake_pcm(rate=RATE):
+    return np.zeros(int(rate * WAKE_MS / 1000), dtype=np.float64)
+
+
+def wake(cfg):
+    proc = start(cfg, RATE)
+    feed(proc, wake_pcm(), rate=RATE)
+    return proc
+
+
+def reap(proc):
+    if proc is None or proc.poll() is not None:
+        return
+    close_stdin(proc)
+    proc.terminate()
+    try:
+        proc.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+
+def feed(proc, samples, rate=RATE):
     pcm = (np.clip(np.asarray(samples), -1.0, 1.0) * 32767).astype(np.int16)
-    if preroll_ms > 0:
-        n = int(rate * preroll_ms / 1000)
-        pcm = np.concatenate([np.zeros(n, dtype=np.int16), pcm])
 
     # Fed from a thread, not written inline here: a multi-second utterance
     # exceeds the OS pipe buffer, so a synchronous write would block the

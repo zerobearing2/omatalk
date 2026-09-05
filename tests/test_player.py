@@ -2,7 +2,15 @@ import time
 
 import numpy as np
 
-from daemon.player import close_stdin, feed, start
+from daemon.player import (
+    RATE,
+    WAKE_MS,
+    close_stdin,
+    feed,
+    start,
+    wake,
+    wake_pcm,
+)
 
 
 def make_echo_player(tmp_path):
@@ -73,29 +81,13 @@ def test_feed_returns_without_waiting_for_a_slow_reader(tmp_path):
     assert captured.read_bytes() == pcm_bytes(samples)
 
 
-def test_feed_wake_pad_is_silence_only(tmp_path):
-    cfg, captured, _args_log = make_echo_player(tmp_path)
-    rate = 24000
-    pad_ms = 100
-
-    proc = start(cfg, rate)
-    feed(proc, [], preroll_ms=pad_ms, rate=rate).join(timeout=5)
+def test_wake_writes_one_quantum_of_silence(tmp_path):
+    cfg, captured, args_log = make_echo_player(tmp_path)
+    proc = wake(cfg)
     close_stdin(proc)
     proc.wait(timeout=5)
 
-    assert captured.read_bytes() == np.zeros(int(rate * pad_ms / 1000), dtype=np.int16).tobytes()
-
-
-def test_feed_preroll_prepends_silence(tmp_path):
-    cfg, captured, _args_log = make_echo_player(tmp_path)
-    samples = [0.5, -0.5]
-    rate = 24000
-    pad_ms = 100
-
-    proc = start(cfg, rate)
-    feed(proc, samples, preroll_ms=pad_ms, rate=rate).join(timeout=5)
-    close_stdin(proc)
-    proc.wait(timeout=5)
-
-    silence = np.zeros(int(rate * pad_ms / 1000), dtype=np.int16).tobytes()
-    assert captured.read_bytes() == silence + pcm_bytes(samples)
+    n = int(RATE * WAKE_MS / 1000)
+    assert captured.read_bytes() == np.zeros(n, dtype=np.int16).tobytes()
+    assert args_log.read_text().strip() == f"--rate {RATE} --channels 1 -"
+    assert len(wake_pcm()) == n

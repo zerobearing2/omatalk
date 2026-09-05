@@ -9,7 +9,7 @@ from .capture import capture_clipboard, capture_primary
 from .chunker import chunks
 from .config import load, socket_path
 from .engine import Engine, FakeEngine
-from .player import PREROLL_MS, RATE, close_stdin, feed, start
+from .player import close_stdin, feed, reap, start, wake
 
 # The onnxruntime arena grows to fit the longest utterance and never shrinks;
 # an idle recycle lets systemd hand us a fresh process instead.
@@ -31,6 +31,9 @@ class Daemon:
         self.engine = engine
         self._cancel = None
         self._proc = None
+        self._wake_proc = None
+        self._wake_alive = False
+        self._wake_lock = threading.Lock()
         self._thread = None
         self._current_text = ""
         self._last_busy = time.monotonic()
@@ -54,6 +57,25 @@ class Daemon:
                 self._proc.kill()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=10)
+        self._stop_wake()
+
+    def _stop_wake(self):
+        with self._wake_lock:
+            self._wake_alive = False
+            proc = self._wake_proc
+            self._wake_proc = None
+        reap(proc)
+
+    def _kick_sink(self, cfg: dict):
+        try:
+            proc = wake(cfg)
+        except OSError:
+            return
+        with self._wake_lock:
+            if not self._wake_alive:
+                reap(proc)
+                return
+            self._wake_proc = proc
 
     def speak(self, text: str, voice: str | None = None):
         self.touch()
@@ -75,6 +97,14 @@ class Daemon:
         self._cancel = cancel
         self._current_text = text
         self._set_state("speaking")
+        with self._wake_lock:
+            self._wake_alive = True
+        threading.Thread(
+            target=self._kick_sink,
+            args=(cfg,),
+            daemon=True,
+            name="omatalk-wake",
+        ).start()
         self._thread = threading.Thread(
             target=self._run,
             args=(text, cancel, voice or cfg["voice"], cfg["speed"], cfg["lang"], cfg),
@@ -132,27 +162,27 @@ class Daemon:
         try:
             feeder = None
             player_died = False
-            # Open the sink before the first create() so A2DP/HDMI can wake
-            # during synthesis; the pad is silence, not speech.
-            proc = start(cfg, RATE)
-            self._proc = proc
-            feeder = feed(proc, [], preroll_ms=PREROLL_MS, rate=RATE)
             for part in chunks(text):
                 if cancel.is_set():
                     return
                 samples, rate = self.engine.synthesize(part, voice, speed, lang)
                 if cancel.is_set():
                     return
-                # Join the previous write so PCM is not interleaved, but
-                # do not wait() the player: that would tear the device
-                # down between chunks.
-                if feeder is not None:
-                    feeder.join()
-                if cancel.is_set():
-                    return
-                if proc.poll() is not None:
-                    player_died = True
-                    break
+                if proc is None:
+                    proc = start(cfg, rate)
+                    self._proc = proc
+                    self._stop_wake()
+                else:
+                    # Join the previous write so PCM is not interleaved, but
+                    # do not wait() the player: that would tear the device
+                    # down between chunks.
+                    if feeder is not None:
+                        feeder.join()
+                    if cancel.is_set():
+                        return
+                    if proc.poll() is not None:
+                        player_died = True
+                        break
                 feeder = feed(proc, samples, rate=rate)
             if feeder is not None:
                 feeder.join()
