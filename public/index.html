@@ -928,8 +928,8 @@
   <section id="config">
     <div class="eyebrow">config</div>
     <h2>The whole configuration surface</h2>
-    <p class="prose" style="margin-top:14px;">Click the bar icon for voice and speed — it auto-saves, no restart
-      needed. <code class="inline-code">omatalk config get/set/voices</code> does the same from a terminal or a
+    <p class="prose" style="margin-top:14px;">Click the bar icon for voice and speed — it auto-saves, and the next
+      utterance picks it up, no restart needed. <code class="inline-code">omatalk config get/set/voices</code> does the same from a terminal or a
       script. Everything else is two files, edited by hand.</p>
 
     <figure class="config-panel-figure">
@@ -1107,7 +1107,7 @@
     <div class="manifest">
       <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Quickshell widget <span class="roadmap-status">shipped</span></div><div class="why">A megaphone status indicator in Omarchy's own shell. It follows the daemon over a Unix socket, uses the theme accent while speaking, and shows the shell urgent color after a 3-second disconnect grace period.</div></div>
       <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Half-size model <span class="roadmap-status">shipped</span></div><div class="why">The installer now ships the fp16 export (~185MB download, spectral correlation 0.999 against fp32 — audibly identical). Measured honestly: resident memory is a wash (~equal on short utterances, slightly higher under sustained long synthesis) — the win is the halved download, not RAM. A low-resource engine choice (Piper, int8) for potato-class machines remains open.</div></div>
-      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Voice + speed panel <span class="roadmap-status">shipped</span></div><div class="why">Click the bar icon for a voice picker and speed slider, both auto-saving to <code class="mono" style="background:none;border:none;padding:0;">config.toml</code> — the already-running daemon picks the change up on its own, no restart. The same surface is scriptable: <code class="mono" style="background:none;border:none;padding:0;">omatalk config get/set/voices</code>.</div></div>
+      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Voice + speed panel <span class="roadmap-status">shipped</span></div><div class="why">Click the bar icon for a voice picker and speed slider, both auto-saving to <code class="mono" style="background:none;border:none;padding:0;">config.toml</code> — the next utterance binds the change, no restart. The same surface is scriptable: <code class="mono" style="background:none;border:none;padding:0;">omatalk config get/set/voices</code>.</div></div>
       <div class="row"><div class="name">Media ducking</div><div class="why">Automatically lower other audio while Omatalk is speaking, opt-in via config.</div></div>
       <div class="row"><div class="name">More languages</div><div class="why">Kokoro-82M ships packs for nine languages. Omatalk speaks English only for now.</div></div>
     </div>

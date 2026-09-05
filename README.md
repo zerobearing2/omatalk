@@ -266,12 +266,11 @@ never hitting this gap.
 ## Config
 
 Click the bar icon to open the voice/speed panel, or use `omatalk config`
-(see Usage above) — both auto-save to `~/.config/omatalk/config.toml` and the
-already-running daemon picks up the change on its own within about a second,
-no restart needed. The file is still hand-editable for the settings not yet
-exposed by the panel or CLI (`lang`, `capture_primary`, `capture_clipboard`,
-`player`, `notify`); those still require `systemctl --user restart omatalk`
-to take effect.
+(see Usage above) — both auto-save to `~/.config/omatalk/config.toml`. The
+next Utterance binds Voice, Speed, and the other file settings from whatever
+is on disk at that moment; an in-flight Stream keeps what it started with.
+No restart needed. Hand-edited settings (`lang`, `capture_primary`,
+`capture_clipboard`, `player`, `notify`) apply the same way.
 
 Picking a voice in the panel immediately speaks a short sample in it, so you
 can compare voices without leaving the panel. `omatalk speak --voice <name>
