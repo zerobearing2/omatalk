@@ -37,14 +37,15 @@ def wait_state(daemon, want, timeout=10):
     raise AssertionError(f"state never reached {want!r}, last {daemon.state!r}")
 
 
-def write_config(path, *, voice="af_heart", speed=1.0, lang="en-us"):
+def write_config(path, *, voice="af_heart", speed=1.0, lang="en-us", player=None):
+    player = player or f"{FAKES}/player"
     path.write_text(
         f'voice = "{voice}"\n'
         f"speed = {speed}\n"
         f'lang = "{lang}"\n'
         f'capture_primary = ["{FAKES}/capture-primary"]\n'
         f'capture_clipboard = ["{FAKES}/capture-clipboard"]\n'
-        f'player = ["{FAKES}/player"]\n'
+        f'player = ["{player}"]\n'
         f'notify = ["{FAKES}/notify"]\n'
     )
 
@@ -131,3 +132,60 @@ def test_in_flight_stream_keeps_bound_voice_speed_lang(binding_env):
     voices = {(voice, speed, lang) for _, voice, speed, lang in engine.calls}
     assert voices == {("af_heart", 1.0, "en-us")}
     assert [text for text, *_ in engine.calls] == [first, second]
+
+
+def two_windows():
+    return "A" * 90 + ".", "B" * 90 + "."
+
+
+def test_player_exit_mid_utterance_sets_error(binding_env, tmp_path):
+    player = tmp_path / "exit-now"
+    player.write_text(
+        "#!/bin/sh\n"
+        'echo "start $$" >> "$OMATALK_TEST_LOG"\n'
+        "dd bs=1 count=1 of=/dev/null 2>/dev/null\n"
+        "exit 0\n"
+    )
+    player.chmod(0o755)
+    write_config(binding_env, player=str(player))
+
+    class WaitForPlayerDeath(RecordingEngine):
+        def synthesize(self, text, voice, speed, lang):
+            if self.calls:
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline:
+                    proc = daemon._proc
+                    if proc is not None and proc.poll() is not None:
+                        break
+                    time.sleep(0.01)
+            return super().synthesize(text, voice, speed, lang)
+
+    first, second = two_windows()
+    daemon = Daemon(WaitForPlayerDeath())
+    daemon.speak(first + " " + second)
+    wait_state(daemon, "error")
+    assert "error: player exited" in (binding_env.parent / "notify.log").read_text()
+
+
+def test_synthesize_error_reaps_player(binding_env):
+    class Boom(RecordingEngine):
+        def synthesize(self, text, voice, speed, lang):
+            self.calls.append((text, voice, speed, lang))
+            if len(self.calls) > 1:
+                raise RuntimeError("boom")
+            return [0.0] * 2400, 24000
+
+    first, second = two_windows()
+    daemon = Daemon(Boom())
+    daemon.speak(first + " " + second)
+    wait_state(daemon, "error")
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        entries = (binding_env.parent / "play.log").read_text().splitlines()
+        if any(line.startswith("killed") for line in entries):
+            break
+        time.sleep(0.05)
+    else:
+        entries = (binding_env.parent / "play.log").read_text().splitlines()
+        raise AssertionError(f"player was not reaped, log={entries!r}")
+    assert "error: boom" in (binding_env.parent / "notify.log").read_text()

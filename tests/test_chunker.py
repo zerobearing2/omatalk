@@ -61,6 +61,12 @@ def test_long_sentence_splits_on_clause_before_words():
     assert all(len(part) <= MAX_CHUNK for part in parts)
 
 
+def test_fit_tail_packs_with_the_next_sentence():
+    long = "A" * 200 + "."
+    parts = list(chunks(long + " Short."))
+    assert parts == ["A" * MAX_CHUNK, "A" * 40 + ". Short."]
+
+
 def test_word_longer_than_cap_is_sliced():
     extra = 50
     text = "a" * (MAX_CHUNK * 2 + extra)

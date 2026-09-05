@@ -99,7 +99,9 @@ def test_follow_supports_multiple_bar_instances(daemon):
 
 def test_speak_captured_text_uses_one_player_for_the_utterance(daemon):
     clear_logs(daemon)
-    set_capture(daemon, "Hello there. Second sentence here. Third one.")
+    first = "A" * 90 + "."
+    second = "B" * 90 + "."
+    set_capture(daemon, first + " " + second)
     assert send(daemon, "speak") == "ok"
     wait_status(daemon, "speaking")
     wait_status(daemon, "idle")

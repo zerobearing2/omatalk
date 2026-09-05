@@ -24,6 +24,7 @@ def feed(proc, samples):
     def write():
         try:
             proc.stdin.write(pcm.tobytes())
+            proc.stdin.flush()
         except (BrokenPipeError, OSError):
             pass
 

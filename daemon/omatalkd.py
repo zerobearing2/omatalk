@@ -128,9 +128,10 @@ class Daemon:
             conn.close()
 
     def _run(self, text: str, cancel: threading.Event, voice: str, speed: float, lang: str, cfg: dict):
+        proc = None
         try:
-            proc = None
             feeder = None
+            player_died = False
             for part in chunks(text):
                 if cancel.is_set():
                     return
@@ -149,11 +150,16 @@ class Daemon:
                     if cancel.is_set():
                         return
                     if proc.poll() is not None:
+                        player_died = True
                         break
                 feeder = feed(proc, samples)
             if feeder is not None:
                 feeder.join()
             if cancel.is_set():
+                return
+            if player_died:
+                self._notify(cfg, "error: player exited")
+                self._set_state("error")
                 return
             if proc is not None:
                 close_stdin(proc)
@@ -165,6 +171,19 @@ class Daemon:
                 traceback.print_exc()
                 self._notify(cfg, f"error: {e}")
                 self._set_state("error")
+        finally:
+            if proc is None:
+                return
+            if cancel.is_set() and self._proc is proc:
+                return
+            if proc.poll() is not None:
+                return
+            close_stdin(proc)
+            proc.terminate()
+            try:
+                proc.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                proc.kill()
 
 
 def handle(daemon: Daemon, line: str) -> str:

@@ -1,11 +1,8 @@
 import re
 from collections.abc import Iterator
 
-# A long sentence, not Kokoro's 510-phoneme window. The onnxruntime arena
-# grows with vocoder output length and never shrinks; 400 characters of
-# dense text was enough to push RSS past 1GB. 160 is ~25 words / ~8–10s
-# of audio. Short sentences pack into this window so a large blob is not
-# one create() per period.
+# The onnxruntime arena grows with vocoder output and never shrinks, so
+# cap each create() at 160 characters.
 MAX_CHUNK = 160
 
 _SENTENCE = re.compile(r"(?<=[.!?])(?:\s+|(?=[A-Z]))")
@@ -23,7 +20,9 @@ def chunks(text: str) -> Iterator[str]:
             if buf:
                 yield buf
                 buf = ""
-            yield from _fit(sentence)
+            *full, last = list(_fit(sentence))
+            yield from full
+            buf = last
             continue
         candidate = f"{buf} {sentence}" if buf else sentence
         if len(candidate) > MAX_CHUNK:
