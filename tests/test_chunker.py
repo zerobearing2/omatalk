@@ -1,4 +1,8 @@
+from pathlib import Path
+
 from daemon.chunker import MAX_CHUNK, chunks
+
+SAMPLE = Path(__file__).parent / "sample.txt"
 
 
 def test_short_sentences_pack_under_the_cap():
@@ -61,3 +65,15 @@ def test_word_longer_than_cap_is_sliced():
     extra = 50
     text = "a" * (MAX_CHUNK * 2 + extra)
     assert list(chunks(text)) == ["a" * MAX_CHUNK, "a" * MAX_CHUNK, "a" * extra]
+
+
+def test_sample_text_packs_and_fixes_missing_spaces():
+    parts = list(chunks(SAMPLE.read_text()))
+    assert len(parts) > 1
+    assert all(len(part) <= MAX_CHUNK for part in parts)
+    joined = " ".join(parts)
+    assert "numbers. First" in joined
+    assert "sentence? Next" in joined
+    assert "success. Abbreviations" in joined
+    assert "smoothly. Finally" in joined
+    assert "she? If" in joined
