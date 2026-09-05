@@ -6,7 +6,7 @@ import time
 import traceback
 
 from .capture import capture_clipboard, capture_primary
-from .chunker import sentences
+from .chunker import chunks
 from .config import load, socket_path
 from .engine import Engine, FakeEngine
 from .player import close_stdin, feed, start
@@ -131,7 +131,7 @@ class Daemon:
         try:
             proc = None
             feeder = None
-            for part in sentences(text):
+            for part in chunks(text):
                 if cancel.is_set():
                     return
                 samples, rate = self.engine.synthesize(part, voice, speed, lang)
@@ -143,7 +143,7 @@ class Daemon:
                 else:
                     # Join the previous write so PCM is not interleaved, but
                     # do not wait() the player: that would tear the device
-                    # down between sentences.
+                    # down between chunks.
                     if feeder is not None:
                         feeder.join()
                     if cancel.is_set():

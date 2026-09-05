@@ -119,7 +119,9 @@ def test_in_flight_stream_keeps_bound_voice_speed_lang(binding_env):
     engine = RecordingEngine()
     engine.hold_after_first()
     daemon = Daemon(engine)
-    daemon.speak("One sentence. Two sentence.")
+    first = "A" * 90 + "."
+    second = "B" * 90 + "."
+    daemon.speak(first + " " + second)
     assert engine._first.wait(timeout=10)
 
     write_config(binding_env, voice="af_bella", speed=1.5, lang="en-gb")
@@ -128,4 +130,4 @@ def test_in_flight_stream_keeps_bound_voice_speed_lang(binding_env):
 
     voices = {(voice, speed, lang) for _, voice, speed, lang in engine.calls}
     assert voices == {("af_heart", 1.0, "en-us")}
-    assert len(engine.calls) == 2
+    assert [text for text, *_ in engine.calls] == [first, second]

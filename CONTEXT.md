@@ -48,8 +48,9 @@ at login.
 _Avoid_: server, service (the systemd unit wraps the Daemon but is not the term)
 
 **Stream**:
-Speaking a Utterance sentence-by-sentence, starting playback before all audio
-is synthesized.
+Speaking a Utterance in sentence-first chunks, starting playback before all
+audio is synthesized. A part over the chunk cap is split at a clause or word
+so the engine never sees the rest of the text.
 
 The Omarchy bar widget (megaphone, setup/config panel) lives in
 https://github.com/zerobearing2/omarchy-omatalk-plugin. This repository does
