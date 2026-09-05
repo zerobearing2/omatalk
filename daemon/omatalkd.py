@@ -9,7 +9,7 @@ from .capture import capture_clipboard, capture_primary
 from .chunker import sentences
 from .config import load, socket_path
 from .engine import Engine, FakeEngine
-from .player import play
+from .player import close_stdin, feed, start
 
 # The onnxruntime arena grows to fit the longest utterance and never shrinks;
 # an idle recycle lets systemd hand us a fresh process instead.
@@ -130,19 +130,33 @@ class Daemon:
     def _run(self, text: str, cancel: threading.Event, voice: str, speed: float, lang: str, cfg: dict):
         try:
             proc = None
+            feeder = None
             for part in sentences(text):
                 if cancel.is_set():
                     return
                 samples, rate = self.engine.synthesize(part, voice, speed, lang)
                 if cancel.is_set():
                     return
-                if proc:
-                    proc.wait()
+                if proc is None:
+                    proc = start(cfg, rate)
+                    self._proc = proc
+                else:
+                    # Join the previous write so PCM is not interleaved, but
+                    # do not wait() the player: that would tear the device
+                    # down between sentences.
+                    if feeder is not None:
+                        feeder.join()
                     if cancel.is_set():
                         return
-                proc = play(cfg, samples, rate)
-                self._proc = proc
-            if proc:
+                    if proc.poll() is not None:
+                        break
+                feeder = feed(proc, samples)
+            if feeder is not None:
+                feeder.join()
+            if cancel.is_set():
+                return
+            if proc is not None:
+                close_stdin(proc)
                 proc.wait()
             if not cancel.is_set():
                 self._set_state("idle")

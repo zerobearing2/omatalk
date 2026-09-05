@@ -97,15 +97,15 @@ def test_follow_supports_multiple_bar_instances(daemon):
         client.close()
 
 
-def test_speak_captured_text_plays_all_chunks(daemon):
+def test_speak_captured_text_uses_one_player_for_the_utterance(daemon):
     clear_logs(daemon)
     set_capture(daemon, "Hello there. Second sentence here. Third one.")
     assert send(daemon, "speak") == "ok"
     wait_status(daemon, "speaking")
     wait_status(daemon, "idle")
     entries = log(daemon).splitlines()
-    assert len([l for l in entries if l.startswith("start")]) == 3
-    assert len([l for l in entries if l.startswith("end")]) == 3
+    assert len([l for l in entries if l.startswith("start")]) == 1
+    assert len([l for l in entries if l.startswith("end")]) == 1
     assert not [l for l in entries if l.startswith("killed")]
 
 
