@@ -9,7 +9,7 @@ from .capture import capture_clipboard, capture_primary
 from .chunker import chunks
 from .config import load, socket_path
 from .engine import Engine, FakeEngine
-from .player import close_stdin, feed, start
+from .player import PREROLL_MS, RATE, close_stdin, feed, start
 
 # The onnxruntime arena grows to fit the longest utterance and never shrinks;
 # an idle recycle lets systemd hand us a fresh process instead.
@@ -132,27 +132,28 @@ class Daemon:
         try:
             feeder = None
             player_died = False
+            # Open the sink before the first create() so A2DP/HDMI can wake
+            # during synthesis; the pad is silence, not speech.
+            proc = start(cfg, RATE)
+            self._proc = proc
+            feeder = feed(proc, [], preroll_ms=PREROLL_MS, rate=RATE)
             for part in chunks(text):
                 if cancel.is_set():
                     return
                 samples, rate = self.engine.synthesize(part, voice, speed, lang)
                 if cancel.is_set():
                     return
-                if proc is None:
-                    proc = start(cfg, rate)
-                    self._proc = proc
-                else:
-                    # Join the previous write so PCM is not interleaved, but
-                    # do not wait() the player: that would tear the device
-                    # down between chunks.
-                    if feeder is not None:
-                        feeder.join()
-                    if cancel.is_set():
-                        return
-                    if proc.poll() is not None:
-                        player_died = True
-                        break
-                feeder = feed(proc, samples)
+                # Join the previous write so PCM is not interleaved, but
+                # do not wait() the player: that would tear the device
+                # down between chunks.
+                if feeder is not None:
+                    feeder.join()
+                if cancel.is_set():
+                    return
+                if proc.poll() is not None:
+                    player_died = True
+                    break
+                feeder = feed(proc, samples, rate=rate)
             if feeder is not None:
                 feeder.join()
             if cancel.is_set():

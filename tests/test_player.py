@@ -71,3 +71,31 @@ def test_feed_returns_without_waiting_for_a_slow_reader(tmp_path):
     close_stdin(proc)
     proc.wait(timeout=5)
     assert captured.read_bytes() == pcm_bytes(samples)
+
+
+def test_feed_wake_pad_is_silence_only(tmp_path):
+    cfg, captured, _args_log = make_echo_player(tmp_path)
+    rate = 24000
+    pad_ms = 100
+
+    proc = start(cfg, rate)
+    feed(proc, [], preroll_ms=pad_ms, rate=rate).join(timeout=5)
+    close_stdin(proc)
+    proc.wait(timeout=5)
+
+    assert captured.read_bytes() == np.zeros(int(rate * pad_ms / 1000), dtype=np.int16).tobytes()
+
+
+def test_feed_preroll_prepends_silence(tmp_path):
+    cfg, captured, _args_log = make_echo_player(tmp_path)
+    samples = [0.5, -0.5]
+    rate = 24000
+    pad_ms = 100
+
+    proc = start(cfg, rate)
+    feed(proc, samples, preroll_ms=pad_ms, rate=rate).join(timeout=5)
+    close_stdin(proc)
+    proc.wait(timeout=5)
+
+    silence = np.zeros(int(rate * pad_ms / 1000), dtype=np.int16).tobytes()
+    assert captured.read_bytes() == silence + pcm_bytes(samples)
