@@ -3,12 +3,8 @@ import threading
 
 import numpy as np
 
-# Kokoro is always 24 kHz. A 1ms chirp is 24 samples — below a PipeWire
-# quantum — so the wake burst is one quantum of silence. Zeros unsuspend
-# the sink; a tone at this rate would be ≤12 kHz and audible. The wake
-# stream is a throwaway pw-cat, not the Utterance player: a new stream
-# still drops its own start if the sink is SUSPENDED, but not if it is
-# already RUNNING (the SoundCore + Brave case).
+# One PipeWire quantum of zeros: shorter does not link, and a tone at
+# 24 kHz would be audible.
 RATE = 24000
 WAKE_MS = 48
 
@@ -28,7 +24,7 @@ def wake_pcm(rate=RATE):
 
 def wake(cfg):
     proc = start(cfg, RATE)
-    feed(proc, wake_pcm(), rate=RATE)
+    feed(proc, wake_pcm()).join()
     return proc
 
 
@@ -43,7 +39,7 @@ def reap(proc):
         proc.kill()
 
 
-def feed(proc, samples, rate=RATE):
+def feed(proc, samples):
     pcm = (np.clip(np.asarray(samples), -1.0, 1.0) * 32767).astype(np.int16)
 
     # Fed from a thread, not written inline here: a multi-second utterance

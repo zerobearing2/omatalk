@@ -192,6 +192,23 @@ def test_player_exit_mid_utterance_sets_error(binding_env, tmp_path):
     assert "error: player exited" in (binding_env.parent / "notify.log").read_text()
 
 
+def test_first_chunk_error_reaps_wake(binding_env):
+    class BoomFirst(RecordingEngine):
+        def synthesize(self, text, voice, speed, lang):
+            deadline = time.monotonic() + 2
+            while time.monotonic() < deadline:
+                if daemon._wake_proc is not None:
+                    break
+                time.sleep(0.01)
+            raise RuntimeError("boom")
+
+    daemon = Daemon(BoomFirst())
+    daemon.speak("One sentence.")
+    wait_state(daemon, "error")
+    assert daemon._wake_proc is None
+    assert "error: boom" in (binding_env.parent / "notify.log").read_text()
+
+
 def test_synthesize_error_reaps_player(binding_env):
     class Boom(RecordingEngine):
         def synthesize(self, text, voice, speed, lang):

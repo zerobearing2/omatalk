@@ -33,6 +33,8 @@ class Daemon:
         self._proc = None
         self._wake_proc = None
         self._wake_alive = False
+        self._wake_gen = 0
+        self._kick_thread = None
         self._wake_lock = threading.Lock()
         self._thread = None
         self._current_text = ""
@@ -62,20 +64,31 @@ class Daemon:
     def _stop_wake(self):
         with self._wake_lock:
             self._wake_alive = False
+            self._wake_gen += 1
             proc = self._wake_proc
             self._wake_proc = None
+            kick = self._kick_thread
+            self._kick_thread = None
         reap(proc)
+        if kick is not None and kick.is_alive() and kick is not threading.current_thread():
+            kick.join(timeout=2)
+        with self._wake_lock:
+            leftover = self._wake_proc
+            self._wake_proc = None
+        reap(leftover)
 
-    def _kick_sink(self, cfg: dict):
+    def _kick_sink(self, cfg: dict, gen: int):
         try:
             proc = wake(cfg)
         except OSError:
             return
         with self._wake_lock:
-            if not self._wake_alive:
+            if gen != self._wake_gen or not self._wake_alive:
                 reap(proc)
                 return
+            old = self._wake_proc
             self._wake_proc = proc
+        reap(old)
 
     def speak(self, text: str, voice: str | None = None):
         self.touch()
@@ -99,12 +112,16 @@ class Daemon:
         self._set_state("speaking")
         with self._wake_lock:
             self._wake_alive = True
-        threading.Thread(
+            gen = self._wake_gen
+        kick = threading.Thread(
             target=self._kick_sink,
-            args=(cfg,),
+            args=(cfg, gen),
             daemon=True,
             name="omatalk-wake",
-        ).start()
+        )
+        with self._wake_lock:
+            self._kick_thread = kick
+        kick.start()
         self._thread = threading.Thread(
             target=self._run,
             args=(text, cancel, voice or cfg["voice"], cfg["speed"], cfg["lang"], cfg),
@@ -183,7 +200,7 @@ class Daemon:
                     if proc.poll() is not None:
                         player_died = True
                         break
-                feeder = feed(proc, samples, rate=rate)
+                feeder = feed(proc, samples)
             if feeder is not None:
                 feeder.join()
             if cancel.is_set():
@@ -203,6 +220,7 @@ class Daemon:
                 self._notify(cfg, f"error: {e}")
                 self._set_state("error")
         finally:
+            self._stop_wake()
             if proc is None:
                 return
             if cancel.is_set() and self._proc is proc:
