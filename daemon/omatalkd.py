@@ -1,6 +1,7 @@
 import os
 import socket
 import subprocess
+import sys
 import threading
 import time
 import traceback
@@ -9,7 +10,7 @@ from .capture import capture_clipboard, capture_primary
 from .chunker import chunks
 from .config import load, socket_path
 from .engine import Engine, FakeEngine
-from .player import close_stdin, feed, reap, start, wake
+from .player import Player
 
 # The onnxruntime arena grows to fit the longest utterance and never shrinks;
 # an idle recycle lets systemd hand us a fresh process instead.
@@ -30,18 +31,15 @@ class Daemon:
         self.state = "idle"
         self.engine = engine
         self._cancel = None
-        self._proc = None
-        self._wake_proc = None
-        self._wake_alive = False
-        self._wake_gen = 0
-        self._kick_thread = None
-        self._wake_lock = threading.Lock()
+        self._player = None
         self._thread = None
         self._current_text = ""
         self._last_busy = time.monotonic()
         self._state_condition = threading.Condition()
 
     def _notify(self, cfg: dict, msg: str):
+        if msg.startswith("error:"):
+            print(msg, file=sys.stderr, flush=True)
         subprocess.run(
             [*cfg["notify"], msg],
             stdout=subprocess.DEVNULL,
@@ -51,44 +49,10 @@ class Daemon:
     def _stop_current(self):
         if self._cancel:
             self._cancel.set()
-        if self._proc and self._proc.poll() is None:
-            self._proc.terminate()
-            try:
-                self._proc.wait(timeout=1)
-            except subprocess.TimeoutExpired:
-                self._proc.kill()
+        if self._player:
+            self._player.stop()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=10)
-        self._stop_wake()
-
-    def _stop_wake(self):
-        with self._wake_lock:
-            self._wake_alive = False
-            self._wake_gen += 1
-            proc = self._wake_proc
-            self._wake_proc = None
-            kick = self._kick_thread
-            self._kick_thread = None
-        reap(proc)
-        if kick is not None and kick.is_alive() and kick is not threading.current_thread():
-            kick.join(timeout=2)
-        with self._wake_lock:
-            leftover = self._wake_proc
-            self._wake_proc = None
-        reap(leftover)
-
-    def _kick_sink(self, cfg: dict, gen: int):
-        try:
-            proc = wake(cfg)
-        except OSError:
-            return
-        with self._wake_lock:
-            if gen != self._wake_gen or not self._wake_alive:
-                reap(proc)
-                return
-            old = self._wake_proc
-            self._wake_proc = proc
-        reap(old)
 
     def speak(self, text: str, voice: str | None = None):
         self.touch()
@@ -110,21 +74,12 @@ class Daemon:
         self._cancel = cancel
         self._current_text = text
         self._set_state("speaking")
-        with self._wake_lock:
-            self._wake_alive = True
-            gen = self._wake_gen
-        kick = threading.Thread(
-            target=self._kick_sink,
-            args=(cfg, gen),
-            daemon=True,
-            name="omatalk-wake",
-        )
-        with self._wake_lock:
-            self._kick_thread = kick
-        kick.start()
+        player = Player(cfg)
+        self._player = player
+        player.begin()
         self._thread = threading.Thread(
             target=self._run,
-            args=(text, cancel, voice or cfg["voice"], cfg["speed"], cfg["lang"], cfg),
+            args=(text, cancel, voice or cfg["voice"], cfg["speed"], cfg["lang"], cfg, player),
             daemon=True,
         )
         self._thread.start()
@@ -174,44 +129,28 @@ class Daemon:
         finally:
             conn.close()
 
-    def _run(self, text: str, cancel: threading.Event, voice: str, speed: float, lang: str, cfg: dict):
-        proc = None
+    def _run(self, text: str, cancel: threading.Event, voice: str, speed: float, lang: str, cfg: dict, player: Player):
         try:
-            feeder = None
-            player_died = False
             for part in chunks(text):
                 if cancel.is_set():
                     return
                 samples, rate = self.engine.synthesize(part, voice, speed, lang)
                 if cancel.is_set():
                     return
-                if proc is None:
-                    proc = start(cfg, rate)
-                    self._proc = proc
-                    self._stop_wake()
-                else:
-                    # Join the previous write so PCM is not interleaved, but
-                    # do not wait() the player: that would tear the device
-                    # down between chunks.
-                    if feeder is not None:
-                        feeder.join()
+                if not player.play(samples, rate):
                     if cancel.is_set():
                         return
-                    if proc.poll() is not None:
-                        player_died = True
-                        break
-                feeder = feed(proc, samples)
-            if feeder is not None:
-                feeder.join()
+                    self._notify(cfg, "error: player exited")
+                    self._set_state("error")
+                    return
             if cancel.is_set():
                 return
-            if player_died:
+            if not player.finish():
+                if cancel.is_set():
+                    return
                 self._notify(cfg, "error: player exited")
                 self._set_state("error")
                 return
-            if proc is not None:
-                close_stdin(proc)
-                proc.wait()
             if not cancel.is_set():
                 self._set_state("idle")
         except Exception as e:
@@ -220,19 +159,7 @@ class Daemon:
                 self._notify(cfg, f"error: {e}")
                 self._set_state("error")
         finally:
-            self._stop_wake()
-            if proc is None:
-                return
-            if cancel.is_set() and self._proc is proc:
-                return
-            if proc.poll() is not None:
-                return
-            close_stdin(proc)
-            proc.terminate()
-            try:
-                proc.wait(timeout=1)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+            player.stop()
 
 
 def handle(daemon: Daemon, line: str) -> str:
@@ -275,6 +202,7 @@ def serve():
     server.bind(str(path))
     server.listen(8)
     server.settimeout(ACCEPT_TIMEOUT)
+    print("model warm", flush=True)
     try:
         while True:
             try:

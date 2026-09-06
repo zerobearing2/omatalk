@@ -3,7 +3,12 @@ from .config import models_path
 
 class Engine:
     def __init__(self):
+        import onnxruntime as ort
         from kokoro_onnx import Kokoro
+
+        # Default is Warning: Reciprocal constant-fold lines on every start.
+        # 3 = Error; real failures still reach the journal.
+        ort.set_default_logger_severity(3)
 
         models = models_path()
         self._kokoro = Kokoro(

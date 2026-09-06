@@ -106,11 +106,9 @@ def test_speak_captured_text_uses_one_player_for_the_utterance(daemon):
     wait_status(daemon, "speaking")
     wait_status(daemon, "idle")
     entries = log(daemon).splitlines()
-    # One player for the whole Utterance (not one per chunk). A wake shim
-    # may also start; FakeEngine is fast enough that it is sometimes reaped
-    # before it logs.
+    # One speech player for the whole Utterance (not one per chunk). A wake
+    # shim is reaped, not waited, so it logs killed rather than end.
     assert len([l for l in entries if l.startswith("end")]) == 1
-    assert len([l for l in entries if l.startswith("start")]) <= 2
 
 
 def test_speak_inline_text(daemon):
@@ -193,9 +191,9 @@ def test_new_selection_interrupts_and_speaks_new(daemon):
     assert send(daemon, "speak") == "ok"
     wait_status(daemon, "speaking")
     wait_status(daemon, "idle")
-    starts = len([l for l in log(daemon).splitlines() if l.startswith("start")])
-    # Two Utterances, each a player plus an optional wake shim.
-    assert 2 <= starts <= 4
+    entries = log(daemon).splitlines()
+    assert [l for l in entries if l.startswith("killed")]
+    assert [l for l in entries if l.startswith("end")]
 
 
 def test_playback_failure_notifies_and_daemon_survives(daemon):

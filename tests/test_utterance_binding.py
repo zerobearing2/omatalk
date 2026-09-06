@@ -37,6 +37,22 @@ def wait_state(daemon, want, timeout=10):
     raise AssertionError(f"state never reached {want!r}, last {daemon.state!r}")
 
 
+def play_log(binding_env):
+    return (binding_env.parent / "play.log").read_text()
+
+
+def wait_play_log(binding_env, prefix, count=1, timeout=2):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        lines = [l for l in play_log(binding_env).splitlines() if l.startswith(prefix)]
+        if len(lines) >= count:
+            return lines
+        time.sleep(0.01)
+    raise AssertionError(
+        f"play.log never reached {count} {prefix!r} lines: {play_log(binding_env)!r}"
+    )
+
+
 def write_config(path, *, voice="af_heart", speed=1.0, lang="en-us", player=None):
     player = player or f"{FAKES}/player"
     path.write_text(
@@ -59,7 +75,9 @@ def binding_env(tmp_path, monkeypatch):
     monkeypatch.setenv("OMATALK_TEST_NOTIFY_LOG", str(tmp_path / "notify.log"))
     monkeypatch.setenv("OMATALK_TEST_TICKS_FILE", str(tmp_path / "ticks.txt"))
     (tmp_path / "play.log").write_text("")
-    (tmp_path / "ticks.txt").write_text("1")
+    # Long enough that a one-chunk Utterance is still alive at finish()
+    # after begin() has already started (and may reap) the wake shim.
+    (tmp_path / "ticks.txt").write_text("10")
     return config
 
 
@@ -130,13 +148,7 @@ def test_wake_starts_without_waiting_for_synthesize(binding_env):
     daemon = Daemon(engine)
     daemon.speak("One sentence.")
     assert started.wait(timeout=10)
-    deadline = time.monotonic() + 2
-    while time.monotonic() < deadline:
-        if daemon._wake_proc is not None:
-            break
-        time.sleep(0.01)
-    assert daemon._wake_proc is not None
-    assert daemon._proc is None
+    wait_play_log(binding_env, "start")
     engine.release()
     wait_state(daemon, "idle")
 
@@ -169,24 +181,23 @@ def test_player_exit_mid_utterance_sets_error(binding_env, tmp_path):
         "#!/bin/sh\n"
         'echo "start $$" >> "$OMATALK_TEST_LOG"\n'
         "dd bs=1 count=1 of=/dev/null 2>/dev/null\n"
+        'echo "gone $$" >> "$OMATALK_TEST_LOG"\n'
         "exit 0\n"
     )
     player.chmod(0o755)
     write_config(binding_env, player=str(player))
 
-    class WaitForPlayerDeath(RecordingEngine):
+    class WaitForSpeechDeath(RecordingEngine):
         def synthesize(self, text, voice, speed, lang):
             if self.calls:
-                deadline = time.monotonic() + 2
-                while time.monotonic() < deadline:
-                    proc = daemon._proc
-                    if proc is not None and proc.poll() is not None:
-                        break
-                    time.sleep(0.01)
+                # Speech logs gone after reading one byte and exiting; wait
+                # so the next play() observes a dead process, not a shell
+                # that has not yet reached `exit`.
+                wait_play_log(binding_env, "gone")
             return super().synthesize(text, voice, speed, lang)
 
     first, second = two_windows()
-    daemon = Daemon(WaitForPlayerDeath())
+    daemon = Daemon(WaitForSpeechDeath())
     daemon.speak(first + " " + second)
     wait_state(daemon, "error")
     assert "error: player exited" in (binding_env.parent / "notify.log").read_text()
@@ -195,17 +206,13 @@ def test_player_exit_mid_utterance_sets_error(binding_env, tmp_path):
 def test_first_chunk_error_reaps_wake(binding_env):
     class BoomFirst(RecordingEngine):
         def synthesize(self, text, voice, speed, lang):
-            deadline = time.monotonic() + 2
-            while time.monotonic() < deadline:
-                if daemon._wake_proc is not None:
-                    break
-                time.sleep(0.01)
+            wait_play_log(binding_env, "start")
             raise RuntimeError("boom")
 
     daemon = Daemon(BoomFirst())
     daemon.speak("One sentence.")
     wait_state(daemon, "error")
-    assert daemon._wake_proc is None
+    wait_play_log(binding_env, "killed")
     assert "error: boom" in (binding_env.parent / "notify.log").read_text()
 
 
