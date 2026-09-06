@@ -23,21 +23,24 @@ def _wake_pcm(rate=RATE):
 
 
 def _reap(proc):
-    # Terminate first: close_stdin would let pw-cat drain the pipe (up to
-    # a second of already-fed PCM) before dying, which is finish()'s job.
+    # SIGTERM first so Interrupt does not drain the pipe. Then EOF: pw-cat
+    # often ignores TERM while stdin is open, and wait() can then succeed.
     if proc is None or proc.poll() is not None:
         return
     proc.terminate()
+    _close_stdin(proc)
     try:
         proc.wait(timeout=1)
     except subprocess.TimeoutExpired:
         proc.kill()
-    _close_stdin(proc)
+        try:
+            proc.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            pass
 
 
 def _drop(proc):
-    # Wake teardown must not wait: pw-cat often ignores SIGTERM while stdin
-    # is open, and wait(timeout=1) would delay the first speech samples.
+    # No wait: first play must not block on the shim.
     if proc is None or proc.poll() is not None:
         return
     proc.terminate()
@@ -82,6 +85,7 @@ class Player:
         self._wake_gen = 0
         self._kick_thread = None
         self._feeder = None
+        self._dropped = []
 
     def begin(self):
         with self._lock:
@@ -131,9 +135,7 @@ class Player:
             if self._stopped:
                 return True
             self._feeder = feeder
-        # After the first feed: wake already ran in parallel with synthesize.
-        # Do not join/wait it before writing speech — that sequenced the
-        # shim's death in front of the first word.
+        # First samples into the pipe before any wake teardown.
         if started:
             self._stop_wake()
         return True
@@ -173,14 +175,22 @@ class Player:
             self._kick_thread = None
             proc = self._proc
             self._proc = None
+            dropped = self._dropped
+            self._dropped = []
         _reap(wake)
         _reap(proc)
+        for stale in dropped:
+            _reap(stale)
         if kick is not None and kick.is_alive() and kick is not threading.current_thread():
             kick.join(timeout=2)
         with self._lock:
             leftover = self._wake_proc
             self._wake_proc = None
+            more = self._dropped
+            self._dropped = []
         _reap(leftover)
+        for stale in more:
+            _reap(stale)
 
     def _kick_sink(self, gen: int):
         try:
@@ -190,11 +200,17 @@ class Player:
             return
         with self._lock:
             if gen != self._wake_gen or not self._wake_alive or self._stopped:
-                _reap(proc)
-                return
-            old = self._wake_proc
-            self._wake_proc = proc
-        _reap(old)
+                self._dropped.append(proc)
+                stale = True
+            else:
+                old = self._wake_proc
+                self._wake_proc = proc
+                stale = False
+        if stale:
+            _drop(proc)
+            return
+        self._stash(old)
+        _drop(old)
 
     def _stop_wake(self):
         with self._lock:
@@ -202,12 +218,16 @@ class Player:
             self._wake_gen += 1
             proc = self._wake_proc
             self._wake_proc = None
-            kick = self._kick_thread
-            self._kick_thread = None
+        self._stash(proc)
         _drop(proc)
-        if kick is not None and kick.is_alive() and kick is not threading.current_thread():
-            kick.join(timeout=2)
         with self._lock:
             leftover = self._wake_proc
             self._wake_proc = None
+        self._stash(leftover)
         _drop(leftover)
+
+    def _stash(self, proc):
+        if proc is None:
+            return
+        with self._lock:
+            self._dropped.append(proc)

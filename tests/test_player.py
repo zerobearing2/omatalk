@@ -1,3 +1,4 @@
+import os
 import time
 
 import numpy as np
@@ -94,15 +95,18 @@ def test_play_returns_without_waiting_for_a_slow_reader(tmp_path):
 
 def test_first_play_does_not_wait_for_wake_to_exit(tmp_path):
     stamp = tmp_path / "speech"
+    pidfile = tmp_path / "wake.pid"
     captured = tmp_path / "captured.bin"
     script = tmp_path / "player"
     script.write_text(
         "#!/bin/sh\n"
         f'stamp="{stamp}"\n'
+        f'pidfile="{pidfile}"\n'
         f'captured="{captured}"\n'
         'if [ -f "$stamp" ]; then\n'
         '  cat >> "$captured"\n'
         "else\n"
+        '  echo $$ > "$pidfile"\n'
         '  touch "$stamp"\n'
         "  trap 'sleep 2; exit 0' TERM\n"
         "  cat >/dev/null\n"
@@ -127,6 +131,13 @@ def test_first_play_does_not_wait_for_wake_to_exit(tmp_path):
     assert player.finish()
     player.stop()
     assert captured.read_bytes().endswith(pcm_bytes(samples))
+    pid = int(pidfile.read_text())
+    try:
+        os.kill(pid, 0)
+        still = True
+    except OSError:
+        still = False
+    assert not still, "stop() must reap a wake shim that ignored SIGTERM"
 
 
 def test_begin_writes_one_quantum_of_silence(tmp_path):
@@ -188,6 +199,42 @@ def test_stop_cuts_without_draining_stdin(tmp_path):
     text = log.read_text()
     assert "killed" in text
     assert "drained" not in text
+
+
+def test_stop_eof_after_term_lets_pw_cat_exit(tmp_path):
+    log = tmp_path / "log.txt"
+    log.write_text("")
+    script = tmp_path / "ignore-term"
+    script.write_text(
+        "#!/usr/bin/env python3\n"
+        "import signal, sys\n"
+        f"log = {str(log)!r}\n"
+        "def stamp(msg):\n"
+        "    with open(log, 'a') as f:\n"
+        "        f.write(msg + '\\n')\n"
+        "        f.flush()\n"
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+        "stamp('start')\n"
+        "sys.stdin.buffer.read()\n"
+        "stamp('eof')\n"
+    )
+    script.chmod(0o755)
+    player = Player({"player": [str(script)]})
+    player.begin()
+    assert player.play([0.1] * 24, 24000)
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        if "start" in log.read_text():
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError(f"player never started: {log.read_text()!r}")
+    start_at = time.monotonic()
+    player.stop()
+    elapsed = time.monotonic() - start_at
+
+    assert elapsed < 0.5, "stop() must close stdin after SIGTERM so wait() can finish"
+    assert "eof" in log.read_text()
 
 
 def test_finish_false_when_speech_process_already_dead(tmp_path):
