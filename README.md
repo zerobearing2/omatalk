@@ -10,12 +10,13 @@ the machine, it talks to you. Fully local, no network calls at runtime.
 2. Press `F8`, next to Omarchy's `F9` dictation key: F9 speaks you, F8 speaks
    back.
 3. Omatalk reads the highlighted text, or the clipboard if nothing is
-   selected. It streams the text sentence by sentence through
+   selected. It streams the text in sentence-first chunks through
    [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (ONNX, CPU) and
-   plays it over PipeWire as each sentence finishes synthesizing.
+   plays over PipeWire as each chunk is synthesized, so you hear the start
+   before the rest of the Utterance is ready.
 4. Press `F8` again while it's speaking to interrupt. If the selection hasn't
-   changed, speech just stops. If it has, the old sentence cuts off and the
-   new one starts.
+   changed, speech just stops. If it has, the playing Utterance cuts off and
+   the new one starts.
 
 On Omarchy, the bar shows a megaphone in the normal bar color and switches it to
 the active color while Omatalk is speaking.
@@ -227,20 +228,18 @@ the report.
 
 ### Clipped start of speech
 
-If the very first fraction of a second is sometimes missing or muffled, but an
-immediate replay never clips, this is a PipeWire/WirePlumber issue, not
-Omatalk's: idle audio sinks suspend after a few seconds (`session.suspend-timeout-seconds`),
-and resuming from suspend takes real time — for Bluetooth outputs specifically,
-the A2DP transport has to be reauthorized with BlueZ, which can take a second
-or more. Whatever text is spoken first after that gap can start before the
-device is actually live. This was confirmed on Omatalk's own daemon by
-recording the actual PipeWire signal and comparing it byte-for-byte against
-what the daemon sent to the player: the audio data is always complete, so a
-truncation fix on Omatalk's side can't help — there's nothing to fix in the
-data.
+Omatalk already kicks a short silent PipeWire stream in parallel with the
+first synthesis so a suspended sink can wake before speech. If the very first
+fraction of a second is still missing or muffled — usually on Bluetooth or
+HDMI after a pause — but an immediate replay is fine, the sink is still
+coming out of WirePlumber suspend (`session.suspend-timeout-seconds`). For
+Bluetooth, A2DP reauthorization with BlueZ can take a second or more, and
+speech can start before the device is actually live. The PCM Omatalk sends
+is complete; remaining clip is the device, not truncated audio.
 
-The known mitigation is a WirePlumber rule disabling suspend for the affected
-sink, e.g. in `~/.config/wireplumber/wireplumber.conf.d/51-disable-suspend.conf`:
+Disable suspend for the affected sink if you want to trade that power saving
+for a gap-free start, e.g. in
+`~/.config/wireplumber/wireplumber.conf.d/51-disable-suspend.conf`:
 
 ```
 monitor.alsa.rules = [
@@ -301,7 +300,7 @@ Prerecorded samples of every voice are on the
 ┌───────────────────────────────────────────┐
 │      omatalk daemon · systemd --user      │
 │ capture:  wl-paste --primary → wl-paste   │
-│ chunker:  text → sentences                │
+│ chunker:  text → sentence-first chunks    │
 │ engine:   Kokoro-82M · ONNX Runtime · CPU │
 │ player:   pw-cat → PipeWire (streamed)    │
 └───────────────────────────────────────────┘
