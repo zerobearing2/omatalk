@@ -7,13 +7,8 @@ from daemon.player import RATE, WAKE_MS, Player
 
 
 def make_echo_player(tmp_path):
-    # Each invocation writes to a file named for its own PID ($$), not one
-    # shared file: in production, every _start() is a separate pw-cat
-    # process on its own PipeWire stream (mixed, not concatenated, at the
-    # sink), so a real proc and a wake proc never share an output. A single
-    # shared file would race the two the way pytest's -q run once did (see
-    # git history) — a test-only artifact with no live-daemon counterpart,
-    # since the wake payload is silence either way.
+    # Per-pid files — wake and speech are separate processes (separate
+    # PipeWire streams in production).
     script = tmp_path / "echo-player"
     args_log = tmp_path / "args.log"
     script.write_text(

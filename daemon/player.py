@@ -197,16 +197,8 @@ class Player:
             proc = _start(self._cfg, RATE)
         except OSError:
             return
-        # Register and write the wake silence in one critical section: this
-        # is the same lock _stop_wake() takes to bump _wake_gen, so the two
-        # can never interleave. Either _stop_wake() already ran (stale here,
-        # so the wake payload is never written to a proc real speech might
-        # race past) or it hasn't yet (so it will find this proc as
-        # self._wake_proc, already fully written, and tear it down below).
-        # A prior version wrote the silence on a joined thread *before* this
-        # check, leaving a window where a concurrent _stop_wake() found no
-        # self._wake_proc yet to cancel — the write always completed anyway,
-        # sometimes landing after real speech had already started.
+        # Register and write under the same lock _stop_wake() uses to bump
+        # _wake_gen, so cancel cannot miss self._wake_proc mid-write.
         with self._lock:
             if gen != self._wake_gen or not self._wake_alive or self._stopped:
                 self._dropped.append(proc)
