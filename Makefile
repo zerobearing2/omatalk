@@ -36,6 +36,7 @@ bump:
 release:
 	gh workflow run release.yml
 	@echo "Triggered. Watch with: gh run watch \$$(gh run list --workflow=release.yml -L1 --json databaseId -q '.[0].databaseId')"
+	@echo "After it lands: check whether the bar plugin needs re-pinning (see AGENTS.md 'Release')"
 
 # Point the installed Daemon at this checkout instead of the last released
 # tarball. Keeps the existing venv/models — swaps in an editable package
