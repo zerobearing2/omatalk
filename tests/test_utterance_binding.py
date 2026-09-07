@@ -74,11 +74,28 @@ def binding_env(tmp_path, monkeypatch):
     monkeypatch.setenv("OMATALK_TEST_LOG", str(tmp_path / "play.log"))
     monkeypatch.setenv("OMATALK_TEST_NOTIFY_LOG", str(tmp_path / "notify.log"))
     monkeypatch.setenv("OMATALK_TEST_TICKS_FILE", str(tmp_path / "ticks.txt"))
+    monkeypatch.setenv("OMATALK_TEST_CAPTURE_FILE", str(tmp_path / "capture.txt"))
+    monkeypatch.setenv("OMATALK_TEST_CLIPBOARD_FILE", str(tmp_path / "clipboard.txt"))
     (tmp_path / "play.log").write_text("")
+    (tmp_path / "notify.log").write_text("")
+    (tmp_path / "capture.txt").write_text("")
+    (tmp_path / "clipboard.txt").write_text("")
     # Long enough that a one-chunk Utterance is still alive at finish()
     # after begin() has already started (and may reap) the wake shim.
     (tmp_path / "ticks.txt").write_text("10")
     return config
+
+
+def set_selection(binding_env, text):
+    (binding_env.parent / "capture.txt").write_text(text)
+
+
+def set_clipboard(binding_env, text):
+    (binding_env.parent / "clipboard.txt").write_text(text)
+
+
+def notify_log(binding_env):
+    return (binding_env.parent / "notify.log").read_text()
 
 
 def test_speak_binds_configured_voice_speed_lang(binding_env):
@@ -238,3 +255,44 @@ def test_synthesize_error_reaps_player(binding_env):
         entries = (binding_env.parent / "play.log").read_text().splitlines()
         raise AssertionError(f"player was not reaped, log={entries!r}")
     assert "error: boom" in (binding_env.parent / "notify.log").read_text()
+
+
+def test_speak_empty_uses_selection(binding_env):
+    set_selection(binding_env, "From the selection.")
+    engine = RecordingEngine()
+    daemon = Daemon(engine)
+    daemon.speak("")
+    wait_state(daemon, "idle")
+
+    assert engine.calls == [("From the selection.", "af_heart", 1.0, "en-us")]
+
+
+def test_speak_empty_falls_back_to_clipboard_when_idle(binding_env):
+    set_selection(binding_env, "")
+    set_clipboard(binding_env, "From the clipboard instead.")
+    engine = RecordingEngine()
+    daemon = Daemon(engine)
+    daemon.speak("")
+    wait_state(daemon, "idle")
+
+    assert engine.calls == [("From the clipboard instead.", "af_heart", 1.0, "en-us")]
+
+
+def test_speak_empty_notifies_when_source_is_empty(binding_env):
+    engine = RecordingEngine()
+    daemon = Daemon(engine)
+    daemon.speak("")
+
+    assert daemon.state == "idle"
+    assert engine.calls == []
+    assert "nothing to read" in notify_log(binding_env)
+
+
+def test_inline_text_skips_selection(binding_env):
+    set_selection(binding_env, "Ignored selection.")
+    engine = RecordingEngine()
+    daemon = Daemon(engine)
+    daemon.speak("Only inline text.")
+    wait_state(daemon, "idle")
+
+    assert engine.calls == [("Only inline text.", "af_heart", 1.0, "en-us")]
