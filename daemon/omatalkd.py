@@ -171,18 +171,28 @@ class Daemon:
             player.stop()
 
 
+def speak_line(text: str = "", voice: str | None = None) -> str:
+    if voice:
+        prefix = f"speak --voice {voice}"
+        return f"{prefix} {text}" if text else prefix
+    return f"speak {text}" if text else "speak"
+
+
+def parse_speak(payload: str) -> tuple[str | None, str]:
+    if payload.startswith("--voice "):
+        voice, _, text = payload[len("--voice "):].partition(" ")
+        if not voice:
+            return None, text
+        return voice, text
+    return None, payload
+
+
 def handle(daemon: Daemon, line: str) -> str:
     parts = line.split(" ", 1)
     cmd = parts[0]
     if cmd == "speak":
         payload = parts[1] if len(parts) > 1 else ""
-        voice = None
-        # Not a new verb (see ADR-0002): a `--voice <token> ` prefix on
-        # speak's own payload is a per-call override, extracted here rather
-        # than in Daemon.speak so the wire format for ordinary speak stays
-        # byte-for-byte unchanged.
-        if payload.startswith("--voice "):
-            voice, _, payload = payload[len("--voice "):].partition(" ")
+        voice, payload = parse_speak(payload)
         daemon.speak(payload, voice=voice)
         return "ok"
     if cmd == "stop":
