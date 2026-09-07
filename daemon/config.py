@@ -1,7 +1,8 @@
 import os
 import subprocess
-import tomllib
 from pathlib import Path
+
+import tomllib
 
 DEFAULTS = {
     "voice": "af_heart",

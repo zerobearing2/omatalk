@@ -84,7 +84,15 @@ class Daemon:
         player.begin()
         self._thread = threading.Thread(
             target=self._run,
-            args=(text, cancel, voice or cfg["voice"], cfg["speed"], cfg["lang"], cfg, player),
+            args=(
+                text,
+                cancel,
+                voice or cfg["voice"],
+                cfg["speed"],
+                cfg["lang"],
+                cfg,
+                player,
+            ),
             daemon=True,
         )
         self._thread.start()
@@ -122,7 +130,9 @@ class Daemon:
         try:
             while True:
                 with self._state_condition:
-                    self._state_condition.wait_for(lambda: self.state != last, timeout=1.0)
+                    self._state_condition.wait_for(
+                        lambda last=last: self.state != last, timeout=1.0
+                    )
                     state = self.state
                 if state != last:
                     conn.sendall((state + "\n").encode())
@@ -134,7 +144,16 @@ class Daemon:
         finally:
             conn.close()
 
-    def _run(self, text: str, cancel: threading.Event, voice: str, speed: float, lang: str, cfg: dict, player: Player):
+    def _run(
+        self,
+        text: str,
+        cancel: threading.Event,
+        voice: str,
+        speed: float,
+        lang: str,
+        cfg: dict,
+        player: Player,
+    ):
         try:
             for part in chunks(text):
                 if cancel.is_set():
@@ -176,7 +195,7 @@ def speak_line(text: str = "", voice: str | None = None) -> str:
 
 def parse_speak(payload: str) -> tuple[str | None, str]:
     if payload.startswith("--voice "):
-        voice, _, text = payload[len("--voice "):].partition(" ")
+        voice, _, text = payload[len("--voice ") :].partition(" ")
         if not voice:
             return None, text
         return voice, text

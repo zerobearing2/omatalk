@@ -2,8 +2,8 @@ import threading
 import time
 
 import pytest
-
 from conftest import FAKES
+
 from daemon.cli import build_parser
 from daemon.omatalkd import Daemon, handle, parse_speak, speak_line
 
@@ -45,7 +45,8 @@ def play_log(binding_env):
 def wait_play_log(binding_env, prefix, count=1, timeout=2):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        lines = [l for l in play_log(binding_env).splitlines() if l.startswith(prefix)]
+        entries = play_log(binding_env).splitlines()
+        lines = [line for line in entries if line.startswith(prefix)]
         if len(lines) >= count:
             return lines
         time.sleep(0.01)
@@ -156,7 +157,9 @@ def test_handle_speak_voice_prefix_binds_override(binding_env):
 
 
 def test_cli_speak_voice_encodes_and_handle_binds_without_writing_config(binding_env):
-    args = build_parser().parse_args(["speak", "--voice", "af_bella", "Hi,", "I'm", "bella."])
+    args = build_parser().parse_args(
+        ["speak", "--voice", "af_bella", "Hi,", "I'm", "bella."]
+    )
     line = speak_line(" ".join(args.text), args.voice)
     before = binding_env.read_text()
 

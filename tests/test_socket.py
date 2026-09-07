@@ -108,7 +108,7 @@ def test_speak_captured_text_uses_one_player_for_the_utterance(daemon):
     entries = log(daemon).splitlines()
     # One speech player for the whole Utterance (not one per chunk). A wake
     # shim is reaped, not waited, so it logs killed rather than end.
-    assert len([l for l in entries if l.startswith("end")]) == 1
+    assert len([line for line in entries if line.startswith("end")]) == 1
 
 
 def test_speak_inline_text(daemon):
@@ -116,7 +116,8 @@ def test_speak_inline_text(daemon):
     assert send(daemon, "speak Only inline text.") == "ok"
     wait_status(daemon, "speaking")
     wait_status(daemon, "idle")
-    assert len([l for l in log(daemon).splitlines() if l.startswith("end")]) == 1
+    lines = log(daemon).splitlines()
+    assert len([line for line in lines if line.startswith("end")]) == 1
 
 
 def test_interrupt_cuts_current_and_plays_new(daemon):
@@ -129,7 +130,7 @@ def test_interrupt_cuts_current_and_plays_new(daemon):
     assert send(daemon, "speak Quick replacement.") == "ok"
     wait_status(daemon, "idle")
     entries = log(daemon).splitlines()
-    assert [l for l in entries if l.startswith("killed")]
+    assert [line for line in entries if line.startswith("killed")]
 
 
 def test_stop_cuts_playback(daemon):
@@ -141,7 +142,7 @@ def test_stop_cuts_playback(daemon):
     wait_log(daemon, "start")
     assert send(daemon, "stop") == "ok"
     assert send(daemon, "status") == "idle"
-    assert [l for l in log(daemon).splitlines() if l.startswith("killed")]
+    assert [line for line in log(daemon).splitlines() if line.startswith("killed")]
 
 
 def test_empty_source_notifies_and_stays_idle(daemon):
@@ -192,8 +193,8 @@ def test_new_selection_interrupts_and_speaks_new(daemon):
     wait_status(daemon, "speaking")
     wait_status(daemon, "idle")
     entries = log(daemon).splitlines()
-    assert [l for l in entries if l.startswith("killed")]
-    assert [l for l in entries if l.startswith("end")]
+    assert [line for line in entries if line.startswith("killed")]
+    assert [line for line in entries if line.startswith("end")]
 
 
 def test_playback_failure_notifies_and_daemon_survives(daemon):
@@ -236,7 +237,8 @@ def test_speak_voice_override_plays_and_leaves_config_toml_untouched(daemon):
     assert send(daemon, "speak --voice af_bella Hi, I'm bella.") == "ok"
     wait_status(daemon, "speaking")
     wait_status(daemon, "idle")
-    assert len([l for l in log(daemon).splitlines() if l.startswith("end")]) == 1
+    lines = log(daemon).splitlines()
+    assert len([line for line in lines if line.startswith("end")]) == 1
     # The override lives on the wire for this one Utterance only — it must
     # never be written to config.toml.
     assert config_path.read_text() == before
@@ -250,4 +252,5 @@ def test_clipboard_fallback_when_idle(daemon):
     assert send(daemon, "speak") == "ok"
     wait_status(daemon, "speaking")
     wait_status(daemon, "idle")
-    assert len([l for l in log(daemon).splitlines() if l.startswith("end")]) == 1
+    lines = log(daemon).splitlines()
+    assert len([line for line in lines if line.startswith("end")]) == 1

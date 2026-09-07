@@ -83,10 +83,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("version", help="print the installed release")
 
-    speak = sub.add_parser("speak", help="speak text, or the current selection/clipboard")
+    speak = sub.add_parser(
+        "speak", help="speak text, or the current selection/clipboard"
+    )
     speak.add_argument("text", nargs="*")
     speak.add_argument(
-        "--voice", help="speak this one Utterance in a voice, without changing the default"
+        "--voice",
+        help="speak this one Utterance in a voice, without changing the default",
     )
 
     sub.add_parser("stop", help="stop speaking")

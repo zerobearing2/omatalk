@@ -42,9 +42,7 @@ def daemon(config, tmp_base):
         "OMATALK_TEST_FAKE_ENGINE": "1",
     }
     (tmp_base / "ticks.txt").write_text("1")
-    proc = subprocess.Popen(
-        [str(REPO / "bin" / "omatalkd")], env=env
-    )
+    proc = subprocess.Popen([str(REPO / "bin" / "omatalkd")], env=env)
     sock = tmp_base / "d.sock"
     deadline = time.time() + 60
     while not sock.exists():
@@ -78,11 +76,13 @@ def wait_status(daemon, want: str, timeout: float = 20, sock: str = "d.sock"):
     raise AssertionError(f"status never reached {want!r}")
 
 
-def wait_log(daemon, prefix: str, count: int = 1, timeout: float = 20, filename: str = "play.log"):
+def wait_log(
+    daemon, prefix: str, count: int = 1, timeout: float = 20, filename: str = "play.log"
+):
     deadline = time.time() + timeout
     while time.time() < deadline:
         lines = log(daemon, filename).splitlines()
-        if len([l for l in lines if l.startswith(prefix)]) >= count:
+        if len([line for line in lines if line.startswith(prefix)]) >= count:
             return lines
         time.sleep(0.05)
     raise AssertionError(f"{filename} never reached {count} {prefix!r} lines")
