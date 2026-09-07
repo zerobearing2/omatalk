@@ -6,7 +6,6 @@ import threading
 import time
 import traceback
 
-from .capture import capture_clipboard, capture_primary
 from .chunker import chunks
 from .config import load, socket_path
 from .engine import Engine, FakeEngine
@@ -18,6 +17,16 @@ IDLE_TIMEOUT = 600
 
 # accept() timeout so the idle-recycle check can run.
 ACCEPT_TIMEOUT = 1.0
+
+
+def _capture(cfg: dict, key: str) -> str:
+    try:
+        result = subprocess.run(cfg[key], capture_output=True, text=True, timeout=2)
+    except subprocess.SubprocessError:
+        return ""
+    if result.returncode == 0:
+        return result.stdout.strip()
+    return ""
 
 
 def build_engine():
@@ -57,7 +66,7 @@ class Daemon:
     def speak(self, text: str, voice: str | None = None):
         self.touch()
         cfg = load()
-        text = text.strip() or capture_primary(cfg)
+        text = text.strip() or _capture(cfg, "capture_primary")
         if text and self.state == "speaking" and text == self._current_text:
             self.stop()
             return
@@ -65,7 +74,7 @@ class Daemon:
             if self.state == "speaking":
                 self.stop()
                 return
-            text = capture_clipboard(cfg)
+            text = _capture(cfg, "capture_clipboard")
         if not text:
             self._notify(cfg, "nothing to read")
             return
