@@ -4,7 +4,8 @@ import time
 import pytest
 
 from conftest import FAKES
-from daemon.omatalkd import Daemon, handle
+from daemon.cli import build_parser
+from daemon.omatalkd import Daemon, handle, parse_speak, speak_line
 
 
 class RecordingEngine:
@@ -116,6 +117,35 @@ def test_speak_voice_override_binds_override_and_configured_speed(binding_env):
     assert engine.calls == [("Hi, I'm bella.", "af_bella", 1.0, "en-us")]
 
 
+@pytest.mark.parametrize(
+    "text, voice, line, parsed",
+    [
+        ("", None, "speak", (None, "")),
+        ("Hi", None, "speak Hi", (None, "Hi")),
+        ("", "af_bella", "speak --voice af_bella", ("af_bella", "")),
+        (
+            "Hi, I'm bella.",
+            "af_bella",
+            "speak --voice af_bella Hi, I'm bella.",
+            ("af_bella", "Hi, I'm bella."),
+        ),
+    ],
+)
+def test_speak_line_round_trip(text, voice, line, parsed):
+    assert speak_line(text, voice) == line
+    cmd, _, payload = line.partition(" ")
+    assert cmd == "speak"
+    assert parse_speak(payload) == parsed
+
+
+def test_parse_speak_empty_name_is_not_an_override():
+    assert parse_speak("--voice  hi") == (None, "hi")
+
+
+def test_parse_speak_without_space_is_text():
+    assert parse_speak("--voice") == (None, "--voice")
+
+
 def test_handle_speak_voice_prefix_binds_override(binding_env):
     engine = RecordingEngine()
     daemon = Daemon(engine)
@@ -123,6 +153,20 @@ def test_handle_speak_voice_prefix_binds_override(binding_env):
     wait_state(daemon, "idle")
 
     assert engine.calls == [("Hi, I'm bella.", "af_bella", 1.0, "en-us")]
+
+
+def test_cli_speak_voice_encodes_and_handle_binds_without_writing_config(binding_env):
+    args = build_parser().parse_args(["speak", "--voice", "af_bella", "Hi,", "I'm", "bella."])
+    line = speak_line(" ".join(args.text), args.voice)
+    before = binding_env.read_text()
+
+    engine = RecordingEngine()
+    daemon = Daemon(engine)
+    assert handle(daemon, line) == "ok"
+    wait_state(daemon, "idle")
+
+    assert engine.calls == [("Hi, I'm bella.", "af_bella", 1.0, "en-us")]
+    assert binding_env.read_text() == before
 
 
 def test_back_to_back_overrides_bind_distinct_voices(binding_env):

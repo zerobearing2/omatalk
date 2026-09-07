@@ -212,8 +212,9 @@ def main():
         text = " ".join(args.text)
         if args.voice and not known_voice(args.voice):
             sys.exit(1)
-        prefix = f"speak --voice {args.voice}" if args.voice else "speak"
-        cmd = f"{prefix} {text}" if text else prefix
+        from .omatalkd import speak_line
+
+        cmd = speak_line(text, args.voice)
     else:
         cmd = args.command
 
