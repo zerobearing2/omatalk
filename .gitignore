@@ -26,3 +26,6 @@ models/
 .vscode/
 .DS_Store
 .pytest_cache/
+
+# Claude Code worktrees
+.claude/worktrees/

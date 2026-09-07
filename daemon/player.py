@@ -47,22 +47,22 @@ def _drop(proc):
     _close_stdin(proc)
 
 
-def _feed(proc, samples):
+def _write_pcm(proc, samples):
     pcm = (np.clip(np.asarray(samples), -1.0, 1.0) * 32767).astype(np.int16)
+    try:
+        proc.stdin.write(pcm.tobytes())
+        proc.stdin.flush()
+    except (BrokenPipeError, OSError):
+        pass
 
+
+def _feed(proc, samples):
     # Fed from a thread, not written inline here: a multi-second utterance
     # exceeds the OS pipe buffer, so a synchronous write would block the
     # caller until the player drains it — defeating overlap of this
     # sentence's playback with the next sentence's synthesis. stdin stays
     # open so later sentences can append to the same player process.
-    def write():
-        try:
-            proc.stdin.write(pcm.tobytes())
-            proc.stdin.flush()
-        except (BrokenPipeError, OSError):
-            pass
-
-    thread = threading.Thread(target=write, daemon=True)
+    thread = threading.Thread(target=_write_pcm, args=(proc, samples), daemon=True)
     thread.start()
     return thread
 
@@ -195,9 +195,18 @@ class Player:
     def _kick_sink(self, gen: int):
         try:
             proc = _start(self._cfg, RATE)
-            _feed(proc, _wake_pcm()).join()
         except OSError:
             return
+        # Register and write the wake silence in one critical section: this
+        # is the same lock _stop_wake() takes to bump _wake_gen, so the two
+        # can never interleave. Either _stop_wake() already ran (stale here,
+        # so the wake payload is never written to a proc real speech might
+        # race past) or it hasn't yet (so it will find this proc as
+        # self._wake_proc, already fully written, and tear it down below).
+        # A prior version wrote the silence on a joined thread *before* this
+        # check, leaving a window where a concurrent _stop_wake() found no
+        # self._wake_proc yet to cancel — the write always completed anyway,
+        # sometimes landing after real speech had already started.
         with self._lock:
             if gen != self._wake_gen or not self._wake_alive or self._stopped:
                 self._dropped.append(proc)
@@ -206,6 +215,7 @@ class Player:
                 old = self._wake_proc
                 self._wake_proc = proc
                 stale = False
+                _write_pcm(proc, _wake_pcm())
         if stale:
             _drop(proc)
             return

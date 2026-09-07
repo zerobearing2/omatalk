@@ -7,17 +7,26 @@ from daemon.player import RATE, WAKE_MS, Player
 
 
 def make_echo_player(tmp_path):
+    # Each invocation writes to a file named for its own PID ($$), not one
+    # shared file: in production, every _start() is a separate pw-cat
+    # process on its own PipeWire stream (mixed, not concatenated, at the
+    # sink), so a real proc and a wake proc never share an output. A single
+    # shared file would race the two the way pytest's -q run once did (see
+    # git history) — a test-only artifact with no live-daemon counterpart,
+    # since the wake payload is silence either way.
     script = tmp_path / "echo-player"
-    captured = tmp_path / "captured.bin"
     args_log = tmp_path / "args.log"
     script.write_text(
         "#!/bin/sh\n"
         f'printf "%s\\n" "$*" >> "{args_log}"\n'
-        f'cat >> "{captured}"\n'
+        f'cat >> "{tmp_path}/captured.$$.bin"\n'
     )
     script.chmod(0o755)
-    captured.write_bytes(b"")
-    return {"player": [str(script)]}, captured, args_log
+
+    def captured_for(pid):
+        return tmp_path / f"captured.{pid}.bin"
+
+    return {"player": [str(script)]}, captured_for, args_log
 
 
 def pcm_bytes(samples):
@@ -40,22 +49,21 @@ def wait_path(path, timeout=5):
 
 
 def test_play_feeds_raw_pcm_via_stdin_with_rate_and_channel_args(tmp_path):
-    cfg, captured, args_log = make_echo_player(tmp_path)
+    cfg, captured_for, args_log = make_echo_player(tmp_path)
     samples = [0.5, -0.5, 0.25, -0.25]
     player = Player(cfg)
     player.begin()
     assert player.play(samples, 24000)
     assert player.finish()
+    captured = captured_for(player._proc.pid)
     player.stop()
 
-    # Wake is a separate process; reap may SIGTERM it before cat flushes.
-    # Speech stdin is closed cleanly, so its PCM is the suffix.
-    assert captured.read_bytes().endswith(pcm_bytes(samples))
+    assert captured.read_bytes() == pcm_bytes(samples)
     assert "--rate 24000 --channels 1 -" in args_log.read_text().splitlines()
 
 
 def test_successive_plays_concatenate_on_one_player(tmp_path):
-    cfg, captured, args_log = make_echo_player(tmp_path)
+    cfg, captured_for, args_log = make_echo_player(tmp_path)
     first = [0.5, -0.5]
     second = [0.25, -0.25]
     player = Player(cfg)
@@ -63,9 +71,10 @@ def test_successive_plays_concatenate_on_one_player(tmp_path):
     assert player.play(first, 24000)
     assert player.play(second, 24000)
     assert player.finish()
+    captured = captured_for(player._proc.pid)
     player.stop()
 
-    assert captured.read_bytes().endswith(pcm_bytes(first) + pcm_bytes(second))
+    assert captured.read_bytes() == pcm_bytes(first) + pcm_bytes(second)
     assert args_log.read_text().splitlines()[-1] == "--rate 24000 --channels 1 -"
 
 
@@ -141,17 +150,23 @@ def test_first_play_does_not_wait_for_wake_to_exit(tmp_path):
 
 
 def test_begin_writes_one_quantum_of_silence(tmp_path):
-    cfg, captured, args_log = make_echo_player(tmp_path)
+    # No play() here, so the wake kick is the only process that ever runs —
+    # its capture file is the only one that can appear.
+    cfg, _captured_for, args_log = make_echo_player(tmp_path)
     player = Player(cfg)
     player.begin()
     wait_path(args_log)
     deadline = time.monotonic() + 5
+    captured = None
     while time.monotonic() < deadline:
-        if captured.exists() and len(captured.read_bytes()) >= len(wake_bytes()):
+        matches = list(tmp_path.glob("captured.*.bin"))
+        if matches and matches[0].stat().st_size >= len(wake_bytes()):
+            captured = matches[0]
             break
         time.sleep(0.01)
     player.stop()
 
+    assert captured is not None, "wake proc never wrote its capture file"
     assert captured.read_bytes() == wake_bytes()
     assert args_log.read_text().strip() == f"--rate {RATE} --channels 1 -"
 
@@ -251,7 +266,7 @@ def test_finish_false_when_speech_process_already_dead(tmp_path):
 
 
 def test_stop_then_play_and_finish_are_not_error(tmp_path):
-    cfg, captured, args_log = make_echo_player(tmp_path)
+    cfg, _captured_for, args_log = make_echo_player(tmp_path)
     player = Player(cfg)
     player.begin()
     wait_path(args_log)
