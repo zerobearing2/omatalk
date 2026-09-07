@@ -11,8 +11,10 @@ from types import SimpleNamespace
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parent.parent
+PLUGIN_ADD_CMD = (
+    "omarchy plugin add https://example.test/omarchy-omatalk-plugin.git --enable --yes"
+)
 
 
 @pytest.fixture
@@ -217,8 +219,7 @@ def run_install(env, answer=""):
 
 def model_requests(site, filename):
     return sum(
-        request.split("?", 1)[0] == f"/models/{filename}"
-        for request in site.requests
+        request.split("?", 1)[0] == f"/models/{filename}" for request in site.requests
     )
 
 
@@ -289,12 +290,12 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     lines = command_log(log)
     stop = max(i for i, line in enumerate(lines) if "systemctl --user stop" in line)
     clear = max(i for i, line in enumerate(lines) if "uv venv --quiet --clear" in line)
-    start = max(i for i, line in enumerate(lines) if "systemctl --user enable --now" in line)
+    start = max(
+        i for i, line in enumerate(lines) if "systemctl --user enable --now" in line
+    )
     assert stop < clear < start
     adds = [line for line in lines if "omarchy plugin add" in line]
-    assert adds == [
-        "omarchy plugin add https://example.test/omarchy-omatalk-plugin.git --enable --yes"
-    ]
+    assert adds == [PLUGIN_ADD_CMD]
     assert (plugin_dir(env) / ".git").is_dir()
     assert not any("omarchy plugin remove" in line for line in lines)
     assert not any("omarchy restart shell" in line for line in lines)
@@ -311,10 +312,7 @@ def test_fresh_install_adds_plugin_repo_and_never_prompts_to_restart_shell(
     assert result.returncode == 0, result.stderr
     assert "already installed before this run" not in result.stdout
     lines = command_log(log)
-    assert (
-        "omarchy plugin add https://example.test/omarchy-omatalk-plugin.git --enable --yes"
-        in lines
-    )
+    assert PLUGIN_ADD_CMD in lines
     assert not any("omarchy restart shell" in line for line in lines)
     assert (plugin_dir(env) / ".git").is_dir()
 
@@ -367,11 +365,10 @@ def test_legacy_copy_is_replaced_via_plugin_remove_and_add(site, tmp_path):
     assert (path / ".git").is_dir()
     assert not (path / "old.txt").exists()
     lines = command_log(log)
-    assert any("omarchy plugin remove zerobearing.omatalk --yes" in line for line in lines)
-    assert (
-        "omarchy plugin add https://example.test/omarchy-omatalk-plugin.git --enable --yes"
-        in lines
+    assert any(
+        "omarchy plugin remove zerobearing.omatalk --yes" in line for line in lines
     )
+    assert PLUGIN_ADD_CMD in lines
     assert not any("omarchy restart shell" in line for line in lines)
 
 
@@ -388,7 +385,9 @@ def test_legacy_copy_is_left_when_plugin_remove_fails(site, tmp_path):
     assert (path / "old.txt").is_file()
     assert not (path / ".git").exists()
     lines = command_log(log)
-    assert any("omarchy plugin remove zerobearing.omatalk --yes" in line for line in lines)
+    assert any(
+        "omarchy plugin remove zerobearing.omatalk --yes" in line for line in lines
+    )
     assert not any("omarchy plugin add" in line for line in lines)
 
 

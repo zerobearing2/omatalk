@@ -26,8 +26,10 @@ def make_echo_player(tmp_path):
 
 def pcm_bytes(samples):
     return (
-        np.clip(np.asarray(samples, dtype=np.float64), -1.0, 1.0) * 32767
-    ).astype(np.int16).tobytes()
+        (np.clip(np.asarray(samples, dtype=np.float64), -1.0, 1.0) * 32767)
+        .astype(np.int16)
+        .tobytes()
+    )
 
 
 def wake_bytes():

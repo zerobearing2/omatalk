@@ -16,9 +16,7 @@ class Engine:
         )
 
     def synthesize(self, text: str, voice: str, speed: float, lang: str):
-        samples, rate = self._kokoro.create(
-            text, voice=voice, speed=speed, lang=lang
-        )
+        samples, rate = self._kokoro.create(text, voice=voice, speed=speed, lang=lang)
         return samples, rate
 
 

@@ -5,14 +5,12 @@ import os
 import subprocess
 import sys
 import threading
-import tomllib
 from pathlib import Path
 
 import numpy
 import pytest
-
+import tomllib
 from conftest import FAKES
-
 
 ROOT = Path(__file__).resolve().parent.parent
 FAKE_VOICES = ["af_heart", "af_bella", "am_test", "bf_other"]
@@ -24,7 +22,7 @@ def installer_site(tmp_path):
     root.mkdir()
     requests = []
     (root / "install.sh").write_text(
-        "#!/bin/sh\nprintf '%s' \"$UPGRADE_VALUE\" > \"$UPGRADE_MARKER\"\n"
+        '#!/bin/sh\nprintf \'%s\' "$UPGRADE_VALUE" > "$UPGRADE_MARKER"\n'
     )
 
     class Handler(http.server.SimpleHTTPRequestHandler):
@@ -254,7 +252,9 @@ def test_config_set_speed_rejects_non_numeric(config_environment):
     assert "fast" in result.stderr
 
 
-@pytest.mark.parametrize("key", ["player", "notify", "capture_primary", "lang", "bogus"])
+@pytest.mark.parametrize(
+    "key", ["player", "notify", "capture_primary", "lang", "bogus"]
+)
 def test_config_set_rejects_unsettable_key(config_environment, key):
     result = run_config(["set", key, "whatever"], config_environment)
 

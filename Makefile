@@ -1,10 +1,18 @@
 OMATALK_HOME ?= $(HOME)/.local/share/omatalk
 REPO := $(CURDIR)
 
-.PHONY: test clean dev-install dev-restart dev-uninstall bump release
+.PHONY: test lint format clean dev-install dev-restart dev-uninstall bump release
 
 test:
 	uv run --group dev pytest tests/
+
+# Check-only: fails on any lint violation, changes nothing.
+lint:
+	uv run --group dev ruff check .
+
+# Rewrites files in place. Run before opening a PR — see AGENTS.md.
+format:
+	uv run --group dev ruff format .
 
 clean:
 	rm -rf build dist .pytest_cache

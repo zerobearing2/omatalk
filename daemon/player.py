@@ -181,7 +181,11 @@ class Player:
         _reap(proc)
         for stale in dropped:
             _reap(stale)
-        if kick is not None and kick.is_alive() and kick is not threading.current_thread():
+        if (
+            kick is not None
+            and kick.is_alive()
+            and kick is not threading.current_thread()
+        ):
             kick.join(timeout=2)
         with self._lock:
             leftover = self._wake_proc

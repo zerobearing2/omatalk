@@ -57,3 +57,17 @@ Run with uv (creates the dev env on demand):
 ```sh
 uv run --group dev pytest tests/
 ```
+
+### Lint & format
+
+Required before opening a PR:
+
+```sh
+make lint
+make format
+```
+
+A local pre-commit hook backstops this (one-time install:
+`git config core.hooksPath .githooks`), but it isn't active on a fresh
+clone — running `make lint`/`make format` yourself is the actual
+compliance step, not the hook.
