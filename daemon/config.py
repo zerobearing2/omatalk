@@ -1,4 +1,5 @@
 import os
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -30,6 +31,17 @@ def load() -> dict:
     if path.exists():
         cfg.update(tomllib.loads(path.read_text()))
     return cfg
+
+
+def notify(cfg: dict, msg: str) -> None:
+    try:
+        subprocess.run(
+            [*cfg["notify"], msg],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        pass
 
 
 def _toml_literal(value) -> str:

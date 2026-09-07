@@ -332,6 +332,24 @@ def test_speak_empty_notifies_when_source_is_empty(binding_env):
     assert "nothing to read" in notify_log(binding_env)
 
 
+def test_speak_empty_survives_missing_notify_binary(binding_env):
+    binding_env.write_text(
+        "\n".join(
+            'notify = ["/no-such-omatalk-notify"]'
+            if line.startswith("notify ")
+            else line
+            for line in binding_env.read_text().splitlines()
+        )
+        + "\n"
+    )
+    engine = RecordingEngine()
+    daemon = Daemon(engine)
+    daemon.speak("")
+
+    assert daemon.state == "idle"
+    assert engine.calls == []
+
+
 def test_inline_text_skips_selection(binding_env):
     set_selection(binding_env, "Ignored selection.")
     engine = RecordingEngine()

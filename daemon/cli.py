@@ -65,16 +65,10 @@ def installed_version() -> str:
 
 
 def notify_daemon_down():
-    try:
-        subprocess.run(
-            [
-                "notify-send",
-                "Omatalk",
-                "daemon not running — systemctl --user start omatalk",
-            ]
-        )
-    except OSError:
-        pass
+    config.notify(
+        config.load(),
+        "daemon not running — systemctl --user start omatalk",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
