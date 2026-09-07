@@ -11,6 +11,8 @@ from pathlib import Path
 import numpy
 import pytest
 
+from conftest import FAKES
+
 
 ROOT = Path(__file__).resolve().parent.parent
 FAKE_VOICES = ["af_heart", "af_bella", "am_test", "bf_other"]
@@ -88,17 +90,13 @@ def test_upgrade_rejects_extra_arguments(installer_site, tmp_path):
 
 
 def make_notify_environment(tmp_path):
-    fake_bin = tmp_path / "bin"
-    fake_bin.mkdir()
-    (fake_bin / "notify-send").write_text(
-        "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$NOTIFY_LOG\"\n"
-    )
-    (fake_bin / "notify-send").chmod(0o755)
+    config = tmp_path / "config.toml"
+    config.write_text(f'notify = ["{FAKES}/notify"]\n')
     return {
         **os.environ,
-        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "OMATALK_CONFIG": str(config),
         "OMATALK_SOCKET": str(tmp_path / "missing.sock"),
-        "NOTIFY_LOG": str(tmp_path / "notify.log"),
+        "OMATALK_TEST_NOTIFY_LOG": str(tmp_path / "notify.log"),
     }
 
 
@@ -136,7 +134,7 @@ def test_version_does_not_notify_when_the_daemon_is_down(args, tmp_path):
     result = run_cli(args, env)
 
     assert result.returncode == 0, result.stderr
-    assert not Path(env["NOTIFY_LOG"]).exists()
+    assert not Path(env["OMATALK_TEST_NOTIFY_LOG"]).exists()
 
 
 def test_status_failure_does_not_notify(tmp_path):
@@ -146,7 +144,7 @@ def test_status_failure_does_not_notify(tmp_path):
 
     assert result.returncode == 1
     assert "daemon not running" in result.stderr
-    assert not Path(env["NOTIFY_LOG"]).exists()
+    assert not Path(env["OMATALK_TEST_NOTIFY_LOG"]).exists()
 
 
 def test_speak_failure_notifies(tmp_path):
@@ -156,7 +154,8 @@ def test_speak_failure_notifies(tmp_path):
 
     assert result.returncode == 1
     assert "daemon not running" in result.stderr
-    assert Path(env["NOTIFY_LOG"]).exists()
+    assert Path(env["OMATALK_TEST_NOTIFY_LOG"]).exists()
+    assert "daemon not running" in Path(env["OMATALK_TEST_NOTIFY_LOG"]).read_text()
 
 
 @pytest.fixture
@@ -277,23 +276,41 @@ def test_speak_voice_rejects_unknown_voice_before_touching_daemon(config_environ
 def test_speak_voice_valid_reaches_the_same_daemon_down_failure_as_plain_speak(
     config_environment, tmp_path
 ):
-    fake_bin = tmp_path / "notify-bin"
-    fake_bin.mkdir()
-    (fake_bin / "notify-send").write_text(
-        "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$NOTIFY_LOG\"\n"
+    Path(config_environment["OMATALK_CONFIG"]).write_text(
+        f'notify = ["{FAKES}/notify"]\n'
     )
-    (fake_bin / "notify-send").chmod(0o755)
     env = {
         **config_environment,
-        "PATH": f"{fake_bin}:{config_environment['PATH']}",
-        "NOTIFY_LOG": str(tmp_path / "notify.log"),
+        "OMATALK_TEST_NOTIFY_LOG": str(tmp_path / "notify.log"),
     }
 
     result = run_cli(["speak", "--voice", "af_bella", "hi"], env)
 
     assert result.returncode == 1
     assert "daemon not running" in result.stderr
-    assert Path(env["NOTIFY_LOG"]).exists()
+    assert Path(env["OMATALK_TEST_NOTIFY_LOG"]).exists()
+    assert "daemon not running" in Path(env["OMATALK_TEST_NOTIFY_LOG"]).read_text()
+
+
+def test_notify_swallows_missing_binary():
+    from daemon.config import notify
+
+    notify({"notify": ["/no-such-omatalk-notify"]}, "hello")
+
+
+def test_speak_daemon_down_survives_missing_notify_binary(tmp_path):
+    config = tmp_path / "config.toml"
+    config.write_text('notify = ["/no-such-omatalk-notify"]\n')
+    env = {
+        **os.environ,
+        "OMATALK_CONFIG": str(config),
+        "OMATALK_SOCKET": str(tmp_path / "missing.sock"),
+    }
+
+    result = run_cli("speak", env)
+
+    assert result.returncode == 1
+    assert "daemon not running" in result.stderr
 
 
 def test_config_set_round_trip_preserves_untouched_keys(config_environment):

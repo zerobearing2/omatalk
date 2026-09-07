@@ -7,7 +7,7 @@ import time
 import traceback
 
 from .chunker import chunks
-from .config import load, socket_path
+from .config import load, notify, socket_path
 from .engine import Engine, FakeEngine
 from .player import Player
 
@@ -49,11 +49,7 @@ class Daemon:
     def _notify(self, cfg: dict, msg: str):
         if msg.startswith("error:"):
             print(msg, file=sys.stderr, flush=True)
-        subprocess.run(
-            [*cfg["notify"], msg],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        notify(cfg, msg)
 
     def _stop_current(self):
         if self._cancel:
