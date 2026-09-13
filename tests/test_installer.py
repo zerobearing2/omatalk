@@ -206,7 +206,15 @@ def without_omarchy(env):
     return env
 
 
-def run_install(env, answer=""):
+def run_install(env, site, answer="", tarball_sha=None):
+    if tarball_sha is None:
+        tarball_sha = hashlib.sha256(
+            (site.root / "omatalk-src.tar.gz").read_bytes()
+        ).hexdigest()
+    env = {
+        **env,
+        "TARBALL_SHA256": tarball_sha,
+    }
     return subprocess.run(
         ["bash", str(ROOT / "install.sh")],
         cwd=ROOT,
@@ -243,7 +251,7 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     site.publish(make_source(stale=True))
     env, _state, log = fake_environment(site, tmp_path)
 
-    first = run_install(env)
+    first = run_install(env, site)
 
     assert first.returncode == 0, first.stderr
     install_home = Path(env["OMATALK_HOME"])
@@ -262,7 +270,7 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     config_before = config.read_bytes()
 
     site.publish(make_source())
-    second = run_install(env)
+    second = run_install(env, site)
 
     assert second.returncode == 0, second.stderr
     assert not (install_home / "src/stale.py").exists()
@@ -275,7 +283,7 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     assert model_requests(site, "voices-v1.0.bin") == 1
 
     (install_home / "models/kokoro-v1.0.fp16.onnx").write_bytes(b"corrupt")
-    third = run_install(env)
+    third = run_install(env, site)
 
     assert third.returncode == 0, third.stderr
     assert model_requests(site, "kokoro-v1.0.fp16.onnx") == 2
@@ -283,7 +291,7 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
 
     (site.root / "models/kokoro-v1.0.fp16.onnx").write_bytes(b"bad download")
     (install_home / "models/kokoro-v1.0.fp16.onnx").unlink()
-    bad_download = run_install(env)
+    bad_download = run_install(env, site)
 
     assert bad_download.returncode != 0
 
@@ -307,7 +315,7 @@ def test_fresh_install_adds_plugin_repo_and_never_prompts_to_restart_shell(
     site.publish(make_source())
     env, _state, log = fake_environment(site, tmp_path)
 
-    result = run_install(env)
+    result = run_install(env, site)
 
     assert result.returncode == 0, result.stderr
     assert "already installed before this run" not in result.stdout
@@ -325,7 +333,7 @@ def test_git_plugin_checkout_is_left_alone(site, tmp_path):
     (path / ".git").mkdir()
     (path / "keep.txt").write_text("store checkout\n")
 
-    result = run_install(env)
+    result = run_install(env, site)
 
     assert result.returncode == 0, result.stderr
     assert (path / "keep.txt").read_text() == "store checkout\n"
@@ -342,7 +350,7 @@ def test_plugin_add_failure_still_installs_the_daemon(site, tmp_path):
     env, _state, log = fake_environment(site, tmp_path)
     env["FAKE_PLUGIN_ADD_FAIL"] = "1"
 
-    result = run_install(env)
+    result = run_install(env, site)
 
     assert result.returncode == 0, result.stderr
     assert Path(env["HOME"], ".local/bin/omatalk").is_file()
@@ -358,7 +366,7 @@ def test_legacy_copy_is_replaced_via_plugin_remove_and_add(site, tmp_path):
     env, _state, log = fake_environment(site, tmp_path)
     seed_copy_plugin(env)
 
-    result = run_install(env)
+    result = run_install(env, site)
 
     assert result.returncode == 0, result.stderr
     path = plugin_dir(env)
@@ -378,7 +386,7 @@ def test_legacy_copy_is_left_when_plugin_remove_fails(site, tmp_path):
     seed_copy_plugin(env)
     env["FAKE_PLUGIN_REMOVE_FAIL"] = "1"
 
-    result = run_install(env)
+    result = run_install(env, site)
 
     assert result.returncode == 0, result.stderr
     path = plugin_dir(env)
@@ -396,7 +404,7 @@ def test_installer_requires_omarchy(site, tmp_path):
     env, _state, log = fake_environment(site, tmp_path)
     without_omarchy(env)
 
-    result = run_install(env)
+    result = run_install(env, site)
 
     assert result.returncode != 0
     combined = result.stdout + result.stderr
@@ -411,9 +419,22 @@ def test_installer_tolerates_missing_unit(site, tmp_path):
     env, _state, _log = fake_environment(site, tmp_path)
     env["FAKE_STOP_STATUS"] = "5"
 
-    result = run_install(env)
+    result = run_install(env, site)
 
     assert result.returncode == 0, result.stderr
+
+
+def test_installer_rejects_tarball_checksum_mismatch(site, tmp_path):
+    site.publish(make_source())
+    env, _state, _log = fake_environment(site, tmp_path)
+    old_source = Path(env["OMATALK_HOME"]) / "src/old.py"
+    old_source.parent.mkdir(parents=True)
+    old_source.write_text("keep me\n")
+
+    result = run_install(env, site, tarball_sha="0" * 64)
+
+    assert result.returncode != 0
+    assert old_source.read_text() == "keep me\n"
 
 
 def test_installer_does_not_replace_files_if_daemon_will_not_stop(site, tmp_path):
@@ -424,7 +445,7 @@ def test_installer_does_not_replace_files_if_daemon_will_not_stop(site, tmp_path
     old_source.write_text("keep me\n")
     env["FAKE_STOP_STATUS"] = "1"
 
-    result = run_install(env)
+    result = run_install(env, site)
 
     assert result.returncode == 1
     assert old_source.read_text() == "keep me\n"
@@ -435,7 +456,7 @@ def test_installer_fails_if_daemon_never_becomes_ready(site, tmp_path):
     env, _state, _log = fake_environment(site, tmp_path)
     env["FAKE_DAEMON_DOWN"] = "1"
 
-    result = run_install(env)
+    result = run_install(env, site)
 
     assert result.returncode != 0
     assert "Daemon did not start" in result.stdout

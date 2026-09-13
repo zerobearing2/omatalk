@@ -71,7 +71,8 @@ Click the megaphone and choose Install Omatalk. Models are about 185MB.
 curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
 ```
 
-The script downloads the latest release tarball (checksum-verified), then:
+The script downloads a pinned GitHub release tarball (SHA-256 is in the
+script, not fetched beside the file), then:
 
 1. Checks system dependencies and installs any missing ones via
    `omarchy pkg add` (python, curl, pipewire, wl-clipboard, uv; stock
@@ -91,24 +92,19 @@ The script downloads the latest release tarball (checksum-verified), then:
    command to add the F8 binding when no Omatalk binding is present. The
    installer never edits your keybindings itself.
 
-Releases are cut manually (GitHub Actions → Release → Run workflow) so
-several PRs can land on `master` before anyone ships. Re-running the
-installer picks up whatever is newest. After the first run of this installer,
-`omatalk upgrade` fetches and runs the same latest installer.
+Releases are cut with `make bump` then `make release` on `master`, so
+several PRs can land before anyone ships. Bump only edits the version
+file. Release builds the tarball, verifies it, commits, pushes, and
+publishes the GitHub release from those files. The plugin is the same
+shape: `make plugin-bump` then `make plugin-release`.
+The plugin's Install button keeps the Daemon pin from that plugin commit.
+After the first run, `omatalk upgrade` fetches and runs the installer that
+shipped with the latest GitHub release.
 
-The script at that URL is a small dispatcher: by default it fetches and runs
-the installer that shipped with the latest release, so the installer's own
-logic and the source it installs are always a matched pair. To test an
-unreleased branch instead, put `OMATALK_REF` in the environment of the
-`bash` that runs the dispatcher (a prefix on `curl` alone is ignored):
-
-```sh
-OMATALK_REF=my-branch bash -c 'curl -fsSL https://omatalk.zerobearing.com/install.sh | bash'
-```
-
-This skips checksum verification for that install — a branch is a moving
-target, so there's nothing to pin the checksum to — and trusts HTTPS/GitHub
-instead, same as any other dev install.
+The script at that URL is a small dispatcher: it fetches and runs the
+installer that shipped with the latest release, so the installer's own
+logic and the source it installs are always a matched pair. Unreleased
+work uses `make dev-install` from a checkout.
 
 Upgrades never create, merge, rewrite, or delete `~/.config/omatalk/config.toml`.
 An existing config stays byte-for-byte unchanged, and an absent config stays
@@ -128,7 +124,7 @@ curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
 
 Stops and removes the systemd unit, the launcher, the source, and the
 Omarchy bar plugin. Asks before deleting the models (~185MB) and your config.
-Also a thin dispatcher; `OMATALK_REF` works the same way here as for install.
+Also a thin dispatcher to the latest release uninstaller.
 Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself. Plugin
 remove is not uninstall.
 
