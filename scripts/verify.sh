@@ -40,7 +40,7 @@ if [ -z "$expected" ]; then
 fi
 
 if [ "$tag" != "v$version" ]; then
-  echo "install.sh RELEASE_TAG is $tag but pyproject.toml is $version (run make build)" >&2
+  echo "install.sh RELEASE_TAG is $tag but pyproject.toml is $version (run scripts/build.sh)" >&2
   exit 1
 fi
 
@@ -67,7 +67,7 @@ actual="$(sha256sum "$tmp")"
 actual="${actual%% *}"
 
 if [ "$actual" != "$expected" ]; then
-  echo "install.sh TARBALL_SHA256 is $expected but this tree packs $actual (run make build)" >&2
+  echo "install.sh TARBALL_SHA256 is $expected but this tree packs $actual (run scripts/build.sh)" >&2
   exit 1
 fi
 

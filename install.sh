@@ -2,7 +2,7 @@
 # Omatalk installer: system deps (omarchy-approved), a pinned GitHub
 # release tarball, venv, models, systemd user unit, PATH launcher. The
 # bar plugin is `omarchy plugin add` of PLUGIN_REPO, not files from this
-# tarball. make build rewrites RELEASE_TAG and TARBALL_SHA256.
+# tarball. scripts/build.sh rewrites RELEASE_TAG and TARBALL_SHA256.
 set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"

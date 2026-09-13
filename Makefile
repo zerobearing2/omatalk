@@ -3,8 +3,8 @@ REPO := $(CURDIR)
 PLUGIN := plugin
 PLUGIN_DIR ?= $(HOME)/.config/omarchy/plugins/zerobearing.omatalk
 
-.PHONY: test lint format clean bump build verify release \
-	plugin-bump plugin-build plugin-verify plugin-release \
+.PHONY: test lint format clean bump release \
+	plugin-bump plugin-release \
 	plugin-test plugin-validate plugin-dev-reload \
 	dev-install dev-restart dev-uninstall
 
@@ -24,33 +24,21 @@ clean:
 	find . -path ./.venv -prune -o -type d -name __pycache__ -print0 | xargs -0 -r rm -rf
 	find . -path ./.venv -prune -o -type f \( -name '*.pyc' -o -name '*.pyo' \) -print0 | xargs -0 -r rm -f
 
-# Version file only, no commit. Then make release / make plugin-release.
+# Version file only, no commit. Then make release.
 bump:
 	scripts/bump.sh
 
-build:
-	scripts/build.sh
-
-verify:
-	scripts/verify.sh
-
-# build + verify + commit + push + gh release create
 release:
 	scripts/release.sh
 
 plugin-bump:
 	scripts/plugin-bump.sh
 
-plugin-build:
-	scripts/plugin-build.sh
-
-plugin-verify:
-	scripts/plugin-verify.sh
-
 plugin-release:
 	scripts/plugin-release.sh
 
-plugin-test: plugin-verify
+plugin-test:
+	scripts/plugin-verify.sh
 
 plugin-validate:
 	omarchy plugin validate "$(abspath $(PLUGIN))"

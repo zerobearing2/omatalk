@@ -18,18 +18,14 @@ GitHub Actions only runs tests on push.
 
 ```sh
 make bump                 # pyproject.toml only; VERSION=x.y.z to set it
-make build                # pack tarball, write pin into install.sh
-make verify               # pytest + pin check
-make release              # build + verify + commit + push + gh
+make release              # build, verify, commit, push, gh
 
 make plugin-bump          # plugin/manifest.json only
-make plugin-build         # copy root install.sh into plugin/
-make plugin-verify        # QML tests
-make plugin-release       # build + verify + commit + push + gh
+make plugin-release       # copy install.sh, verify, commit, push, gh
 ```
 
-`make release` / `make plugin-release` run the build and verify steps.
-You can run those two on their own to inspect without publishing.
+Build and verify live in `scripts/` and run from release. Do not add
+Make targets for them.
 
 `plugin/install.sh` is a copy of this repo's `install.sh`. Edit the root
 file only. Install in the panel downloads the Daemon tarball named in
