@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Local Daemon release: test, pin this tree, commit install.sh if needed,
-# push master, create the GitHub release from the tarball we just packed.
-# Does not clobber an existing tag. Does not vendor the plugin.
+# Daemon publish: build, verify, commit version+pin, push, gh release create
+# from the tarball just packed. Does not clobber an existing tag.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -12,8 +11,29 @@ if [ "$(git rev-parse --abbrev-ref HEAD)" != master ]; then
   exit 1
 fi
 
-if [ -n "$(git status --porcelain)" ]; then
-  echo "working tree must be clean" >&2
+unexpected=""
+while IFS= read -r status; do
+  if [ -z "$status" ]; then
+    continue
+  fi
+  path="${status:3}"
+  case "$path" in
+    pyproject.toml|install.sh)
+      ;;
+    *)
+      if [ -z "$unexpected" ]; then
+        unexpected="$path"
+      else
+        unexpected="$unexpected $path"
+      fi
+      ;;
+  esac
+done <<EOF
+$(git status --porcelain)
+EOF
+
+if [ -n "$unexpected" ]; then
+  echo "unexpected dirty paths: $unexpected" >&2
   exit 1
 fi
 
@@ -28,7 +48,7 @@ tag="v$version"
 
 remote_tag="$(git ls-remote --tags origin "refs/tags/$tag")"
 if [ -n "$remote_tag" ]; then
-  echo "$tag already exists — bump pyproject.toml first (make bump)" >&2
+  echo "$tag already exists — make bump first" >&2
   exit 1
 fi
 
@@ -37,31 +57,27 @@ if [ "$(git merge-base HEAD origin/master)" != "$(git rev-parse origin/master)" 
   exit 1
 fi
 
-uv run --group dev pytest tests/
+scripts/build.sh
+scripts/verify.sh
 
-scripts/pin-install.sh
-scripts/verify-pin.sh
-
-git add install.sh
-if git diff --cached --quiet -- install.sh; then
-  echo "install.sh already pinned to $tag"
+git add pyproject.toml install.sh
+if git diff --cached --quiet; then
+  echo "version and pin already committed"
 else
-  git commit -m "Pin install.sh to $tag"
+  git commit -m "Release $tag"
 fi
 
 git push origin master
 
 if [ ! -f omatalk-src.tar.gz ]; then
-  echo "missing omatalk-src.tar.gz after pin" >&2
+  echo "missing omatalk-src.tar.gz after build" >&2
   exit 1
 fi
 if [ ! -f omatalk-src.tar.gz.sha256 ]; then
-  echo "missing omatalk-src.tar.gz.sha256 after pin" >&2
+  echo "missing omatalk-src.tar.gz.sha256 after build" >&2
   exit 1
 fi
 
-# The tarball pin packed is the asset. install.sh/uninstall.sh go up as
-# siblings so the site dispatcher fetches a script already pinned to it.
 gh release create "$tag" --title "$tag" --generate-notes \
   --target "$(git rev-parse HEAD)" \
   omatalk-src.tar.gz omatalk-src.tar.gz.sha256 install.sh uninstall.sh

@@ -2,12 +2,12 @@
 # Omatalk installer: system deps (omarchy-approved), a pinned GitHub
 # release tarball, venv, models, systemd user unit, PATH launcher. The
 # bar plugin is `omarchy plugin add` of PLUGIN_REPO, not files from this
-# tarball. make pin rewrites RELEASE_TAG and TARBALL_SHA256.
+# tarball. make build rewrites RELEASE_TAG and TARBALL_SHA256.
 set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
 RELEASE_TAG="${RELEASE_TAG:-v0.4.2}"
-TARBALL_SHA256="${TARBALL_SHA256:-9546f68384b7e83e9bce31d78dab1455102e348227799390e07fe9da143197ff}"
+TARBALL_SHA256="${TARBALL_SHA256:-9bcbfba3ed357595af8679c157bf65638d45c01c3bc6eba92afb4871c38a2eca}"
 RELEASE_BASE="${RELEASE_BASE:-https://github.com/zerobearing2/omatalk/releases/download/${RELEASE_TAG}}"
 PLUGIN_REPO="${PLUGIN_REPO:-https://github.com/zerobearing2/omarchy-omatalk-plugin.git}"
 MODEL_BASE="${MODEL_BASE:-https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1}"

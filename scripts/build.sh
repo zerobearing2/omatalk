@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Pack this tree into omatalk-src.tar.gz and write RELEASE_TAG +
-# TARBALL_SHA256 into install.sh. Tag is v$(pyproject version).
+# Pack the runtime tarball and write RELEASE_TAG + TARBALL_SHA256 into
+# install.sh. Tag is v$(pyproject version).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -50,4 +50,4 @@ fi
 
 mv "$rewritten" install.sh
 chmod +x install.sh
-printf 'pinned %s %s\n' "$tag" "$digest"
+printf 'built %s %s\n' "$tag" "$digest"

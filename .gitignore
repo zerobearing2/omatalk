@@ -1,4 +1,4 @@
-# Packed release tarball (make pack / make pin)
+# Packed release tarball (make build / make release)
 omatalk-src.tar.gz
 omatalk-src.tar.gz.sha256
 

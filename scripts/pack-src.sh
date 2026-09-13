@@ -15,6 +15,9 @@ tar --sort=name \
   --group=0 \
   --numeric-owner \
   --mode=u=rwX,go=rX \
+  --exclude=__pycache__ \
+  --exclude='*.pyc' \
+  --exclude='*.pyo' \
   --transform=s,^,omatalk/, \
   -cf - \
   daemon \

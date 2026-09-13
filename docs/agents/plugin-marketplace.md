@@ -36,9 +36,8 @@ applies `approved-and-verified`.
 
 ## After listing, each plugin release
 
-`make pin-release` (when Install should ship a newer pinned Daemon) or
-`make plugin-bump` then `git -C plugin push` and `make plugin-release`
-stay as in `AGENTS.md`. Then file a **new** issue — not #4712.
+`make plugin-bump` then `make plugin-release` stay as in `AGENTS.md`.
+Then file a **new** issue — not #4712.
 
 ```sh
 SHA=$(git -C plugin rev-parse HEAD)
@@ -108,8 +107,8 @@ detail page), not current HEAD. A `review-required` result needs
 
 - Keep `zerobearing.omatalk`. Update README and commands in the same change
   if it ever must move, and only before the first listing.
-- Edit `install.sh` in this repository only. `make pin-release` copies it
-  to `plugin/install.sh`. Not for every Daemon release.
+- Edit `install.sh` in this repository only. `make plugin-release` copies
+  it to `plugin/install.sh`. Not for every Daemon release.
 - `omarchy plugin add` / `update` clone mutable HEAD, not the verified SHA.
 - Agent docs stay in this repository. The `plugin/` git tree is the listed
   snapshot.

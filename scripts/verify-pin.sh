@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fail unless install.sh names this tree's version and the tarball this
-# tree packs. Same check locally and in the release workflow.
+# tree packs.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,7 +17,7 @@ tag="${pin%% *}"
 expected="${pin##* }"
 
 if [ "$tag" != "v$version" ]; then
-  echo "install.sh RELEASE_TAG is $tag but pyproject.toml is $version (run make pin)" >&2
+  echo "install.sh RELEASE_TAG is $tag but pyproject.toml is $version (run make build)" >&2
   exit 1
 fi
 
@@ -28,7 +28,7 @@ actual="$(sha256sum "$tmp")"
 actual="${actual%% *}"
 
 if [ "$actual" != "$expected" ]; then
-  echo "install.sh TARBALL_SHA256 is $expected but this tree packs $actual (run make pin)" >&2
+  echo "install.sh TARBALL_SHA256 is $expected but this tree packs $actual (run make build)" >&2
   exit 1
 fi
 

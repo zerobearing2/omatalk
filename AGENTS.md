@@ -11,30 +11,29 @@ After clone or pull: `git submodule update --init`.
 
 ## Release
 
-Daemon: `make bump` (or `make bump VERSION=x.y.z`), then `make release`.
-That runs tests, packs the tarball, writes the pin into `install.sh`,
-commits it, pushes `master`, and `gh release create`s from those local
-files. It will not clobber an existing tag. GitHub Actions only runs
-tests on push.
+Same shape for Daemon and plugin: bump (version file only), then
+release (build, verify, commit, push, `gh release create`). GitHub
+Actions only runs tests on push.
 
-### Bar plugin installer
+```sh
+make bump              # or VERSION=x.y.z make bump
+make release           # Daemon
+
+make plugin-bump
+make plugin-release    # copies root install.sh, tests, tags the plugin
+```
+
+`make build` / `make verify` (and `plugin-build` / `plugin-verify`) are
+the same steps without publishing. Release will not clobber an existing
+tag.
 
 `plugin/install.sh` is a copy of this repo's `install.sh`. Edit the root
 file only. Install in the panel runs that copy and downloads the Daemon
-tarball named in `RELEASE_TAG` / `TARBALL_SHA256`.
-
-Refresh that pin when first-time Install should ship a newer Daemon:
-`make pin-release` (copies `install.sh` into `plugin/`). Commit both
-trees. `make plugin-bump` if this is a plugin version, then
-`git -C plugin push` and `make plugin-release`. Not on every Daemon
-tag. `omatalk upgrade` and the site curl fetch
-`releases/latest/download/install.sh` (self-pinned to that release).
+tarball named in `RELEASE_TAG` / `TARBALL_SHA256`. `omatalk upgrade` and
+the site curl fetch `releases/latest/download/install.sh` (self-pinned
+to that release).
 
 Marketplace listing after a plugin SHA change:
-`docs/agents/plugin-marketplace.md`.
-
-Plugin QML-only releases: `make plugin-bump`, `git -C plugin push`,
-`make plugin-release`. Marketplace listing after that:
 `docs/agents/plugin-marketplace.md`.
 
 ## Agent skills
