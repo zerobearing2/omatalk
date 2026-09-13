@@ -30,10 +30,14 @@ set -e
 rm -f "$UNIT"
 systemctl --user daemon-reload
 if pgrep -f "[o]matalk.daemon" >/dev/null 2>&1; then
+  set +e
   pkill -f "[o]matalk.daemon"
+  set -e
 fi
 if pgrep -f "[d]aemon.omatalkd" >/dev/null 2>&1; then
+  set +e
   pkill -f "[d]aemon.omatalkd"
+  set -e
 fi
 rm -rf "${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk"
 rm -f "$HOME/.local/bin/omatalk" "$HOME/.local/bin/omatalkd"

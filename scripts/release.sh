@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 if [ "$(git rev-parse --abbrev-ref HEAD)" != master ]; then
-  echo "need master" >&2
+  echo "need master; git switch master" >&2
   exit 1
 fi
 

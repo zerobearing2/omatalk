@@ -7,7 +7,7 @@ set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
 RELEASE_TAG="${RELEASE_TAG:-v0.5.0}"
-TARBALL_SHA256="${TARBALL_SHA256:-af786dd98f4a1282e70a4bfea1edfa15e7c248ffa3ba2b75a71cf9a706ff7fc2}"
+TARBALL_SHA256="${TARBALL_SHA256:-1b1c82f6535926c58d35efcaeb2c9b24ccb18036e93ebbcafed7da50b1dca8c0}"
 RELEASE_BASE="${RELEASE_BASE:-https://github.com/zerobearing2/omatalk/releases/download/${RELEASE_TAG}}"
 PLUGIN_REPO="${PLUGIN_REPO:-https://github.com/zerobearing2/omarchy-omatalk-plugin.git}"
 MODEL_BASE="${MODEL_BASE:-https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1}"

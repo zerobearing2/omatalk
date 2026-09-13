@@ -6,6 +6,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+pack_only=0
+if [ "${1:-}" = "--pack-only" ]; then
+  pack_only=1
+fi
+
 version="$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml)"
 if [ -z "$version" ]; then
   echo "could not read version from pyproject.toml" >&2
@@ -36,6 +41,11 @@ tar --sort=name \
 sha256sum omatalk-src.tar.gz > omatalk-src.tar.gz.sha256
 digest="$(sha256sum omatalk-src.tar.gz)"
 digest="${digest%% *}"
+
+if [ "$pack_only" -eq 1 ]; then
+  printf 'packed %s %s\n' "$tag" "$digest"
+  exit 0
+fi
 
 rewritten="$(mktemp)"
 trap 'rm -f "$rewritten"' EXIT

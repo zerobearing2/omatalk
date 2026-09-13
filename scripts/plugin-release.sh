@@ -17,7 +17,7 @@ if [ "$(git -C "$plugin" rev-parse --show-toplevel)" != "$plugin" ]; then
 fi
 
 if [ "$(git -C "$plugin" rev-parse --abbrev-ref HEAD)" != master ]; then
-  echo "plugin needs master" >&2
+  echo "plugin needs master; git -C plugin switch master" >&2
   exit 1
 fi
 
@@ -69,6 +69,26 @@ fi
 
 scripts/plugin-build.sh
 scripts/plugin-verify.sh
+
+daemon_tag=""
+while IFS= read -r line; do
+  case "$line" in
+    RELEASE_TAG=*)
+      daemon_tag="${line#*:-}"
+      daemon_tag="${daemon_tag%\"}"
+      daemon_tag="${daemon_tag%\}}"
+      ;;
+  esac
+done < "$plugin/install.sh"
+
+if [ -z "$daemon_tag" ]; then
+  echo "could not read RELEASE_TAG from plugin/install.sh" >&2
+  exit 1
+fi
+if ! gh release view "$daemon_tag" --repo zerobearing2/omatalk >/dev/null; then
+  echo "Daemon release $daemon_tag is missing — make release first" >&2
+  exit 1
+fi
 
 git -C "$plugin" add manifest.json install.sh
 if git -C "$plugin" diff --cached --quiet; then

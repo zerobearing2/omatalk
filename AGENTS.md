@@ -18,10 +18,11 @@ GitHub Actions only runs tests on push.
 
 ```sh
 make bump                 # pyproject.toml only; VERSION=x.y.z to set it
-make release              # build, verify, commit, push, gh
+make release              # master only; build, verify, commit, push, gh
 
 make plugin-bump          # plugin/manifest.json only
-make plugin-release       # copy install.sh, verify, commit, push, gh
+make plugin-release       # plugin/ on master (git -C plugin switch master);
+                          # Daemon RELEASE_TAG must already exist on GitHub
 ```
 
 Build and verify live in `scripts/` and run from release. Do not add
