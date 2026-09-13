@@ -24,10 +24,11 @@ file only. Install in the panel runs that copy and downloads the Daemon
 tarball named in `RELEASE_TAG` / `TARBALL_SHA256`.
 
 Refresh that pin when first-time Install should ship a newer Daemon:
-`make pin-release`, commit `install.sh` here, `git -C plugin push`,
-`make plugin-release`. Not on every Daemon tag. `omatalk upgrade` and
-the site curl fetch `releases/latest/download/install.sh` (self-pinned
-to that release).
+`make pin-release` (copies `install.sh` into `plugin/`). Commit both
+trees. `make plugin-bump` if this is a plugin version, then
+`git -C plugin push` and `make plugin-release`. Not on every Daemon
+tag. `omatalk upgrade` and the site curl fetch
+`releases/latest/download/install.sh` (self-pinned to that release).
 
 Marketplace listing after a plugin SHA change:
 `docs/agents/plugin-marketplace.md`.

@@ -9,7 +9,7 @@ PLUGIN_GH := zerobearing2/omarchy-omatalk-plugin
 	pack pin verify-pin pin-release \
 	plugin-ready plugin-on-master \
 	plugin-test plugin-validate plugin-dev-reload \
-	plugin-vendor plugin-set-version plugin-bump plugin-release
+	plugin-set-version plugin-bump plugin-release
 
 test:
 	uv run --group dev pytest tests/
@@ -48,10 +48,10 @@ pin:
 verify-pin:
 	scripts/verify-pin.sh
 
-# Copy the pinned installer into the plugin and bump it. Daemon releases
-# do not do this; run it when Install should ship a newer first-time Daemon.
-pin-release: pin plugin-vendor
-	@echo "Pinned and vendored. Commit install.sh here, git -C plugin push, then make plugin-release."
+# Copy root install.sh into the plugin. Daemon releases do not do this.
+pin-release: pin plugin-ready
+	cp -f install.sh $(PLUGIN)/install.sh
+	@echo "Copied install.sh to plugin/. Commit both trees when you want Install to ship this pin."
 
 plugin-ready:
 	@test -e $(PLUGIN)/.git -a -f $(PLUGIN)/Panel.qml || { echo "git submodule update --init" >&2; exit 1; }
@@ -92,17 +92,6 @@ plugin-dev-reload: plugin-ready
 		"$(abspath $(PLUGIN))/" "$(PLUGIN_DIR)/"
 	omarchy restart shell
 	omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1 || true
-
-# Copy this repo's install.sh into plugin/ and bump the plugin. Root file
-# is the original; do not edit plugin/install.sh by hand.
-plugin-vendor: plugin-on-master
-	@cp -f install.sh $(PLUGIN)/install.sh
-	$(MAKE) plugin-set-version
-	$(MAKE) plugin-test
-	@new=$$(sed -n 's/^  "version": "\(.*\)",$$/\1/p' $(PLUGIN)/manifest.json); \
-	git -C $(PLUGIN) add install.sh manifest.json; \
-	git -C $(PLUGIN) commit -m "Vendor install.sh and bump to $$new"; \
-	echo "Committed plugin $$new"
 
 plugin-set-version:
 	@current=$$(sed -n 's/^  "version": "\(.*\)",$$/\1/p' $(PLUGIN)/manifest.json); \
