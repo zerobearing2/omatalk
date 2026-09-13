@@ -35,9 +35,9 @@ applies `approved-and-verified`.
 
 ## After listing, each plugin release
 
-`make plugin-bump` / `make plugin-pin-release`, `git -C plugin push`, and
-`make plugin-release` stay as in `AGENTS.md`. Then file a **new** issue —
-not #4712.
+`make release` (when `install.sh` changed) or `make plugin-bump` then
+`git -C plugin push` and `make plugin-release` stay as in `AGENTS.md`.
+Then file a **new** issue — not #4712.
 
 ```sh
 SHA=$(git -C plugin rev-parse HEAD)

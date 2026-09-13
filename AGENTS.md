@@ -19,10 +19,10 @@ the Makefile's comments for the full mechanics.
 `plugin/Panel.qml` pins this repo's `install.sh` (commit URL + SHA-256 of
 the local file). That freezes the installer script, not the Daemon tarball.
 
-`make release` from pushed `master` re-pins the plugin (on `plugin` master)
-only when HEAD's `install.sh` hash no longer matches the pin, then cuts the
-Daemon release. Then `git -C plugin push`, `make plugin-release`, and record
-the submodule SHA (`git add plugin && git commit`).
+`make release` from pushed `master` re-pins, pushes, and releases the
+plugin when HEAD's `install.sh` hash no longer matches the pin, then cuts
+the Daemon release. Marketplace listing after a plugin SHA change:
+`docs/agents/plugin-marketplace.md`.
 
 Plugin QML-only releases: `make plugin-bump`, `git -C plugin push`,
 `make plugin-release`. Marketplace listing after that:

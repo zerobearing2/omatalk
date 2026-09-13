@@ -50,11 +50,16 @@ plugin-on-master: plugin-ready
 	@test -z "$$(git -C $(PLUGIN) status --porcelain)" || { echo "plugin/ working tree must be clean" >&2; exit 1; }
 	@git -C $(PLUGIN) switch --quiet master
 
-# Re-pin plugin if install.sh changed, then cut the Daemon release from origin/master.
+# Re-pin plugin if install.sh changed (commit, push, plugin GH release),
+# then cut the Daemon release from origin/master.
 release: plugin-ready on-pushed-master
 	@hash=$$(git show HEAD:install.sh | sha256sum | awk '{print $$1}'); \
 	pinned=$$(sed -n 's/^  readonly property string installerSha256: "\(.*\)"$$/\1/p' $(PLUGIN)/Panel.qml); \
-	if [ "$$hash" != "$$pinned" ]; then $(MAKE) plugin-pin-release; fi
+	if [ "$$hash" != "$$pinned" ]; then \
+		$(MAKE) plugin-pin-release; \
+		git -C $(PLUGIN) push origin master; \
+		$(MAKE) plugin-release; \
+	fi
 	gh workflow run release.yml --ref master
 	@echo "Triggered. Watch with: gh run watch \$$(gh run list --workflow=release.yml -L1 --json databaseId -q '.[0].databaseId')"
 
@@ -106,7 +111,7 @@ plugin-pin-release: plugin-on-master
 	commit=$$(sed -n 's/^  readonly property string installerUrl: "https:\/\/raw.githubusercontent.com\/zerobearing2\/omatalk\/\([0-9a-f]\{40\}\)\/install.sh"$$/\1/p' $(PLUGIN)/Panel.qml); \
 	git -C $(PLUGIN) add Panel.qml manifest.json; \
 	git -C $(PLUGIN) commit -m "Pin omatalk installer $$commit and bump to $$new"; \
-	echo "Committed $$new (pin $$commit). git -C plugin push, then make plugin-release."
+	echo "Committed $$new (pin $$commit)"
 
 plugin-set-version:
 	@current=$$(sed -n 's/^  "version": "\(.*\)",$$/\1/p' $(PLUGIN)/manifest.json); \
