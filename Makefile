@@ -4,8 +4,6 @@ REPO := $(CURDIR)
 PLUGIN ?= plugin
 PLUGIN_DIR ?= $(HOME)/.config/omarchy/plugins/zerobearing.omatalk
 PLUGIN_GH ?= zerobearing2/omarchy-omatalk-plugin
-# omatalk tag (vX.Y.Z) or 40-char commit for plugin-pin. Empty = latest GitHub release.
-REF ?=
 
 .PHONY: test lint format clean dev-install dev-restart dev-uninstall bump release \
 	plugin-test plugin-validate plugin-dev-reload plugin-pin plugin-pin-release \
@@ -48,11 +46,24 @@ bump:
 
 # Trigger the Release workflow (manual-only, see .github/workflows/release.yml).
 # It releases whatever version is already committed in pyproject.toml on the
-# remote's default branch, so `make bump` (and push) first.
+# remote's default branch, so `make bump` (and push) first. If local
+# install.sh no longer matches the plugin pin, rewrites plugin/Panel.qml
+# to this HEAD and bumps the plugin (push plugin yourself).
 release:
+	@if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse @{u})" ]; then \
+		echo "push first: release and pin use the remote commit" >&2; \
+		exit 1; \
+	fi
 	gh workflow run release.yml
 	@echo "Triggered. Watch with: gh run watch \$$(gh run list --workflow=release.yml -L1 --json databaseId -q '.[0].databaseId')"
-	@echo "After it lands: check whether the bar plugin needs re-pinning (see AGENTS.md 'Release')"
+	@hash=$$(sha256sum install.sh | awk '{print $$1}'); \
+	pinned=$$(sed -n 's/^  readonly property string installerSha256: "\(.*\)"$$/\1/p' $(PLUGIN)/Panel.qml); \
+	if [ "$$hash" = "$$pinned" ]; then \
+		echo "plugin pin current"; \
+	else \
+		echo "install.sh changed — pinning plugin to $$(git rev-parse HEAD)"; \
+		$(MAKE) plugin-pin-release; \
+	fi
 
 # Point the installed Daemon at this checkout instead of the last released
 # tarball. Keeps the existing venv/models — swaps in an editable package
@@ -91,15 +102,35 @@ plugin-dev-reload:
 	omarchy restart shell
 	omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1 || true
 
+# Point plugin/Panel.qml at this repo's HEAD + sha256 of local install.sh.
+# No-op when the hash already matches. HEAD must be on the remote.
 plugin-pin:
-	./scripts/pin-installer.sh "$(REF)"
+	@if ! git diff --quiet -- install.sh; then echo "commit install.sh first" >&2; exit 1; fi
+	@hash=$$(sha256sum install.sh | awk '{print $$1}'); \
+	pinned=$$(sed -n 's/^  readonly property string installerSha256: "\(.*\)"$$/\1/p' $(PLUGIN)/Panel.qml); \
+	if [ "$$hash" = "$$pinned" ]; then echo "plugin pin current"; exit 0; fi
+	@if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse @{u})" ]; then \
+		echo "push HEAD before pinning (raw.githubusercontent.com must serve this commit)" >&2; \
+		exit 1; \
+	fi
+	@commit=$$(git rev-parse HEAD); \
+	hash=$$(sha256sum install.sh | awk '{print $$1}'); \
+	url="https://raw.githubusercontent.com/zerobearing2/omatalk/$$commit/install.sh"; \
+	panel="$(PLUGIN)/Panel.qml"; \
+	sed -i \
+		-e "s|^  readonly property string installerUrl: \".*\"$$|  readonly property string installerUrl: \"$$url\"|" \
+		-e "s|^  readonly property string installerSha256: \".*\"$$|  readonly property string installerSha256: \"$$hash\"|" \
+		"$$panel"; \
+	echo "Pinned $$commit"; \
+	echo "  $$url"; \
+	echo "  $$hash"
 
 # Pin install.sh, bump plugin version, one commit in plugin/. Working tree
 # must be clean. Does not push — git -C plugin push, then plugin-release.
 plugin-pin-release:
 	@if [ -n "$$(git -C $(PLUGIN) status --porcelain)" ]; then echo "plugin/ working tree must be clean" >&2; exit 1; fi
-	./scripts/pin-installer.sh "$(REF)"
-	@if git -C $(PLUGIN) diff --quiet -- Panel.qml; then echo "installer pin already current" >&2; exit 1; fi
+	$(MAKE) plugin-pin
+	@if git -C $(PLUGIN) diff --quiet -- Panel.qml; then echo "installer pin already current"; exit 0; fi
 	$(MAKE) plugin-bump-manifest
 	$(MAKE) plugin-test
 	@new=$$(sed -n 's/^  "version": "\(.*\)",$$/\1/p' $(PLUGIN)/manifest.json); \

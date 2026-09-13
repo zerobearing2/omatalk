@@ -13,25 +13,14 @@ Commit QML in `plugin/`. Agent docs stay here. Start Grok at this root.
 `make bump` (or `make bump VERSION=x.y.z`), push, then `make release` — see
 the Makefile's comments for the full mechanics.
 
-### Re-pin the bar plugin — only when install.sh actually changed
+### Bar plugin pin
 
-`plugin/Panel.qml` pins `install.sh` to an exact commit + SHA-256. That pin
-freezes the installer script, not the Daemon version: `install.sh` already
-fetches the latest release at install time, so most Daemon releases need no
-plugin action.
+`plugin/Panel.qml` pins this repo's `install.sh` (commit URL + SHA-256 of
+the local file). That freezes the installer script, not the Daemon tarball.
 
-After releasing, check whether `install.sh` changed since the plugin's
-current pin:
-
-```sh
-pinned=$(grep -oP '(?<=omatalk/)[0-9a-f]{40}(?=/install\.sh)' plugin/Panel.qml)
-git diff --quiet "$pinned" HEAD -- install.sh \
-  && echo "no re-pin needed" \
-  || echo "install.sh changed — make plugin-pin-release"
-```
-
-If it changed: `make plugin-pin-release`, `git -C plugin push`, then
-`make plugin-release`. Then record the new submodule SHA here
+`make release` (after push) re-pins the plugin only when `install.sh`'s
+hash no longer matches the pin. Then `git -C plugin push`,
+`make plugin-release`, and record the submodule SHA
 (`git add plugin && git commit`).
 
 Plugin QML-only releases: `make plugin-bump`, `git -C plugin push`,

@@ -108,8 +108,8 @@ detail page), not current HEAD. A `review-required` result needs
 - Keep `zerobearing.omatalk`. Update README and commands in the same change
   if it ever must move, and only before the first listing.
 - Keep `install.sh` in this repository, not in `plugin/`.
-- Re-pin when `install.sh` itself changes (`make plugin-pin-release`), not
-  for every Daemon tarball.
+- Re-pin when `install.sh` itself changes (`make release` does this after
+  the Daemon push). Not for every Daemon tarball.
 - `omarchy plugin add` / `update` clone mutable HEAD, not the verified SHA.
 - Agent docs stay in this repository. The `plugin/` git tree is the listed
   snapshot.
