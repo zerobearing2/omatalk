@@ -11,27 +11,30 @@ After clone or pull: `git submodule update --init`.
 
 ## Release
 
-Same shape for Daemon and plugin: bump (version file only), then
-release (build, verify, commit, push, `gh release create`). GitHub
-Actions only runs tests on push.
+Daemon scripts have no prefix; `plugin-*` is plugin-only. Bump edits the
+version file and does not commit. Release does build, verify, commit,
+push, and `gh release create`. It will not clobber an existing tag.
+GitHub Actions only runs tests on push.
 
 ```sh
-make bump              # or VERSION=x.y.z make bump
-make release           # Daemon
+make bump                 # pyproject.toml only; VERSION=x.y.z to set it
+make build                # pack tarball, write pin into install.sh
+make verify               # pytest + pin check
+make release              # build + verify + commit + push + gh
 
-make plugin-bump
-make plugin-release    # copies root install.sh, tests, tags the plugin
+make plugin-bump          # plugin/manifest.json only
+make plugin-build         # copy root install.sh into plugin/
+make plugin-verify        # QML tests
+make plugin-release       # build + verify + commit + push + gh
 ```
 
-`make build` / `make verify` (and `plugin-build` / `plugin-verify`) are
-the same steps without publishing. Release will not clobber an existing
-tag.
+`make release` / `make plugin-release` run the build and verify steps.
+You can run those two on their own to inspect without publishing.
 
 `plugin/install.sh` is a copy of this repo's `install.sh`. Edit the root
-file only. Install in the panel runs that copy and downloads the Daemon
-tarball named in `RELEASE_TAG` / `TARBALL_SHA256`. `omatalk upgrade` and
-the site curl fetch `releases/latest/download/install.sh` (self-pinned
-to that release).
+file only. Install in the panel downloads the Daemon tarball named in
+`RELEASE_TAG` / `TARBALL_SHA256`. `omatalk upgrade` and the site curl
+fetch `releases/latest/download/install.sh` (self-pinned to that release).
 
 Marketplace listing after a plugin SHA change:
 `docs/agents/plugin-marketplace.md`.

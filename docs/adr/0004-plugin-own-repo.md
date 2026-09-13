@@ -18,4 +18,4 @@ submodule. The tarball still does not include QML. The plugin ships a
 copy of this repo's `install.sh` for the panel Install button. That
 script downloads a pinned Daemon release tarball (`RELEASE_TAG` and
 `TARBALL_SHA256`). `make plugin-release` copies that script into
-`plugin/`; `make release` does not.
+`plugin/` as its build step; `make release` (Daemon) does not.

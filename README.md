@@ -93,9 +93,10 @@ script, not fetched beside the file), then:
    installer never edits your keybindings itself.
 
 Releases are cut with `make bump` then `make release` on `master`, so
-several PRs can land before anyone ships. That builds the tarball, verifies
-it, commits the pin, and publishes the GitHub release from those files.
-The plugin is the same shape: `make plugin-bump` then `make plugin-release`.
+several PRs can land before anyone ships. Bump only edits the version
+file. Release builds the tarball, verifies it, commits, pushes, and
+publishes the GitHub release from those files. The plugin is the same
+shape: `make plugin-bump` then `make plugin-release`.
 The plugin's Install button keeps the Daemon pin from that plugin commit.
 After the first run, `omatalk upgrade` fetches and runs the installer that
 shipped with the latest GitHub release.
