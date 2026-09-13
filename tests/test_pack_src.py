@@ -1,37 +1,28 @@
 import hashlib
-import os
 import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def pack_to(path):
-    subprocess.run(
-        ["bash", str(ROOT / "scripts/pack-src.sh"), str(path)],
-        cwd=ROOT,
-        check=True,
-    )
-
-
-def test_pack_is_byte_identical_across_runs(tmp_path):
-    first = tmp_path / "a.tar.gz"
-    second = tmp_path / "b.tar.gz"
-    pack_to(first)
-    pack_to(second)
-    assert first.read_bytes() == second.read_bytes()
-    digest = hashlib.sha256(first.read_bytes()).hexdigest()
-    assert len(digest) == 64
+def test_build_is_byte_identical_across_runs(tmp_path):
+    subprocess.run(["bash", str(ROOT / "scripts/build.sh")], cwd=ROOT, check=True)
+    first = (ROOT / "omatalk-src.tar.gz").read_bytes()
+    subprocess.run(["bash", str(ROOT / "scripts/build.sh")], cwd=ROOT, check=True)
+    second = (ROOT / "omatalk-src.tar.gz").read_bytes()
+    assert first == second
+    assert len(hashlib.sha256(first).hexdigest()) == 64
 
 
 def test_committed_pin_matches_this_tree():
-    env = {**os.environ}
     result = subprocess.run(
-        ["bash", str(ROOT / "scripts/verify-pin.sh")],
+        ["bash", str(ROOT / "scripts/build.sh")],
         cwd=ROOT,
-        env=env,
         capture_output=True,
         text=True,
+        check=True,
     )
-    assert result.returncode == 0, result.stderr + result.stdout
-    assert result.stdout.startswith("pin ok:")
+    digest = hashlib.sha256((ROOT / "omatalk-src.tar.gz").read_bytes()).hexdigest()
+    assert digest in result.stdout
+    install = (ROOT / "install.sh").read_text()
+    assert f'TARBALL_SHA256="${{TARBALL_SHA256:-{digest}}}"' in install

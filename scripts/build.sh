@@ -13,7 +13,26 @@ if [ -z "$version" ]; then
 fi
 tag="v$version"
 
-scripts/pack-src.sh omatalk-src.tar.gz
+# Reproducible: bytes depend only on the listed paths. install.sh is not
+# in this archive; it is a sibling GitHub release asset.
+tar --sort=name \
+  --mtime=@0 \
+  --owner=0 \
+  --group=0 \
+  --numeric-owner \
+  --mode=u=rwX,go=rX \
+  --exclude=__pycache__ \
+  --exclude='*.pyc' \
+  --exclude='*.pyo' \
+  --transform=s,^,omatalk/, \
+  -cf - \
+  daemon \
+  systemd \
+  pyproject.toml \
+  README.md \
+  uninstall.sh \
+  | gzip -n > omatalk-src.tar.gz
+
 sha256sum omatalk-src.tar.gz > omatalk-src.tar.gz.sha256
 digest="$(sha256sum omatalk-src.tar.gz)"
 digest="${digest%% *}"
