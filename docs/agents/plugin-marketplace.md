@@ -24,9 +24,9 @@ validation comment, edit that issue (same six headings, all five checkboxes
 checked). Editing retriggers detection. A comment does not.
 
 Keep tags as `bar, media, quickshell`, category `Productivity`, and
-`manual-setup` as a stated fact in Maintainer notes. Install still fetches
-the pinned `install.sh` (URL + SHA-256 in `plugin/Panel.qml`); the script
-still installs the current GitHub release tarball.
+`manual-setup` as a stated fact in Maintainer notes. Install runs the
+`install.sh` shipped in the plugin checkout (a copy of this repo's
+script). That script still installs the current GitHub release tarball.
 
 Done when the bot validation comment names current `plugin/` HEAD, the
 baseline is `passed` (or `review-required` with `installer` only), and
@@ -35,9 +35,9 @@ applies `approved-and-verified`.
 
 ## After listing, each plugin release
 
-`make release` (when `install.sh` changed) or `make plugin-bump` then
-`git -C plugin push` and `make plugin-release` stay as in `AGENTS.md`.
-Then file a **new** issue — not #4712.
+`make release` (when root `install.sh` differs from the plugin copy) or
+`make plugin-bump` then `git -C plugin push` and `make plugin-release`
+stay as in `AGENTS.md`. Then file a **new** issue — not #4712.
 
 ```sh
 SHA=$(git -C plugin rev-parse HEAD)
@@ -107,9 +107,8 @@ detail page), not current HEAD. A `review-required` result needs
 
 - Keep `zerobearing.omatalk`. Update README and commands in the same change
   if it ever must move, and only before the first listing.
-- Keep `install.sh` in this repository, not in `plugin/`.
-- Re-pin when `install.sh` itself changes (`make release` does this after
-  the Daemon push). Not for every Daemon tarball.
+- Edit `install.sh` in this repository only. `make release` copies it to
+  `plugin/install.sh` when they differ. Not for every Daemon tarball.
 - `omarchy plugin add` / `update` clone mutable HEAD, not the verified SHA.
 - Agent docs stay in this repository. The `plugin/` git tree is the listed
   snapshot.

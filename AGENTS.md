@@ -14,14 +14,14 @@ After clone or pull: `git submodule update --init`.
 `make bump` (or `make bump VERSION=x.y.z`), push, then `make release` — see
 the Makefile's comments for the full mechanics.
 
-### Bar plugin pin
+### Bar plugin installer
 
-`plugin/Panel.qml` pins this repo's `install.sh` (commit URL + SHA-256 of
-the local file). That freezes the installer script, not the Daemon tarball.
+`plugin/install.sh` is a copy of this repo's `install.sh`. Edit the root
+file only. Install in the panel runs that copy.
 
-`make release` from pushed `master` re-pins, pushes, and releases the
-plugin when HEAD's `install.sh` hash no longer matches the pin, then cuts
-the Daemon release. Marketplace listing after a plugin SHA change:
+`make release` from pushed `master` copies, bumps, pushes, and releases
+the plugin when the files differ, then cuts the Daemon release.
+Marketplace listing after a plugin SHA change:
 `docs/agents/plugin-marketplace.md`.
 
 Plugin QML-only releases: `make plugin-bump`, `git -C plugin push`,

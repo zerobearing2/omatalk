@@ -8,7 +8,7 @@ PLUGIN_GH := zerobearing2/omarchy-omatalk-plugin
 	dev-install dev-restart dev-uninstall \
 	on-pushed-master plugin-ready plugin-on-master \
 	plugin-test plugin-validate plugin-dev-reload \
-	plugin-pin plugin-pin-release plugin-set-version plugin-bump plugin-release
+	plugin-vendor plugin-set-version plugin-bump plugin-release
 
 test:
 	uv run --group dev pytest tests/
@@ -50,13 +50,11 @@ plugin-on-master: plugin-ready
 	@test -z "$$(git -C $(PLUGIN) status --porcelain)" || { echo "plugin/ working tree must be clean" >&2; exit 1; }
 	@git -C $(PLUGIN) switch --quiet master
 
-# Re-pin plugin if install.sh changed (commit, push, plugin GH release),
-# then cut the Daemon release from origin/master.
+# If root install.sh differs from the plugin copy, vendor it, push, and
+# cut a plugin release. Then cut the Daemon release from origin/master.
 release: plugin-ready on-pushed-master
-	@hash=$$(git show HEAD:install.sh | sha256sum | awk '{print $$1}'); \
-	pinned=$$(sed -n 's/^  readonly property string installerSha256: "\(.*\)"$$/\1/p' $(PLUGIN)/Panel.qml); \
-	if [ "$$hash" != "$$pinned" ]; then \
-		$(MAKE) plugin-pin-release; \
+	@if ! cmp -s install.sh $(PLUGIN)/install.sh; then \
+		$(MAKE) plugin-vendor; \
 		git -C $(PLUGIN) push origin master; \
 		$(MAKE) plugin-release; \
 	fi
@@ -90,28 +88,16 @@ plugin-dev-reload: plugin-ready
 	omarchy restart shell
 	omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1 || true
 
-plugin-pin: plugin-ready on-pushed-master
-	@hash=$$(git show HEAD:install.sh | sha256sum | awk '{print $$1}'); \
-	pinned=$$(sed -n 's/^  readonly property string installerSha256: "\(.*\)"$$/\1/p' $(PLUGIN)/Panel.qml); \
-	if [ "$$hash" = "$$pinned" ]; then echo "plugin pin current"; exit 0; fi; \
-	commit=$$(git rev-parse HEAD); \
-	url="https://raw.githubusercontent.com/zerobearing2/omatalk/$$commit/install.sh"; \
-	sed -i \
-		-e "s|^  readonly property string installerUrl: \".*\"$$|  readonly property string installerUrl: \"$$url\"|" \
-		-e "s|^  readonly property string installerSha256: \".*\"$$|  readonly property string installerSha256: \"$$hash\"|" \
-		$(PLUGIN)/Panel.qml; \
-	echo "Pinned $$commit $$hash"
-
-plugin-pin-release: plugin-on-master
-	$(MAKE) plugin-pin
-	@git -C $(PLUGIN) diff --quiet -- Panel.qml && { echo "installer pin already current"; exit 1; }
+# Copy this repo's install.sh into plugin/ and bump the plugin. Root file
+# is the original; do not edit plugin/install.sh by hand.
+plugin-vendor: plugin-on-master
+	@cp -f install.sh $(PLUGIN)/install.sh
 	$(MAKE) plugin-set-version
 	$(MAKE) plugin-test
 	@new=$$(sed -n 's/^  "version": "\(.*\)",$$/\1/p' $(PLUGIN)/manifest.json); \
-	commit=$$(sed -n 's/^  readonly property string installerUrl: "https:\/\/raw.githubusercontent.com\/zerobearing2\/omatalk\/\([0-9a-f]\{40\}\)\/install.sh"$$/\1/p' $(PLUGIN)/Panel.qml); \
-	git -C $(PLUGIN) add Panel.qml manifest.json; \
-	git -C $(PLUGIN) commit -m "Pin omatalk installer $$commit and bump to $$new"; \
-	echo "Committed $$new (pin $$commit)"
+	git -C $(PLUGIN) add install.sh manifest.json; \
+	git -C $(PLUGIN) commit -m "Vendor install.sh and bump to $$new"; \
+	echo "Committed plugin $$new"
 
 plugin-set-version:
 	@current=$$(sed -n 's/^  "version": "\(.*\)",$$/\1/p' $(PLUGIN)/manifest.json); \

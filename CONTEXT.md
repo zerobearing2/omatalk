@@ -69,8 +69,8 @@ tarball. See `docs/adr/0004-plugin-own-repo.md`. Installed means
 
 ## Panel states
 
-- Not installed: setup (Install fetches a pinned `install.sh` from this
-  repository, verifies SHA-256, and runs it in Omarchy's floating terminal).
+- Not installed: setup (Install runs the `install.sh` shipped in the
+  plugin checkout, in Omarchy's floating terminal).
   Plugin version from `plugin/manifest.json`. No `omatalk config` /
   `version` / preview `speak`.
 - Installed: voice, speed, plugin version, Daemon version (`omatalk version`).
