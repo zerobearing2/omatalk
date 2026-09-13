@@ -65,6 +65,10 @@ Run with uv (creates the dev env on demand):
 uv run --group dev pytest tests/
 ```
 
+### Shell scripts
+
+Writing or editing a bash/shell script: follow `CODE_STYLE.md`.
+
 ### Lint & format
 
 Required before opening a PR:

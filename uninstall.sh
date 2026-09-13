@@ -7,27 +7,43 @@ set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
 UNIT="$HOME/.config/systemd/user/omatalk.service"
+PLUGIN_DIR="$HOME/.config/omarchy/plugins/zerobearing.omatalk"
 
-msg() { printf '\033[1;32m==>\033[0m %s\n' "$1"; }
-warn() { printf '\033[1;33m==>\033[0m %s\n' "$1"; }
+msg() {
+  printf '\033[1;32m==>\033[0m %s\n' "$1"
+}
+
+warn() {
+  printf '\033[1;33m==>\033[0m %s\n' "$1"
+}
 
 # Prompts read the terminal when piped via curl | bash; fall back to stdin
 # for scripted runs where /dev/tty is unavailable.
 ASK_FROM=/dev/tty
-{ : < /dev/tty; } 2>/dev/null || ASK_FROM=/dev/stdin
+if ! { : < /dev/tty; } 2>/dev/null; then
+  ASK_FROM=/dev/stdin
+fi
 
-systemctl --user disable --now omatalk.service 2>/dev/null || true
+set +e
+systemctl --user disable --now omatalk.service 2>/dev/null
+set -e
 rm -f "$UNIT"
 systemctl --user daemon-reload
-pkill -f "[o]matalk.daemon" 2>/dev/null || true
-pkill -f "[d]aemon.omatalkd" 2>/dev/null || true
+if pgrep -f "[o]matalk.daemon" >/dev/null 2>&1; then
+  pkill -f "[o]matalk.daemon"
+fi
+if pgrep -f "[d]aemon.omatalkd" >/dev/null 2>&1; then
+  pkill -f "[d]aemon.omatalkd"
+fi
 rm -rf "${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk"
 rm -f "$HOME/.local/bin/omatalk" "$HOME/.local/bin/omatalkd"
-if command -v omarchy >/dev/null 2>&1 && [ -d "$HOME/.config/omarchy/plugins/zerobearing.omatalk" ]; then
-  omarchy plugin remove zerobearing.omatalk --yes >/dev/null 2>&1
-  rm -rf "$HOME/.config/omarchy/plugins"/.zerobearing.omatalk.bak.*
+if command -v omarchy >/dev/null 2>&1; then
+  if [ -d "$PLUGIN_DIR" ]; then
+    omarchy plugin remove zerobearing.omatalk --yes >/dev/null 2>&1
+    rm -rf "$HOME/.config/omarchy/plugins"/.zerobearing.omatalk.bak.*
+  fi
 fi
-rm -rf "$HOME/.config/omarchy/plugins/zerobearing.omatalk"
+rm -rf "$PLUGIN_DIR"
 msg "Daemon stopped and removed; stray Daemons killed; launcher and bar plugin removed"
 
 if [ -d "$OMATALK_HOME" ]; then
