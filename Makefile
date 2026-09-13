@@ -105,16 +105,15 @@ plugin-dev-reload:
 # Point plugin/Panel.qml at this repo's HEAD + sha256 of local install.sh.
 # No-op when the hash already matches. HEAD must be on the remote.
 plugin-pin:
-	@if ! git diff --quiet -- install.sh; then echo "commit install.sh first" >&2; exit 1; fi
-	@hash=$$(sha256sum install.sh | awk '{print $$1}'); \
+	@if ! git diff --quiet -- install.sh; then echo "commit install.sh first" >&2; exit 1; fi; \
+	hash=$$(sha256sum install.sh | awk '{print $$1}'); \
 	pinned=$$(sed -n 's/^  readonly property string installerSha256: "\(.*\)"$$/\1/p' $(PLUGIN)/Panel.qml); \
-	if [ "$$hash" = "$$pinned" ]; then echo "plugin pin current"; exit 0; fi
-	@if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse @{u})" ]; then \
+	if [ "$$hash" = "$$pinned" ]; then echo "plugin pin current"; exit 0; fi; \
+	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse @{u})" ]; then \
 		echo "push HEAD before pinning (raw.githubusercontent.com must serve this commit)" >&2; \
 		exit 1; \
-	fi
-	@commit=$$(git rev-parse HEAD); \
-	hash=$$(sha256sum install.sh | awk '{print $$1}'); \
+	fi; \
+	commit=$$(git rev-parse HEAD); \
 	url="https://raw.githubusercontent.com/zerobearing2/omatalk/$$commit/install.sh"; \
 	panel="$(PLUGIN)/Panel.qml"; \
 	sed -i \
@@ -130,7 +129,7 @@ plugin-pin:
 plugin-pin-release:
 	@if [ -n "$$(git -C $(PLUGIN) status --porcelain)" ]; then echo "plugin/ working tree must be clean" >&2; exit 1; fi
 	$(MAKE) plugin-pin
-	@if git -C $(PLUGIN) diff --quiet -- Panel.qml; then echo "installer pin already current"; exit 0; fi
+	@if git -C $(PLUGIN) diff --quiet -- Panel.qml; then echo "installer pin already current"; exit 1; fi
 	$(MAKE) plugin-bump-manifest
 	$(MAKE) plugin-test
 	@new=$$(sed -n 's/^  "version": "\(.*\)",$$/\1/p' $(PLUGIN)/manifest.json); \
