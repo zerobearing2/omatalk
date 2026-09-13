@@ -11,4 +11,7 @@ ship QML in the release tarball and does not copy into
 `~/.config/omarchy/plugins/`.
 
 A Daemon upgrade (`omatalk upgrade` / the site curl) therefore cannot rewrite
-plugin code. Plugin work does not land in this tree.
+plugin code. QML commits still go to omarchy-omatalk-plugin.
+
+For development this repository nests that checkout as the `plugin/`
+submodule. The tarball still does not include QML.
