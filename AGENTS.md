@@ -11,16 +11,23 @@ After clone or pull: `git submodule update --init`.
 
 ## Release
 
-`make bump` (or `make bump VERSION=x.y.z`), push, then `make release` — see
-the Makefile's comments for the full mechanics.
+Daemon: `make bump` (or `make bump VERSION=x.y.z`), `make pin`, commit
+`install.sh`, push, then `make release`. That cuts the GitHub release
+only. The workflow packs the tarball the same way `make pin` did, checks
+the committed digest, and refuses to clobber an existing tag.
 
 ### Bar plugin installer
 
 `plugin/install.sh` is a copy of this repo's `install.sh`. Edit the root
-file only. Install in the panel runs that copy.
+file only. Install in the panel runs that copy and downloads the Daemon
+tarball named in `RELEASE_TAG` / `TARBALL_SHA256`.
 
-`make release` from pushed `master` copies, bumps, pushes, and releases
-the plugin when the files differ, then cuts the Daemon release.
+Refresh that pin when first-time Install should ship a newer Daemon:
+`make pin-release`, commit `install.sh` here, `git -C plugin push`,
+`make plugin-release`. Not on every Daemon tag. `omatalk upgrade` and
+the site curl fetch `releases/latest/download/install.sh` (self-pinned
+to that release).
+
 Marketplace listing after a plugin SHA change:
 `docs/agents/plugin-marketplace.md`.
 
@@ -67,7 +74,7 @@ uv run --group dev pytest tests/
 
 ### Shell scripts
 
-Writing or editing a bash/shell script: follow `CODE_STYLE.md`.
+Writing or editing a bash/shell script: follow `docs/agents/code_style.md`.
 
 ### Lint & format
 

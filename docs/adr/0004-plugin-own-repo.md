@@ -15,5 +15,7 @@ plugin code. QML commits still go to omarchy-omatalk-plugin.
 
 For development this repository nests that checkout as the `plugin/`
 submodule. The tarball still does not include QML. The plugin ships a
-copy of this repo's `install.sh` for the panel Install button; `make
-release` updates that copy when the root script changes.
+copy of this repo's `install.sh` for the panel Install button. That
+script downloads a pinned Daemon release tarball (`RELEASE_TAG` and
+`TARBALL_SHA256`). `make pin-release` updates the copy when first-time
+Install should ship a newer Daemon; `make release` does not.

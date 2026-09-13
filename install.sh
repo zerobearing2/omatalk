@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Omatalk installer: system deps (omarchy-approved), latest GitHub release,
-# venv, models, systemd user unit, PATH launcher. The bar plugin is
-# `omarchy plugin add` of PLUGIN_REPO, not files from this tarball.
+# Omatalk installer: system deps (omarchy-approved), a pinned GitHub
+# release tarball, venv, models, systemd user unit, PATH launcher. The
+# bar plugin is `omarchy plugin add` of PLUGIN_REPO, not files from this
+# tarball. make pin rewrites RELEASE_TAG and TARBALL_SHA256.
 set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
-RELEASE_BASE="${RELEASE_BASE:-https://github.com/zerobearing2/omatalk/releases/latest/download}"
+RELEASE_TAG="${RELEASE_TAG:-v0.4.2}"
+TARBALL_SHA256="${TARBALL_SHA256:-40792be2aa8aa4b69cf1697b498903d178745c88ab03596af5c15337101094e7}"
+RELEASE_BASE="${RELEASE_BASE:-https://github.com/zerobearing2/omatalk/releases/download/${RELEASE_TAG}}"
 PLUGIN_REPO="${PLUGIN_REPO:-https://github.com/zerobearing2/omarchy-omatalk-plugin.git}"
 MODEL_BASE="${MODEL_BASE:-https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1}"
 MODEL_SHA256="${MODEL_SHA256:-f3a290d384fbb27966d462905c71a46cef9e5fd00516b40df32a0b4afe77ac96}"
@@ -33,8 +36,22 @@ download_model() {
 
   rm -f "$path"
   msg "Downloading $file (~185MB total) — this can take a few minutes depending on your connection"
-  curl -L --fail --progress-bar -o "$path" "$MODEL_BASE/$file"
+  download "$MODEL_BASE/$file" "$path" --progress-bar
   echo "$sha256  $path" | sha256sum -c --quiet
+}
+
+download() {
+  local url="$1"
+  local dest="$2"
+  shift 2
+  case "$url" in
+    https://*)
+      curl --fail --proto '=https' --tlsv1.2 --location --max-redirs 5 "$@" -o "$dest" "$url"
+      ;;
+    *)
+      curl --fail --location --max-redirs 5 "$@" -o "$dest" "$url"
+      ;;
+  esac
 }
 
 add_bar_plugin() {
@@ -58,16 +75,12 @@ else
   omarchy pkg add "${PKG_DEPS[@]}"
 fi
 
-# 2. Latest GitHub release tarball and its checksum.
+# 2. Pinned GitHub release tarball. Digest is in this script, not fetched
+# beside the artifact.
 mkdir -p "$OMATALK_HOME"
-msg "Downloading latest release from GitHub"
-TS=$(date +%s)
-curl -L --fail -o "$OMATALK_HOME/omatalk-src.tar.gz" "$RELEASE_BASE/omatalk-src.tar.gz?ts=$TS"
-curl -L --fail --silent -o "$OMATALK_HOME/omatalk-src.tar.gz.sha256" "$RELEASE_BASE/omatalk-src.tar.gz.sha256?ts=$TS"
-(
-  cd "$OMATALK_HOME"
-  sha256sum -c omatalk-src.tar.gz.sha256 --quiet
-)
+msg "Downloading $RELEASE_TAG from GitHub"
+download "$RELEASE_BASE/omatalk-src.tar.gz" "$OMATALK_HOME/omatalk-src.tar.gz"
+echo "$TARBALL_SHA256  $OMATALK_HOME/omatalk-src.tar.gz" | sha256sum -c --quiet
 
 # 3. Models (~185MB, skipped when their checksums match). fp16 half-size
 # export: spectral correlation 0.999 against fp32 — audibly identical.
@@ -94,7 +107,7 @@ fi
 rm -rf "$OMATALK_HOME/src"
 mkdir -p "$OMATALK_HOME/src"
 tar -xzf "$OMATALK_HOME/omatalk-src.tar.gz" -C "$OMATALK_HOME/src" --strip-components=1
-rm -f "$OMATALK_HOME/omatalk-src.tar.gz" "$OMATALK_HOME/omatalk-src.tar.gz.sha256"
+rm -f "$OMATALK_HOME/omatalk-src.tar.gz"
 
 # 5. Python environment (uv; fast installs, kokoro-onnx bundles its own phonemizer).
 # --clear makes reinstalls and version upgrades work over an existing install.

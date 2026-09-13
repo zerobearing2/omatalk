@@ -43,17 +43,15 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Pack source tarball
+      - name: Pack source tarball and verify pin
         run: |
-          # Runtime minimum only: package, service unit, build metadata,
-          # README (referenced by pyproject), uninstaller.
-          # No site, tests, docs, CI config, or bar plugin (that is
-          # zerobearing2/omarchy-omatalk-plugin).
-          tar --transform "s,^,omatalk/," \
-            -czf omatalk-src.tar.gz \
-            daemon systemd pyproject.toml README.md uninstall.sh
+          # Same pack as make pin. Fail if install.sh names a different
+          # tag or digest than this commit packs — do not rewrite assets.
+          chmod +x scripts/pack-src.sh scripts/read-pin.sh scripts/verify-pin.sh
+          scripts/verify-pin.sh
+          scripts/pack-src.sh omatalk-src.tar.gz
           sha256sum omatalk-src.tar.gz > omatalk-src.tar.gz.sha256
-      - name: Create or update release
+      - name: Create release
         env:
           VERSION: ${{ steps.ver.outputs.version }}
           GH_TOKEN: ${{ github.token }}
@@ -62,9 +60,7 @@ jobs:
           # install.sh/uninstall.sh are also uploaded standalone (not just
           # inside the tarball) so the site's thin dispatcher
           # (public/install.sh, public/uninstall.sh) can fetch
-          # releases/latest/download/<script> directly — pinning the
-          # installer's own logic to the release it ships, not to master.
+          # releases/latest/download/<script> directly — that copy of
+          # install.sh is already pinned to this tarball.
           gh release create "$tag" --title "$tag" --generate-notes \
-            omatalk-src.tar.gz omatalk-src.tar.gz.sha256 install.sh uninstall.sh \
-            || gh release upload "$tag" --clobber \
-              omatalk-src.tar.gz omatalk-src.tar.gz.sha256 install.sh uninstall.sh
+            omatalk-src.tar.gz omatalk-src.tar.gz.sha256 install.sh uninstall.sh

@@ -6,7 +6,8 @@ PLUGIN_GH := zerobearing2/omarchy-omatalk-plugin
 
 .PHONY: test lint format clean bump release \
 	dev-install dev-restart dev-uninstall \
-	on-pushed-master plugin-ready plugin-on-master \
+	on-pushed-master pack pin verify-pin pin-release \
+	plugin-ready plugin-on-master \
 	plugin-test plugin-validate plugin-dev-reload \
 	plugin-vendor plugin-set-version plugin-bump plugin-release
 
@@ -23,7 +24,8 @@ clean:
 	rm -rf build dist .pytest_cache
 	rm -rf *.egg-info
 
-# Bump pyproject.toml and commit. Push, then `make release`.
+# Bump pyproject.toml and commit. Then `make pin`, commit install.sh, push,
+# `make release`.
 bump:
 	@current=$$(sed -n 's/^version = "\(.*\)"$$/\1/p' pyproject.toml); \
 	if [ -n "$(VERSION)" ]; then new="$(VERSION)"; else \
@@ -42,6 +44,21 @@ on-pushed-master:
 	@test "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/master)" || { echo "push master first" >&2; exit 1; }
 	@git diff --quiet HEAD -- install.sh || { echo "commit install.sh first" >&2; exit 1; }
 
+pack:
+	scripts/pack-src.sh omatalk-src.tar.gz
+	sha256sum omatalk-src.tar.gz > omatalk-src.tar.gz.sha256
+
+pin:
+	scripts/pin-install.sh
+
+verify-pin:
+	scripts/verify-pin.sh
+
+# Copy the pinned installer into the plugin and bump it. Daemon releases
+# do not do this; run it when Install should ship a newer first-time Daemon.
+pin-release: pin plugin-vendor
+	@echo "Pinned and vendored. Commit install.sh here, git -C plugin push, then make plugin-release."
+
 plugin-ready:
 	@test -e $(PLUGIN)/.git -a -f $(PLUGIN)/Panel.qml || { echo "git submodule update --init" >&2; exit 1; }
 	@test "$$(git -C $(PLUGIN) rev-parse --show-toplevel)" = "$(abspath $(PLUGIN))" || { echo "plugin/ is not the submodule" >&2; exit 1; }
@@ -50,14 +67,10 @@ plugin-on-master: plugin-ready
 	@test -z "$$(git -C $(PLUGIN) status --porcelain)" || { echo "plugin/ working tree must be clean" >&2; exit 1; }
 	@git -C $(PLUGIN) switch --quiet master
 
-# If root install.sh differs from the plugin copy, vendor it, push, and
-# cut a plugin release. Then cut the Daemon release from origin/master.
-release: plugin-ready on-pushed-master
-	@if ! cmp -s install.sh $(PLUGIN)/install.sh; then \
-		$(MAKE) plugin-vendor; \
-		git -C $(PLUGIN) push origin master; \
-		$(MAKE) plugin-release; \
-	fi
+# Daemon only. Pin must already match this tree (make pin after make bump).
+# The workflow packs the same way, checks the committed digest, and creates
+# the GitHub release; it does not clobber an existing tag.
+release: on-pushed-master verify-pin
 	gh workflow run release.yml --ref master
 	@echo "Triggered. Watch with: gh run watch \$$(gh run list --workflow=release.yml -L1 --json databaseId -q '.[0].databaseId')"
 

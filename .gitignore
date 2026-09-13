@@ -1,3 +1,7 @@
+# Packed release tarball (make pack / make pin)
+omatalk-src.tar.gz
+omatalk-src.tar.gz.sha256
+
 # Python
 __pycache__/
 *.py[cod]

@@ -71,7 +71,8 @@ Click the megaphone and choose Install Omatalk. Models are about 185MB.
 curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
 ```
 
-The script downloads the latest release tarball (checksum-verified), then:
+The script downloads a pinned GitHub release tarball (SHA-256 is in the
+script, not fetched beside the file), then:
 
 1. Checks system dependencies and installs any missing ones via
    `omarchy pkg add` (python, curl, pipewire, wl-clipboard, uv; stock
@@ -92,9 +93,10 @@ The script downloads the latest release tarball (checksum-verified), then:
    installer never edits your keybindings itself.
 
 Releases are cut manually (GitHub Actions → Release → Run workflow) so
-several PRs can land on `master` before anyone ships. Re-running the
-installer picks up whatever is newest. After the first run of this installer,
-`omatalk upgrade` fetches and runs the same latest installer.
+several PRs can land on `master` before anyone ships. The plugin's
+Install button keeps the Daemon pin from that plugin commit. After the
+first run, `omatalk upgrade` fetches and runs the installer that shipped
+with the latest GitHub release.
 
 The script at that URL is a small dispatcher: it fetches and runs the
 installer that shipped with the latest release, so the installer's own
