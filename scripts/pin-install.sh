@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Pack this tree and write RELEASE_TAG + TARBALL_SHA256 into install.sh.
-# Tag is v$(pyproject version). Commit install.sh, push, then make release.
+# Pack this tree into omatalk-src.tar.gz and write RELEASE_TAG +
+# TARBALL_SHA256 into install.sh. Tag is v$(pyproject version).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,12 +13,13 @@ if [ -z "$version" ]; then
 fi
 tag="v$version"
 
-tmp="$(mktemp)"
-rewritten="$(mktemp)"
-trap 'rm -f "$tmp" "$rewritten"' EXIT
-scripts/pack-src.sh "$tmp"
-digest="$(sha256sum "$tmp")"
+scripts/pack-src.sh omatalk-src.tar.gz
+sha256sum omatalk-src.tar.gz > omatalk-src.tar.gz.sha256
+digest="$(sha256sum omatalk-src.tar.gz)"
 digest="${digest%% *}"
+
+rewritten="$(mktemp)"
+trap 'rm -f "$rewritten"' EXIT
 
 wrote_tag=0
 wrote_digest=0

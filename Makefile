@@ -6,7 +6,7 @@ PLUGIN_GH := zerobearing2/omarchy-omatalk-plugin
 
 .PHONY: test lint format clean bump release \
 	dev-install dev-restart dev-uninstall \
-	on-pushed-master pack pin verify-pin pin-release \
+	pack pin verify-pin pin-release \
 	plugin-ready plugin-on-master \
 	plugin-test plugin-validate plugin-dev-reload \
 	plugin-vendor plugin-set-version plugin-bump plugin-release
@@ -24,8 +24,7 @@ clean:
 	rm -rf build dist .pytest_cache
 	rm -rf *.egg-info
 
-# Bump pyproject.toml and commit. Then `make pin`, commit install.sh, push,
-# `make release`.
+# Bump pyproject.toml and commit. Then `make release`.
 bump:
 	@current=$$(sed -n 's/^version = "\(.*\)"$$/\1/p' pyproject.toml); \
 	if [ -n "$(VERSION)" ]; then new="$(VERSION)"; else \
@@ -38,11 +37,6 @@ bump:
 	git add pyproject.toml; \
 	git commit -m "Bump version to $$new"; \
 	echo "Bumped $$current -> $$new (push when ready)"
-
-on-pushed-master:
-	@test "$$(git rev-parse --abbrev-ref HEAD)" = master || { echo "need master" >&2; exit 1; }
-	@test "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/master)" || { echo "push master first" >&2; exit 1; }
-	@git diff --quiet HEAD -- install.sh || { echo "commit install.sh first" >&2; exit 1; }
 
 pack:
 	scripts/pack-src.sh omatalk-src.tar.gz
@@ -67,12 +61,10 @@ plugin-on-master: plugin-ready
 	@test -z "$$(git -C $(PLUGIN) status --porcelain)" || { echo "plugin/ working tree must be clean" >&2; exit 1; }
 	@git -C $(PLUGIN) switch --quiet master
 
-# Daemon only. Pin must already match this tree (make pin after make bump).
-# The workflow packs the same way, checks the committed digest, and creates
-# the GitHub release; it does not clobber an existing tag.
-release: on-pushed-master verify-pin
-	gh workflow run release.yml --ref master
-	@echo "Triggered. Watch with: gh run watch \$$(gh run list --workflow=release.yml -L1 --json databaseId -q '.[0].databaseId')"
+# Daemon only, all local: test, pin, commit install.sh, push, gh release
+# create from the tarball just packed. Does not vendor the plugin.
+release:
+	scripts/release.sh
 
 dev-install:
 	systemctl --user stop omatalk.service

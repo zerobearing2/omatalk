@@ -11,10 +11,11 @@ After clone or pull: `git submodule update --init`.
 
 ## Release
 
-Daemon: `make bump` (or `make bump VERSION=x.y.z`), `make pin`, commit
-`install.sh`, push, then `make release`. That cuts the GitHub release
-only. The workflow packs the tarball the same way `make pin` did, checks
-the committed digest, and refuses to clobber an existing tag.
+Daemon: `make bump` (or `make bump VERSION=x.y.z`), then `make release`.
+That runs tests, packs the tarball, writes the pin into `install.sh`,
+commits it, pushes `master`, and `gh release create`s from those local
+files. It will not clobber an existing tag. GitHub Actions only runs
+tests on push.
 
 ### Bar plugin installer
 
