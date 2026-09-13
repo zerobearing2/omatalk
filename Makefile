@@ -39,7 +39,7 @@ release:
 	scripts/release.sh
 
 plugin-bump:
-	scripts/bump.sh plugin
+	scripts/plugin-bump.sh
 
 plugin-build:
 	scripts/plugin-build.sh
