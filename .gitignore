@@ -10,9 +10,6 @@ dist/
 build/
 .venv/
 
-# uv
-uv.lock
-
 # Local TTS models and audio caches
 models/
 *.onnx

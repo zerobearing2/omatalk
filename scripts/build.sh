@@ -35,6 +35,7 @@ tar --sort=name \
   systemd \
   pyproject.toml \
   README.md \
+  requirements.txt \
   uninstall.sh \
   | gzip -n > omatalk-src.tar.gz
 
@@ -55,11 +56,11 @@ wrote_digest=0
 while IFS= read -r line; do
   case "$line" in
     RELEASE_TAG=*)
-      printf 'RELEASE_TAG="${RELEASE_TAG:-%s}"\n' "$tag"
+      printf 'RELEASE_TAG="%s"\n' "$tag"
       wrote_tag=1
       ;;
     TARBALL_SHA256=*)
-      printf 'TARBALL_SHA256="${TARBALL_SHA256:-%s}"\n' "$digest"
+      printf 'TARBALL_SHA256="%s"\n' "$digest"
       wrote_digest=1
       ;;
     *)

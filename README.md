@@ -88,9 +88,10 @@ script, not fetched beside the file), then:
 4. Puts `omatalk` on `PATH`, then runs `omarchy plugin add` for
    https://github.com/zerobearing2/omarchy-omatalk-plugin if the plugin is
    missing, or converts a leftover file copy the same way. An existing git
-   checkout is left alone. QML is not in this tarball. It prints a copy-paste
-   command to add the F8 binding when no Omatalk binding is present. The
-   installer never edits your keybindings itself.
+   checkout is left alone. QML is not in this tarball. When no Omatalk
+   binding is present, it asks to bind F8 in `~/.config/hypr/bindings.lua`
+   and appends the line on yes. On no, or when F8 is already bound to
+   something else, it leaves the file alone and prints a copy-paste command.
 
 Releases are cut with `make bump` then `make release` on `master`, so
 several PRs can land before anyone ships. Bump only edits the version
@@ -119,14 +120,21 @@ leaves the Daemon, venv, models, and config. F8 still speaks.
 ## Uninstall
 
 ```sh
+omatalk uninstall
+```
+
+Runs the uninstaller that shipped with the installed release. If the
+`omatalk` command is already gone, use the site copy:
+
+```sh
 curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
 ```
 
 Stops and removes the systemd unit, the launcher, the source, and the
 Omarchy bar plugin. Asks before deleting the models (~185MB) and your config.
 Also a thin dispatcher to the latest release uninstaller.
-Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself. Plugin
-remove is not uninstall.
+Asks before removing the Omatalk binding from `~/.config/hypr/bindings.lua`
+(default no). Plugin remove is not uninstall.
 
 ## Usage
 
@@ -138,6 +146,7 @@ omatalk stop                        # cut off the current utterance
 omatalk status                      # idle | speaking | error
 omatalk version                     # print the installed release (--version works too)
 omatalk upgrade                     # install the latest release
+omatalk uninstall                   # remove Omatalk (asks about models, config, F8)
 omatalk config get [--json]         # print the effective config
 omatalk config set voice af_bella   # set voice or speed; auto-applies
 omatalk config set speed 1.25       # (0.5-2.0)

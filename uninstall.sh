@@ -18,10 +18,12 @@ warn() {
 }
 
 # Prompts read the terminal when piped via curl | bash; fall back to stdin
-# for scripted runs where /dev/tty is unavailable.
-ASK_FROM=/dev/tty
-if ! { : < /dev/tty; } 2>/dev/null; then
-  ASK_FROM=/dev/stdin
+# for scripted runs where /dev/tty is unavailable. Tests set ASK_FROM.
+if [ -z "${ASK_FROM:-}" ]; then
+  ASK_FROM=/dev/tty
+  if ! { : < /dev/tty; } 2>/dev/null; then
+    ASK_FROM=/dev/stdin
+  fi
 fi
 
 set +e
@@ -70,4 +72,21 @@ if [ -d "$HOME/.config/omatalk" ]; then
   fi
 fi
 
-msg "Omatalk uninstalled. Remove the o.bind line for F8 from ~/.config/hypr/bindings.lua."
+bindings="$HOME/.config/hypr/bindings.lua"
+bind_note=""
+if [ -f "$bindings" ]; then
+  if grep -qE 'o\.bind.*omatalk' "$bindings"; then
+    bind_note=" Remove the o.bind line for F8 from ~/.config/hypr/bindings.lua."
+    if ! read -r -p "Remove the Omatalk binding from $bindings? [y/N] " answer < "$ASK_FROM"; then
+      :
+    elif [[ "$answer" =~ ^[Yy]$ ]]; then
+      sed -i -E '/o\.bind.*omatalk/d' "$bindings"
+      bind_note=" Removed the Omatalk binding."
+      if ! hyprctl reload >/dev/null 2>&1; then
+        warn "Could not reload Hyprland; run: hyprctl reload"
+      fi
+    fi
+  fi
+fi
+
+msg "Omatalk uninstalled.$bind_note"

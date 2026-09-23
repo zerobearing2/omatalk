@@ -26,6 +26,10 @@ make plugin-release       # plugin/ on master (git -C plugin switch master);
                           # Daemon RELEASE_TAG must already exist on GitHub
 ```
 
+Runtime dependencies install from the hashed `requirements.txt` shipped in
+the tarball. After changing dependencies in `pyproject.toml`: `uv lock`, then
+re-export (`tests/test_requirements.py` fails with the exact command).
+
 Build and verify live in `scripts/` and run from release. Do not add
 Make targets for them.
 

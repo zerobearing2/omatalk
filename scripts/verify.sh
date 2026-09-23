@@ -18,14 +18,12 @@ expected=""
 while IFS= read -r line; do
   case "$line" in
     RELEASE_TAG=*)
-      tag="${line#*:-}"
+      tag="${line#*=\"}"
       tag="${tag%\"}"
-      tag="${tag%\}}"
       ;;
     TARBALL_SHA256=*)
-      expected="${line#*:-}"
+      expected="${line#*=\"}"
       expected="${expected%\"}"
-      expected="${expected%\}}"
       ;;
   esac
 done < install.sh
@@ -61,6 +59,7 @@ tar --sort=name \
   systemd \
   pyproject.toml \
   README.md \
+  requirements.txt \
   uninstall.sh \
   | gzip -n > "$tmp"
 actual="$(sha256sum "$tmp")"

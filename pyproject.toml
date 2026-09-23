@@ -15,6 +15,9 @@ dependencies = [
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]
+# Installed from hashed requirements.txt so the project builds with
+# --no-build-isolation instead of fetching setuptools at install time.
+build = ["setuptools>=61"]
 
 [tool.ruff]
 line-length = 88

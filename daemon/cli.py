@@ -20,6 +20,21 @@ SITE_BASE = "https://omatalk.zerobearing.com"
 CONFIG_SETTABLE = {"voice", "speed"}
 
 
+def run_script_and_delete(path, label):
+    """Replace this process with `bash path`, removing path when it exits."""
+    os.execvpe(
+        "bash",
+        [
+            "bash",
+            "-c",
+            'trap \'status=$?; rm -f -- "$1"; exit "$status"\' EXIT; bash "$1"',
+            label,
+            path,
+        ],
+        os.environ,
+    )
+
+
 def upgrade():
     site = os.environ.get("SITE_BASE", SITE_BASE).rstrip("/")
     path = None
@@ -41,19 +56,31 @@ def upgrade():
             ],
             check=True,
         )
-        os.execvpe(
-            "bash",
-            [
-                "bash",
-                "-c",
-                'trap \'status=$?; rm -f -- "$1"; exit "$status"\' EXIT; bash "$1"',
-                "omatalk upgrade",
-                path,
-            ],
-            os.environ,
-        )
+        run_script_and_delete(path, "omatalk upgrade")
     except (OSError, subprocess.CalledProcessError) as error:
         print(f"upgrade failed: {error}", file=sys.stderr)
+        sys.exit(1)
+    finally:
+        if path:
+            Path(path).unlink(missing_ok=True)
+
+
+def uninstall():
+    # The uninstaller that shipped with this release. It deletes
+    # OMATALK_HOME, so run a temp copy rather than the file in place.
+    home = os.environ.get("OMATALK_HOME", str(Path.home() / ".local/share/omatalk"))
+    source = Path(home) / "src/uninstall.sh"
+    path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            prefix="omatalk-uninstall-", suffix=".sh", delete=False
+        ) as script:
+            path = script.name
+            script.write(source.read_bytes())
+        run_script_and_delete(path, "omatalk uninstall")
+    except OSError as error:
+        print(f"uninstall failed: {error}", file=sys.stderr)
+        print(f"run: curl -fsSL {SITE_BASE}/uninstall.sh | bash", file=sys.stderr)
         sys.exit(1)
     finally:
         if path:
@@ -95,6 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("stop", help="stop speaking")
     sub.add_parser("status", help="print the daemon's state")
     sub.add_parser("upgrade", help="install the latest release")
+    sub.add_parser("uninstall", help="remove the Daemon, launcher, and bar plugin")
 
     config_parser = sub.add_parser("config", help="get or set voice/speed")
     config_sub = config_parser.add_subparsers(dest="config_command", required=True)
@@ -194,6 +222,10 @@ def main():
 
     if args.command == "upgrade":
         upgrade()
+        return
+
+    if args.command == "uninstall":
+        uninstall()
         return
 
     if args.command == "config":

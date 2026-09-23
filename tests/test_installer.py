@@ -1,11 +1,10 @@
 import hashlib
-import http.server
 import io
 import os
+import re
 import shutil
 import subprocess
 import tarfile
-import threading
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -21,22 +20,6 @@ PLUGIN_ADD_CMD = (
 def site(tmp_path):
     root = tmp_path / "site"
     root.mkdir()
-    requests = []
-
-    class Handler(http.server.SimpleHTTPRequestHandler):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, directory=root, **kwargs)
-
-        def do_GET(self):
-            requests.append(self.path)
-            super().do_GET()
-
-        def log_message(self, format, *args):
-            pass
-
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
 
     def publish(source_files):
         archive = root / "omatalk-src.tar.gz"
@@ -46,21 +29,8 @@ def site(tmp_path):
                 info = tarfile.TarInfo(f"omatalk/{name}")
                 info.size = len(content)
                 tar.addfile(info, io.BytesIO(content))
-        digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-        (root / "omatalk-src.tar.gz.sha256").write_text(
-            f"{digest}  omatalk-src.tar.gz\n"
-        )
 
-    try:
-        yield SimpleNamespace(
-            root=root,
-            requests=requests,
-            url=f"http://127.0.0.1:{server.server_port}",
-            publish=publish,
-        )
-    finally:
-        server.shutdown()
-        thread.join(timeout=5)
+    return SimpleNamespace(root=root, url="https://release.test", publish=publish)
 
 
 def make_source(stale=False):
@@ -68,6 +38,7 @@ def make_source(stale=False):
         "pyproject.toml": "[project]\nname = 'omatalk'\n",
         "systemd/omatalk.service": "[Service]\nExecStart=fake\n",
         "current.py": "new source\n",
+        "requirements.txt": "kokoro-onnx==0.6.1 --hash=sha256:00\n",
     }
     if stale:
         files["stale.py"] = "old source\n"
@@ -151,7 +122,43 @@ set -eu
 printf 'omarchy-shell %s\\n' "$*" >> "$FAKE_LOG"
 """
     )
+    (fake_bin / "curl").write_text(
+        """#!/bin/sh
+set -eu
+printf 'curl %s\\n' "$*" >> "$FAKE_LOG"
+dest=""
+url=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o)
+      dest="$2"
+      shift 2
+      ;;
+    https://*)
+      url="$1"
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+src="$FAKE_SITE/${url#https://*/}"
+if [ ! -f "$src" ]; then
+  exit 22
+fi
+cp "$src" "$dest"
+"""
+    )
+    (fake_bin / "hyprctl").write_text(
+        """#!/bin/sh
+set -eu
+printf 'hyprctl %s\\n' "$*" >> "$FAKE_LOG"
+"""
+    )
     (fake_bin / "sleep").write_text("#!/bin/sh\nexit 0\n")
+    for tool in ("pgrep", "pkill"):
+        (fake_bin / tool).write_text("#!/bin/sh\nexit 1\n")
     for tool in fake_bin.iterdir():
         tool.chmod(0o755)
 
@@ -166,15 +173,18 @@ printf 'omarchy-shell %s\\n' "$*" >> "$FAKE_LOG"
         **os.environ,
         "HOME": str(tmp_path / "home"),
         "PATH": f"{fake_bin}:{os.environ['PATH']}",
-        "RELEASE_BASE": site.url,
         "OMATALK_HOME": str(tmp_path / "omatalk"),
-        "MODEL_BASE": f"{site.url}/models",
-        "MODEL_SHA256": hashlib.sha256(model).hexdigest(),
-        "VOICES_SHA256": hashlib.sha256(voices).hexdigest(),
         "FAKE_LOG": str(log),
         "FAKE_STATE": str(state),
+        "FAKE_SITE": str(site.root),
         "ASK_FROM": "/dev/stdin",
-        "PLUGIN_REPO": "https://example.test/omarchy-omatalk-plugin.git",
+        "XDG_RUNTIME_DIR": str(tmp_path / "runtime"),
+        # PIN_* rewrite install.sh's fixed constants; see pinned_installer.
+        "PIN_RELEASE_BASE": site.url,
+        "PIN_MODEL_BASE": f"{site.url}/models",
+        "PIN_MODEL_SHA256": hashlib.sha256(model).hexdigest(),
+        "PIN_VOICES_SHA256": hashlib.sha256(voices).hexdigest(),
+        "PIN_PLUGIN_REPO": "https://example.test/omarchy-omatalk-plugin.git",
     }
     Path(env["HOME"]).mkdir()
     return env, state, log
@@ -206,17 +216,32 @@ def without_omarchy(env):
     return env
 
 
+def pinned_installer(env, pins):
+    """install.sh with its fixed constants rewritten for the fake site."""
+    script = (ROOT / "install.sh").read_text()
+    for name, value in pins.items():
+        script, count = re.subn(
+            rf"^{name}=.*$", f'{name}="{value}"', script, count=1, flags=re.M
+        )
+        assert count == 1, name
+    path = Path(env["HOME"]).parent / "install.sh"
+    path.write_text(script)
+    return path
+
+
 def run_install(env, site, answer="", tarball_sha=None):
     if tarball_sha is None:
         tarball_sha = hashlib.sha256(
             (site.root / "omatalk-src.tar.gz").read_bytes()
         ).hexdigest()
-    env = {
-        **env,
-        "TARBALL_SHA256": tarball_sha,
+    pins = {
+        name.removeprefix("PIN_"): value
+        for name, value in env.items()
+        if name.startswith("PIN_")
     }
+    pins["TARBALL_SHA256"] = tarball_sha
     return subprocess.run(
-        ["bash", str(ROOT / "install.sh")],
+        ["bash", str(pinned_installer(env, pins))],
         cwd=ROOT,
         env=env,
         input=answer,
@@ -225,9 +250,25 @@ def run_install(env, site, answer="", tarball_sha=None):
     )
 
 
-def model_requests(site, filename):
+def run_uninstall(env, answer=""):
+    return subprocess.run(
+        ["bash", str(ROOT / "uninstall.sh")],
+        cwd=ROOT,
+        env=env,
+        input=answer,
+        capture_output=True,
+        text=True,
+    )
+
+
+def bindings_file(env):
+    return Path(env["HOME"]) / ".config/hypr/bindings.lua"
+
+
+def model_requests(log, filename):
     return sum(
-        request.split("?", 1)[0] == f"/models/{filename}" for request in site.requests
+        line.startswith("curl ") and line.endswith(f"/models/{filename}")
+        for line in command_log(log)
     )
 
 
@@ -251,15 +292,15 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     site.publish(make_source(stale=True))
     env, _state, log = fake_environment(site, tmp_path)
 
-    first = run_install(env, site)
+    first = run_install(env, site, answer="n\n")
 
     assert first.returncode == 0, first.stderr
     install_home = Path(env["OMATALK_HOME"])
     assert (install_home / "src/stale.py").is_file()
     assert "To bind F8" in first.stdout
     assert not (Path(env["HOME"]) / ".config/omatalk/config.toml").exists()
-    assert model_requests(site, "kokoro-v1.0.fp16.onnx") == 1
-    assert model_requests(site, "voices-v1.0.bin") == 1
+    assert model_requests(log, "kokoro-v1.0.fp16.onnx") == 1
+    assert model_requests(log, "voices-v1.0.bin") == 1
 
     config = Path(env["HOME"]) / ".config/omatalk/config.toml"
     config.parent.mkdir(parents=True)
@@ -279,14 +320,14 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     assert config.read_bytes() == config_before
     assert bindings.read_text() == 'o.bind("F8", "Omatalk", "omatalk speak")\n'
     assert "To bind F8" not in second.stdout
-    assert model_requests(site, "kokoro-v1.0.fp16.onnx") == 1
-    assert model_requests(site, "voices-v1.0.bin") == 1
+    assert model_requests(log, "kokoro-v1.0.fp16.onnx") == 1
+    assert model_requests(log, "voices-v1.0.bin") == 1
 
     (install_home / "models/kokoro-v1.0.fp16.onnx").write_bytes(b"corrupt")
     third = run_install(env, site)
 
     assert third.returncode == 0, third.stderr
-    assert model_requests(site, "kokoro-v1.0.fp16.onnx") == 2
+    assert model_requests(log, "kokoro-v1.0.fp16.onnx") == 2
     assert (install_home / "models/kokoro-v1.0.fp16.onnx").read_bytes() == b"fake model"
 
     (site.root / "models/kokoro-v1.0.fp16.onnx").write_bytes(b"bad download")
@@ -460,3 +501,210 @@ def test_installer_fails_if_daemon_never_becomes_ready(site, tmp_path):
 
     assert result.returncode != 0
     assert "Daemon did not start" in result.stdout
+
+
+BIND_LINE = 'o.bind("F8", "Omatalk", "omatalk speak")'
+
+
+@pytest.mark.parametrize("answer", ["", "n\n"])
+def test_install_does_not_bind_f8_on_eof_or_decline(site, tmp_path, answer):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+
+    result = run_install(env, site, answer=answer)
+
+    assert result.returncode == 0, result.stderr
+    assert not bindings_file(env).exists()
+    assert "To bind F8" in result.stdout
+    assert PLUGIN_ADD_CMD in command_log(log)
+    assert not any(line.startswith("hyprctl") for line in command_log(log))
+
+
+@pytest.mark.parametrize("answer", ["y\n", "\n"])
+def test_install_binds_f8_on_yes_or_enter(site, tmp_path, answer):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+
+    result = run_install(env, site, answer=answer)
+
+    assert result.returncode == 0, result.stderr
+    assert bindings_file(env).read_text() == f"\n{BIND_LINE}\n"
+    assert "To bind F8" not in result.stdout
+    assert "hyprctl reload" in command_log(log)
+    assert PLUGIN_ADD_CMD in command_log(log)
+
+
+def test_install_reasks_after_decline(site, tmp_path):
+    site.publish(make_source())
+    env, _state, _log = fake_environment(site, tmp_path)
+    bindings = bindings_file(env)
+    bindings.parent.mkdir(parents=True)
+    bindings.write_text("-- mine\n")
+
+    first = run_install(env, site, answer="n\n")
+    second = run_install(env, site, answer="y\n")
+
+    assert first.returncode == 0, first.stderr
+    assert second.returncode == 0, second.stderr
+    assert bindings.read_text() == f"-- mine\n\n{BIND_LINE}\n"
+
+
+def test_install_never_takes_f8_from_another_command(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+    bindings = bindings_file(env)
+    bindings.parent.mkdir(parents=True)
+    bindings.write_text('o.bind("F8", "Other", "other thing")\n')
+    before = bindings.read_bytes()
+
+    result = run_install(env, site, answer="y\n")
+
+    assert result.returncode == 0, result.stderr
+    assert bindings.read_bytes() == before
+    assert "F8 is already bound" in result.stdout
+    assert "To bind F8" in result.stdout
+    assert not any(line.startswith("hyprctl") for line in command_log(log))
+
+
+def seed_bindings(env):
+    bindings = bindings_file(env)
+    bindings.parent.mkdir(parents=True)
+    bindings.write_text(
+        "-- Omatalk: F8 speaks selection\n"
+        'o.bind("F9", "Dictate", "voxtype")\n'
+        'o.bind("F7", "Omatalk", "omatalk speak")\n'
+    )
+    return bindings
+
+
+def test_uninstall_removes_omatalk_bind_on_yes(tmp_path, site):
+    env, _state, log = fake_environment(site, tmp_path)
+    bindings = seed_bindings(env)
+
+    result = run_uninstall(env, answer="y\n")
+
+    assert result.returncode == 0, result.stderr
+    assert bindings.read_text() == (
+        '-- Omatalk: F8 speaks selection\no.bind("F9", "Dictate", "voxtype")\n'
+    )
+    assert "hyprctl reload" in command_log(log)
+    assert "Removed the Omatalk binding" in result.stdout
+    assert "Remove the o.bind line" not in result.stdout
+
+
+@pytest.mark.parametrize("answer", ["", "n\n"])
+def test_uninstall_keeps_bind_on_no_or_eof(tmp_path, site, answer):
+    env, _state, _log = fake_environment(site, tmp_path)
+    bindings = seed_bindings(env)
+    before = bindings.read_bytes()
+
+    result = run_uninstall(env, answer=answer)
+
+    assert result.returncode == 0, result.stderr
+    assert bindings.read_bytes() == before
+    assert "Remove the o.bind line" in result.stdout
+
+
+def test_uninstall_skips_bind_prompt_without_omatalk_bind(tmp_path, site):
+    env, _state, _log = fake_environment(site, tmp_path)
+    bindings = bindings_file(env)
+    bindings.parent.mkdir(parents=True)
+    bindings.write_text('o.bind("F9", "Dictate", "voxtype")\n')
+
+    result = run_uninstall(env)
+
+    assert result.returncode == 0, result.stderr
+    assert "Omatalk binding" not in result.stdout + result.stderr
+    assert "o.bind line" not in result.stdout
+
+
+def test_installer_ignores_environment_overrides_of_its_pins(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+    for name in ("RELEASE_TAG", "RELEASE_BASE", "MODEL_BASE", "PLUGIN_REPO"):
+        env[name] = "https://evil.test/x"
+    env["TARBALL_SHA256"] = "0" * 64
+
+    subprocess.run(
+        ["bash", str(ROOT / "install.sh")],
+        cwd=ROOT,
+        env=env,
+        input="",
+        capture_output=True,
+        text=True,
+    )
+
+    downloads = [line for line in command_log(log) if line.startswith("curl ")]
+    assert downloads
+    assert not any("evil.test" in line for line in downloads)
+    release = "https://github.com/zerobearing2/omatalk/releases/download/v"
+    assert release in downloads[0]
+
+
+def test_every_download_is_https_only_and_bounded(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+
+    result = run_install(env, site)
+
+    assert result.returncode == 0, result.stderr
+    downloads = [line for line in command_log(log) if line.startswith("curl ")]
+    assert len(downloads) == 3
+    for line in downloads:
+        for flag in (
+            "--proto =https",
+            "--proto-redir =https",
+            "--max-filesize ",
+            "--max-time ",
+            "--speed-time ",
+        ):
+            assert flag in line, (flag, line)
+
+
+def test_install_rebinds_after_uninstall_leaves_a_comment(site, tmp_path):
+    site.publish(make_source())
+    env, _state, _log = fake_environment(site, tmp_path)
+    bindings = bindings_file(env)
+    bindings.parent.mkdir(parents=True)
+    bindings.write_text(
+        "-- F8 speaks selection (installed via ~/Work/omatalk/install.sh)\n"
+        f"{BIND_LINE}\n"
+    )
+
+    uninstalled = run_uninstall(env, answer="y\n")
+    reinstalled = run_install(env, site, answer="y\n")
+
+    assert uninstalled.returncode == 0, uninstalled.stderr
+    assert reinstalled.returncode == 0, reinstalled.stderr
+    assert bindings.read_text().endswith(f"\n{BIND_LINE}\n")
+    assert bindings.read_text().count(BIND_LINE) == 1
+
+
+def test_installer_pins_are_not_read_from_the_environment():
+    script = (ROOT / "install.sh").read_text()
+    for name in (
+        "RELEASE_TAG",
+        "TARBALL_SHA256",
+        "RELEASE_BASE",
+        "PLUGIN_REPO",
+        "MODEL_BASE",
+        "MODEL_SHA256",
+        "VOICES_SHA256",
+    ):
+        assert re.search(rf'^{name}="[^$]', script, re.M), name
+
+
+def test_install_uses_only_hashed_dependencies(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+
+    result = run_install(env, site)
+
+    assert result.returncode == 0, result.stderr
+    installs = [line for line in command_log(log) if line.startswith("uv pip install")]
+    home = env["OMATALK_HOME"]
+    assert len(installs) == 2
+    assert "--require-hashes" in installs[0]
+    assert installs[0].endswith(f"-r {home}/src/requirements.txt")
+    assert "--no-deps --no-build-isolation" in installs[1]
+    assert installs[1].endswith(f"{home}/src")
