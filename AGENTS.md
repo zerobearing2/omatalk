@@ -7,7 +7,7 @@ This repository is the Daemon, CLI, and site. Python lives in `daemon/`.
 The installed CLI is still `omatalk` / `omatalkd`. The listed bar plugin is
 https://github.com/zerobearing2/omarchy-omatalk-plugin, a separate repo with
 its own release. Work on it in a plain clone of that repo
-(`~/Work/omarchy-omatalk`). The installed plugin at
+(`~/Work/omarchy-omatalk-plugin`). The installed plugin at
 `~/.config/omarchy/plugins/zerobearing.omatalk` is a git clone too. Its
 agent docs stay here, because the listed tree must not track `AGENTS.md`,
 `CONTEXT.md`, or `docs/agents/`.
