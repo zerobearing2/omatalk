@@ -22,6 +22,7 @@ make release              # master only; build, verify, commit, push, gh
 
 make plugin-bump          # plugin/manifest.json only
 make plugin-release       # plugin/ on master (git -C plugin switch master);
+                          # commits + pushes the submodule pointer here;
                           # Daemon RELEASE_TAG must already exist on GitHub
 ```
 

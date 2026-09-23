@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Plugin publish: copy install.sh, verify, commit version+installer, push,
-# gh release create. Same shape as scripts/release.sh. Does not clobber.
+# gh release create, then commit and push the submodule pointer in this repo.
+# Same shape as scripts/release.sh. Does not clobber.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,6 +14,44 @@ if [ ! -e "$plugin/.git" ]; then
 fi
 if [ "$(git -C "$plugin" rev-parse --show-toplevel)" != "$plugin" ]; then
   echo "plugin/ is not the submodule" >&2
+  exit 1
+fi
+
+if [ "$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)" != master ]; then
+  echo "need master; git switch master" >&2
+  exit 1
+fi
+
+unexpected=""
+while IFS= read -r status; do
+  if [ -z "$status" ]; then
+    continue
+  fi
+  path="${status:3}"
+  case "$path" in
+    plugin)
+      ;;
+    *)
+      if [ -z "$unexpected" ]; then
+        unexpected="$path"
+      else
+        unexpected="$unexpected $path"
+      fi
+      ;;
+  esac
+done <<EOF
+$(git -C "$ROOT" status --porcelain)
+EOF
+
+if [ -n "$unexpected" ]; then
+  echo "unexpected dirty paths: $unexpected" >&2
+  exit 1
+fi
+
+git -C "$ROOT" fetch origin master
+
+if [ "$(git -C "$ROOT" merge-base HEAD origin/master)" != "$(git -C "$ROOT" rev-parse origin/master)" ]; then
+  echo "master is behind origin; pull first" >&2
   exit 1
 fi
 
@@ -101,5 +140,14 @@ git -C "$plugin" push origin master
 
 gh --repo "$repo" release create "$tag" --title "$tag" --generate-notes \
   --target "$(git -C "$plugin" rev-parse HEAD)"
+
+git -C "$ROOT" add plugin
+if git -C "$ROOT" diff --cached --quiet; then
+  echo "plugin submodule already points at $tag"
+else
+  git -C "$ROOT" commit -m "Point plugin submodule at $tag"
+fi
+
+git -C "$ROOT" push origin master
 
 echo "Released plugin $tag"
