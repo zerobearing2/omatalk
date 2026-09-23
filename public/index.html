@@ -957,8 +957,8 @@
 
       <div>
         <p class="prose" style="margin-top:0; font-size:0.98rem;"><span class="key primary mono" style="font-size:0.78rem; padding:3px 9px; margin-right:2px;">F8</span> answers
-          F9: voxtype's dictation key speaks <em>to</em> the machine, F8 speaks back. The installer only <em>prints</em> this
-          line; paste it into <code class="inline-code">~/.config/hypr/bindings.lua</code> yourself.</p>
+          F9: voxtype's dictation key speaks <em>to</em> the machine, F8 speaks back. The installer <em>asks</em> before adding
+          this line to <code class="inline-code">~/.config/hypr/bindings.lua</code>; say no and paste it yourself.</p>
         <div class="code-card">
           <div class="cc-title">
             ~/.config/hypr/bindings.lua
@@ -1072,7 +1072,7 @@
       <div class="row"><div class="name">wl-paste --primary</div><div class="why">Reads the Wayland primary selection directly: no synthetic keystrokes, no clipboard mutation, no keyboard-injection daemon.</div></div>
       <div class="row"><div class="name">PipeWire</div><div class="why"><code class="mono" style="background:none;border:none;padding:0;">pw-cat</code> streams raw PCM straight over stdin as each chunk is synthesized &mdash; no staged WAV files, layering over whatever else is playing. One player process per Utterance.</div></div>
       <div class="row"><div class="name">systemd --user</div><div class="why">Starts the daemon at login and keeps it resident across the session; state and models live under <code class="mono" style="background:none;border:none;padding:0;">~/.local/share/omatalk/</code>.</div></div>
-      <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config, never touched by the installer. F8 sits next to voxtype's F9 dictation key on purpose: F9 speaks you, F8 speaks back.</div></div>
+      <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config: the installer asks before adding its one line, and never takes a key that is already bound. F8 sits next to voxtype's F9 dictation key on purpose: F9 speaks you, F8 speaks back.</div></div>
     </div>
   </section>
 

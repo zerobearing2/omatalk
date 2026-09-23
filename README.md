@@ -88,9 +88,10 @@ script, not fetched beside the file), then:
 4. Puts `omatalk` on `PATH`, then runs `omarchy plugin add` for
    https://github.com/zerobearing2/omarchy-omatalk-plugin if the plugin is
    missing, or converts a leftover file copy the same way. An existing git
-   checkout is left alone. QML is not in this tarball. It prints a copy-paste
-   command to add the F8 binding when no Omatalk binding is present. The
-   installer never edits your keybindings itself.
+   checkout is left alone. QML is not in this tarball. When no Omatalk
+   binding is present, it asks to bind F8 in `~/.config/hypr/bindings.lua`
+   and appends the line on yes. On no, or when F8 is already bound to
+   something else, it leaves the file alone and prints a copy-paste command.
 
 Releases are cut with `make bump` then `make release` on `master`, so
 several PRs can land before anyone ships. Bump only edits the version
@@ -125,8 +126,8 @@ curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
 Stops and removes the systemd unit, the launcher, the source, and the
 Omarchy bar plugin. Asks before deleting the models (~185MB) and your config.
 Also a thin dispatcher to the latest release uninstaller.
-Remove the F8 binding from `~/.config/hypr/bindings.lua` yourself. Plugin
-remove is not uninstall.
+Asks before removing the Omatalk binding from `~/.config/hypr/bindings.lua`
+(default no). Plugin remove is not uninstall.
 
 ## Usage
 

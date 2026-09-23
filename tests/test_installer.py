@@ -151,7 +151,15 @@ set -eu
 printf 'omarchy-shell %s\\n' "$*" >> "$FAKE_LOG"
 """
     )
+    (fake_bin / "hyprctl").write_text(
+        """#!/bin/sh
+set -eu
+printf 'hyprctl %s\\n' "$*" >> "$FAKE_LOG"
+"""
+    )
     (fake_bin / "sleep").write_text("#!/bin/sh\nexit 0\n")
+    for tool in ("pgrep", "pkill"):
+        (fake_bin / tool).write_text("#!/bin/sh\nexit 1\n")
     for tool in fake_bin.iterdir():
         tool.chmod(0o755)
 
@@ -174,6 +182,7 @@ printf 'omarchy-shell %s\\n' "$*" >> "$FAKE_LOG"
         "FAKE_LOG": str(log),
         "FAKE_STATE": str(state),
         "ASK_FROM": "/dev/stdin",
+        "XDG_RUNTIME_DIR": str(tmp_path / "runtime"),
         "PLUGIN_REPO": "https://example.test/omarchy-omatalk-plugin.git",
     }
     Path(env["HOME"]).mkdir()
@@ -225,6 +234,21 @@ def run_install(env, site, answer="", tarball_sha=None):
     )
 
 
+def run_uninstall(env, answer=""):
+    return subprocess.run(
+        ["bash", str(ROOT / "uninstall.sh")],
+        cwd=ROOT,
+        env=env,
+        input=answer,
+        capture_output=True,
+        text=True,
+    )
+
+
+def bindings_file(env):
+    return Path(env["HOME"]) / ".config/hypr/bindings.lua"
+
+
 def model_requests(site, filename):
     return sum(
         request.split("?", 1)[0] == f"/models/{filename}" for request in site.requests
@@ -251,7 +275,7 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     site.publish(make_source(stale=True))
     env, _state, log = fake_environment(site, tmp_path)
 
-    first = run_install(env, site)
+    first = run_install(env, site, answer="n\n")
 
     assert first.returncode == 0, first.stderr
     install_home = Path(env["OMATALK_HOME"])
@@ -460,3 +484,118 @@ def test_installer_fails_if_daemon_never_becomes_ready(site, tmp_path):
 
     assert result.returncode != 0
     assert "Daemon did not start" in result.stdout
+
+
+BIND_LINE = 'o.bind("F8", "Omatalk", "omatalk speak")'
+
+
+@pytest.mark.parametrize("answer", ["", "n\n"])
+def test_install_does_not_bind_f8_on_eof_or_decline(site, tmp_path, answer):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+
+    result = run_install(env, site, answer=answer)
+
+    assert result.returncode == 0, result.stderr
+    assert not bindings_file(env).exists()
+    assert "To bind F8" in result.stdout
+    assert PLUGIN_ADD_CMD in command_log(log)
+    assert not any(line.startswith("hyprctl") for line in command_log(log))
+
+
+@pytest.mark.parametrize("answer", ["y\n", "\n"])
+def test_install_binds_f8_on_yes_or_enter(site, tmp_path, answer):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+
+    result = run_install(env, site, answer=answer)
+
+    assert result.returncode == 0, result.stderr
+    assert bindings_file(env).read_text() == f"\n{BIND_LINE}\n"
+    assert "To bind F8" not in result.stdout
+    assert "hyprctl reload" in command_log(log)
+    assert PLUGIN_ADD_CMD in command_log(log)
+
+
+def test_install_reasks_after_decline(site, tmp_path):
+    site.publish(make_source())
+    env, _state, _log = fake_environment(site, tmp_path)
+    bindings = bindings_file(env)
+    bindings.parent.mkdir(parents=True)
+    bindings.write_text("-- mine\n")
+
+    first = run_install(env, site, answer="n\n")
+    second = run_install(env, site, answer="y\n")
+
+    assert first.returncode == 0, first.stderr
+    assert second.returncode == 0, second.stderr
+    assert bindings.read_text() == f"-- mine\n\n{BIND_LINE}\n"
+
+
+def test_install_never_takes_f8_from_another_command(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+    bindings = bindings_file(env)
+    bindings.parent.mkdir(parents=True)
+    bindings.write_text('o.bind("F8", "Other", "other thing")\n')
+    before = bindings.read_bytes()
+
+    result = run_install(env, site, answer="y\n")
+
+    assert result.returncode == 0, result.stderr
+    assert bindings.read_bytes() == before
+    assert "F8 is already bound" in result.stdout
+    assert "To bind F8" in result.stdout
+    assert not any(line.startswith("hyprctl") for line in command_log(log))
+
+
+def seed_bindings(env):
+    bindings = bindings_file(env)
+    bindings.parent.mkdir(parents=True)
+    bindings.write_text(
+        "-- Omatalk: F8 speaks selection\n"
+        'o.bind("F9", "Dictate", "voxtype")\n'
+        'o.bind("F7", "Omatalk", "omatalk speak")\n'
+    )
+    return bindings
+
+
+def test_uninstall_removes_omatalk_bind_on_yes(tmp_path, site):
+    env, _state, log = fake_environment(site, tmp_path)
+    bindings = seed_bindings(env)
+
+    result = run_uninstall(env, answer="y\n")
+
+    assert result.returncode == 0, result.stderr
+    assert bindings.read_text() == (
+        '-- Omatalk: F8 speaks selection\no.bind("F9", "Dictate", "voxtype")\n'
+    )
+    assert "hyprctl reload" in command_log(log)
+    assert "Removed the Omatalk binding" in result.stdout
+    assert "Remove the o.bind line" not in result.stdout
+
+
+@pytest.mark.parametrize("answer", ["", "n\n"])
+def test_uninstall_keeps_bind_on_no_or_eof(tmp_path, site, answer):
+    env, _state, _log = fake_environment(site, tmp_path)
+    bindings = seed_bindings(env)
+    before = bindings.read_bytes()
+
+    result = run_uninstall(env, answer=answer)
+
+    assert result.returncode == 0, result.stderr
+    assert bindings.read_bytes() == before
+    assert "Remove the o.bind line" in result.stdout
+
+
+def test_uninstall_skips_bind_prompt_without_omatalk_bind(tmp_path, site):
+    env, _state, _log = fake_environment(site, tmp_path)
+    bindings = bindings_file(env)
+    bindings.parent.mkdir(parents=True)
+    bindings.write_text('o.bind("F9", "Dictate", "voxtype")\n')
+
+    result = run_uninstall(env)
+
+    assert result.returncode == 0, result.stderr
+    assert "Omatalk binding" not in result.stdout + result.stderr
+    assert "o.bind line" not in result.stdout

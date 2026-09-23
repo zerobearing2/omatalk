@@ -23,6 +23,15 @@ warn() {
   printf '\033[1;33m==>\033[0m %s\n' "$1"
 }
 
+# Prompts read the terminal when piped via curl | bash; fall back to stdin
+# for scripted runs where /dev/tty is unavailable. Tests set ASK_FROM.
+if [ -z "${ASK_FROM:-}" ]; then
+  ASK_FROM=/dev/tty
+  if ! { : < /dev/tty; } 2>/dev/null; then
+    ASK_FROM=/dev/stdin
+  fi
+fi
+
 download_model() {
   local file="$1"
   local sha256="$2"
@@ -124,20 +133,43 @@ cp "$OMATALK_HOME/venv/bin/omatalk" "$HOME/.local/bin/omatalk"
 systemctl --user daemon-reload
 systemctl --user enable --now omatalk.service
 
-# 7. Keybindings are user-owned; the installer only prints the command.
-need_bind=0
-if [ ! -f "$HOME/.config/hypr/bindings.lua" ]; then
-  need_bind=1
-else
-  if ! grep -q omatalk "$HOME/.config/hypr/bindings.lua"; then
-    need_bind=1
-  fi
-fi
-if [ "$need_bind" -eq 1 ]; then
+# 7. F8 binding. Ask before writing bindings.lua; stay silent when an
+# omatalk bind already exists; never take F8 from another command.
+bindings="$HOME/.config/hypr/bindings.lua"
+bind_line='o.bind("F8", "Omatalk", "omatalk speak")'
+print_bind_command() {
   msg "To bind F8, paste this command (safe to re-run):"
   cat <<'EOF'
     grep -q omatalk ~/.config/hypr/bindings.lua || printf '\no.bind("F8", "Omatalk", "omatalk speak")\n' >> ~/.config/hypr/bindings.lua; hyprctl reload
 EOF
+}
+already_bound=0
+f8_taken=0
+if [ -f "$bindings" ]; then
+  if grep -q omatalk "$bindings"; then
+    already_bound=1
+  else
+    if grep -qF 'o.bind("F8"' "$bindings"; then
+      f8_taken=1
+    fi
+  fi
+fi
+if [ "$already_bound" -eq 1 ]; then
+  :
+elif [ "$f8_taken" -eq 1 ]; then
+  warn "F8 is already bound in $bindings; leaving it alone"
+  print_bind_command
+elif ! read -r -p "Bind F8 to omatalk speak in $bindings? [Y/n] " answer < "$ASK_FROM"; then
+  print_bind_command
+elif [[ "$answer" =~ ^[Nn] ]]; then
+  print_bind_command
+else
+  mkdir -p "$(dirname "$bindings")"
+  printf '\n%s\n' "$bind_line" >> "$bindings"
+  msg "Bound F8 in $bindings"
+  if ! hyprctl reload >/dev/null 2>&1; then
+    warn "Could not reload Hyprland; run: hyprctl reload"
+  fi
 fi
 
 # 8. Welcome through the freshly installed daemon — proves the whole
