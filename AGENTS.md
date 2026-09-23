@@ -6,10 +6,11 @@ See `CONTEXT.md` for domain language.
 This repository is the Daemon, CLI, and site. Python lives in `daemon/`.
 The installed CLI is still `omatalk` / `omatalkd`. The listed bar plugin is
 https://github.com/zerobearing2/omarchy-omatalk-plugin, a separate repo with
-its own release. Work on it in a plain clone of that repo. The installed
-plugin at `~/.config/omarchy/plugins/zerobearing.omatalk` is a git clone too.
-Its agent docs stay here, because the listed tree must not track
-`AGENTS.md`, `CONTEXT.md`, or a Makefile.
+its own release. Work on it in a plain clone of that repo
+(`~/Work/omarchy-omatalk`). The installed plugin at
+`~/.config/omarchy/plugins/zerobearing.omatalk` is a git clone too. Its
+agent docs stay here, because the listed tree must not track `AGENTS.md`,
+`CONTEXT.md`, or `docs/agents/`.
 
 ## Release
 
@@ -22,8 +23,9 @@ make bump                 # pyproject.toml + uv.lock; VERSION=x.y.z to set it
 make release              # master only; build, verify, commit, push, gh
 ```
 
-The plugin releases on its own; the steps are in its README. A Daemon
-release never requires a plugin release, and the reverse.
+The plugin has the same `make bump` / `make release` (`manifest.json`;
+test, validate, commit, push, gh), run in its own clone. A Daemon release
+never requires a plugin release, and the reverse.
 
 Runtime dependencies install from the hashed `requirements.txt` shipped in
 the tarball. After changing dependencies in `pyproject.toml`: `uv lock`, then
@@ -56,8 +58,8 @@ Single-context: `CONTEXT.md` at root + `docs/adr/`. See `docs/agents/domain.md`.
 
 ### Bar plugin tests
 
-In the plugin clone: `./tests/run.sh` and `omarchy plugin validate .` must
-pass. QML tests need `qmltestrunner` (skipped with a note when it is not
+In the plugin clone: `make test` and `omarchy plugin validate .` must
+pass (`make release` runs both). QML tests need `qmltestrunner` (skipped with a note when it is not
 installed; required in plugin CI).
 
 ### Marketplace listing

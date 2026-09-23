@@ -33,8 +33,8 @@ the baseline is `passed`, and labels include `validated` and
 
 ## After listing, each plugin release
 
-Release as in the plugin README (bump `manifest.json`, commit, push,
-`gh release create`). Then file a **new** Verify issue.
+In the plugin clone, `make bump` then `make release`. Then file a **new**
+Verify issue.
 
 ```sh
 SHA=$(git rev-parse HEAD)
