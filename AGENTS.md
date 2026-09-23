@@ -5,26 +5,27 @@ See `CONTEXT.md` for domain language.
 
 This repository is the Daemon, CLI, and site. Python lives in `daemon/`.
 The installed CLI is still `omatalk` / `omatalkd`. The listed bar plugin is
-the `plugin/` submodule (https://github.com/zerobearing2/omarchy-omatalk-plugin).
-Commit QML in `plugin/`. Agent docs stay here. Start Grok at this root.
-After clone or pull: `git submodule update --init`.
+https://github.com/zerobearing2/omarchy-omatalk-plugin, a separate repo with
+its own release. Work on it in a plain clone of that repo
+(`~/Work/omarchy-omatalk-plugin`). The installed plugin at
+`~/.config/omarchy/plugins/zerobearing.omatalk` is a git clone too. Its
+agent docs stay here, because the listed tree must not track `AGENTS.md`,
+`CONTEXT.md`, or `docs/agents/`.
 
 ## Release
 
-Daemon scripts have no prefix; `plugin-*` is plugin-only. Bump edits the
-version file and does not commit. Release does build, verify, commit,
+Bump edits the version files and does not commit. Release does build, verify, commit,
 push, and `gh release create`. It will not clobber an existing tag.
 GitHub Actions only runs tests on push.
 
 ```sh
 make bump                 # pyproject.toml + uv.lock; VERSION=x.y.z to set it
 make release              # master only; build, verify, commit, push, gh
-
-make plugin-bump          # plugin/manifest.json only
-make plugin-release       # plugin/ on master (git -C plugin switch master);
-                          # commits + pushes the submodule pointer here;
-                          # Daemon RELEASE_TAG must already exist on GitHub
 ```
+
+The plugin has the same `make bump` / `make release` (`manifest.json`;
+test, validate, commit, push, gh), run in its own clone. A Daemon release
+never requires a plugin release, and the reverse.
 
 Runtime dependencies install from the hashed `requirements.txt` shipped in
 the tarball. After changing dependencies in `pyproject.toml`: `uv lock`, then
@@ -33,10 +34,10 @@ re-export (`tests/test_requirements.py` fails with the exact command).
 Build and verify live in `scripts/` and run from release. Do not add
 Make targets for them.
 
-`plugin/install.sh` is a copy of this repo's `install.sh`. Edit the root
-file only. Install in the panel downloads the Daemon tarball named in
-`RELEASE_TAG` / `TARBALL_SHA256`. `omatalk upgrade` and the site curl
-fetch `releases/latest/download/install.sh` (self-pinned to that release).
+The plugin never installs the Daemon. Its setup screen shows the site curl
+command. `omatalk upgrade` and the site curl fetch
+`releases/latest/download/install.sh`, which build pins to that release's
+tarball (`RELEASE_TAG` / `TARBALL_SHA256`).
 
 Marketplace listing after a plugin SHA change:
 `docs/agents/plugin-marketplace.md`.
@@ -57,18 +58,15 @@ Single-context: `CONTEXT.md` at root + `docs/adr/`. See `docs/agents/domain.md`.
 
 ### Bar plugin tests
 
-```sh
-make plugin-test
-```
-
-`omarchy plugin validate plugin` must pass. QML tests need `qmltestrunner`
-(skipped with a note when it is not installed; required in plugin CI).
+In the plugin clone: `make test` and `omarchy plugin validate .` must
+pass (`make release` runs both). QML tests need `qmltestrunner` (skipped with a note when it is not
+installed; required in plugin CI).
 
 ### Marketplace listing
 
-Until listed, re-validate by editing omacom/omarchy-plugin-marketplace#4712.
-After listing, each plugin release files a `[Verify]:` issue for `plugin/`
-HEAD. See `docs/agents/plugin-marketplace.md`.
+Not listed yet; #4712 was closed and a new submission is needed. After
+listing, each plugin release files a `[Verify]:` issue for the plugin's
+`master` HEAD. See `docs/agents/plugin-marketplace.md`.
 
 ### Tests
 

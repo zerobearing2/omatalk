@@ -13,9 +13,11 @@ ship QML in the release tarball and does not copy into
 A Daemon upgrade (`omatalk upgrade` / the site curl) therefore cannot rewrite
 plugin code. QML commits still go to omarchy-omatalk-plugin.
 
-For development this repository nests that checkout as the `plugin/`
-submodule. The tarball still does not include QML. The plugin ships a
-copy of this repo's `install.sh` for the panel Install button. That
-script downloads a pinned Daemon release tarball (`RELEASE_TAG` and
-`TARBALL_SHA256`). `make plugin-release` copies that script into
-`plugin/` as its build step; `make release` (Daemon) does not.
+The plugin does not install the Daemon. Its setup screen shows the site
+command (`curl -fsSL https://omatalk.zerobearing.com/install.sh | bash`)
+with a copy button, and the user runs it in a terminal. An earlier version
+shipped a pinned copy of `install.sh` in the plugin for an Install button.
+That tied every Daemon release to a plugin release and a marketplace
+re-verification, so it was removed. The plugin is no longer a submodule
+here. The two repositories release independently. The plugin only depends
+on the `omatalk` CLI (`version`, `config get/set/voices`, `speak`).

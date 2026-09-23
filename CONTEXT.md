@@ -53,9 +53,9 @@ audio is synthesized. A part over the chunk cap is split at a clause or word
 so the engine never sees the rest of the text.
 
 The Omarchy bar widget (megaphone, setup/config panel) lives in
-https://github.com/zerobearing2/omarchy-omatalk-plugin, nested here as the
-`plugin/` submodule. This repository does not ship QML in the release
-tarball. See `docs/adr/0004-plugin-own-repo.md`. Installed means
+https://github.com/zerobearing2/omarchy-omatalk-plugin, released on its own.
+This repository does not ship QML in the release tarball, and the plugin
+does not ship or run the Daemon installer. See `docs/adr/0004-plugin-own-repo.md`. Installed means
 `~/.local/bin/omatalk` exists (the launcher `install.sh` writes). Do not use
 `command -v omatalk` as the only probe.
 
@@ -69,9 +69,9 @@ tarball. See `docs/adr/0004-plugin-own-repo.md`. Installed means
 
 ## Panel states
 
-- Not installed: setup (Install runs the `install.sh` shipped in the
-  plugin checkout, in Omarchy's floating terminal).
-  Plugin version from `plugin/manifest.json`. No `omatalk config` /
+- Not installed: setup (shows the site install command with a copy
+  button; the user runs it in a terminal).
+  Plugin version from the plugin's `manifest.json`. No `omatalk config` /
   `version` / preview `speak`.
 - Installed: voice, speed, plugin version, Daemon version (`omatalk version`).
   Config CLI uses `~/.local/bin/omatalk`.

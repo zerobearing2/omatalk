@@ -1,11 +1,7 @@
 OMATALK_HOME ?= $(HOME)/.local/share/omatalk
 REPO := $(CURDIR)
-PLUGIN := plugin
-PLUGIN_DIR ?= $(HOME)/.config/omarchy/plugins/zerobearing.omatalk
 
 .PHONY: test lint format clean bump release \
-	plugin-bump plugin-release \
-	plugin-test plugin-validate plugin-dev-reload \
 	dev-install dev-restart dev-uninstall
 
 test:
@@ -30,26 +26,6 @@ bump:
 
 release:
 	scripts/release.sh
-
-plugin-bump:
-	scripts/plugin-bump.sh
-
-plugin-release:
-	scripts/plugin-release.sh
-
-plugin-test:
-	scripts/plugin-verify.sh
-
-plugin-validate:
-	omarchy plugin validate "$(abspath $(PLUGIN))"
-
-plugin-dev-reload:
-	omarchy plugin disable zerobearing.omatalk >/dev/null 2>&1 || true
-	mkdir -p "$(PLUGIN_DIR)"
-	rsync -a --delete --exclude .git --exclude tests --exclude .github \
-		"$(abspath $(PLUGIN))/" "$(PLUGIN_DIR)/"
-	omarchy restart shell
-	omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1 || true
 
 dev-install:
 	systemctl --user stop omatalk.service

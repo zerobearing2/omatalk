@@ -96,10 +96,8 @@ script, not fetched beside the file), then:
 Releases are cut with `make bump` then `make release` on `master`, so
 several PRs can land before anyone ships. Bump only edits the version
 file. Release builds the tarball, verifies it, commits, pushes, and
-publishes the GitHub release from those files. The plugin is the same
-shape: `make plugin-bump` then `make plugin-release`.
-The plugin's Install button keeps the Daemon pin from that plugin commit.
-After the first run, `omatalk upgrade` fetches and runs the installer that
+publishes the GitHub release from those files. The bar plugin releases on
+its own, from its own repository. After the first run, `omatalk upgrade` fetches and runs the installer that
 shipped with the latest GitHub release.
 
 The script at that URL is a small dispatcher: it fetches and runs the
