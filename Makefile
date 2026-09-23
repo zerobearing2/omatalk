@@ -1,68 +1,65 @@
 OMATALK_HOME ?= $(HOME)/.local/share/omatalk
 REPO := $(CURDIR)
+PLUGIN := plugin
+PLUGIN_DIR ?= $(HOME)/.config/omarchy/plugins/zerobearing.omatalk
 
-.PHONY: test lint format clean dev-install dev-restart dev-uninstall bump release
+.PHONY: test lint format clean bump release \
+	plugin-bump plugin-release \
+	plugin-test plugin-validate plugin-dev-reload \
+	dev-install dev-restart dev-uninstall
 
 test:
 	uv run --group dev pytest tests/
 
-# Check-only: fails on any lint violation, changes nothing.
 lint:
 	uv run --group dev ruff check .
 
-# Rewrites files in place. Run before opening a PR — see AGENTS.md.
 format:
 	uv run --group dev ruff format .
 
 clean:
-	rm -rf build dist .pytest_cache
+	rm -f omatalk-src.tar.gz omatalk-src.tar.gz.sha256
+	rm -rf build dist .pytest_cache .ruff_cache
 	rm -rf *.egg-info
+	find . -path ./.venv -prune -o -type d -name __pycache__ -print0 | xargs -0 -r rm -rf
+	find . -path ./.venv -prune -o -type f \( -name '*.pyc' -o -name '*.pyo' \) -print0 | xargs -0 -r rm -f
 
-# Bump pyproject.toml's version and commit it (not pushed — push yourself
-# when ready). `make bump` increments the patch; `make bump VERSION=0.3.0`
-# sets that exact version instead. This commit is what `release` (below) and
-# the Release workflow read the version from, so bump and push *before*
-# releasing, not as part of releasing.
+# Version file only, no commit. Then make release.
 bump:
-	@current=$$(sed -n 's/^version = "\(.*\)"$$/\1/p' pyproject.toml); \
-	if [ -n "$(VERSION)" ]; then \
-		new="$(VERSION)"; \
-	else \
-		major=$$(echo "$$current" | cut -d. -f1); \
-		minor=$$(echo "$$current" | cut -d. -f2); \
-		patch=$$(echo "$$current" | cut -d. -f3); \
-		new="$$major.$$minor.$$((patch + 1))"; \
-	fi; \
-	sed -i "s/^version = \".*\"/version = \"$$new\"/" pyproject.toml; \
-	git add pyproject.toml; \
-	git commit -m "Bump version to $$new"; \
-	echo "Bumped $$current -> $$new (commit made — push when ready)"
+	scripts/bump.sh
 
-# Trigger the Release workflow (manual-only, see .github/workflows/release.yml).
-# It releases whatever version is already committed in pyproject.toml on the
-# remote's default branch, so `make bump` (and push) first.
 release:
-	gh workflow run release.yml
-	@echo "Triggered. Watch with: gh run watch \$$(gh run list --workflow=release.yml -L1 --json databaseId -q '.[0].databaseId')"
-	@echo "After it lands: check whether the bar plugin needs re-pinning (see AGENTS.md 'Release')"
+	scripts/release.sh
 
-# Point the installed Daemon at this checkout instead of the last released
-# tarball. Keeps the existing venv/models — swaps in an editable package
-# install, so `dev-restart` is all that's needed after that for ordinary
-# Python edits. The bar plugin is the other repo
-# (zerobearing2/omarchy-omatalk-plugin); this target does not copy QML.
+plugin-bump:
+	scripts/plugin-bump.sh
+
+plugin-release:
+	scripts/plugin-release.sh
+
+plugin-test:
+	scripts/plugin-verify.sh
+
+plugin-validate:
+	omarchy plugin validate "$(abspath $(PLUGIN))"
+
+plugin-dev-reload:
+	omarchy plugin disable zerobearing.omatalk >/dev/null 2>&1 || true
+	mkdir -p "$(PLUGIN_DIR)"
+	rsync -a --delete --exclude .git --exclude tests --exclude .github \
+		"$(abspath $(PLUGIN))/" "$(PLUGIN_DIR)/"
+	omarchy restart shell
+	omarchy plugin enable zerobearing.omatalk >/dev/null 2>&1 || true
+
 dev-install:
 	systemctl --user stop omatalk.service
 	uv pip install --quiet --python "$(OMATALK_HOME)/venv/bin/python" -e "$(REPO)"
 	systemctl --user start omatalk.service
 	@echo "Dev install active: Daemon runs from $(REPO)"
 
-# After editing daemon/*.py: restart the Daemon to pick up the change.
-# No reinstall needed — dev-install's editable install already points here.
 dev-restart:
 	systemctl --user restart omatalk.service
 
-# Undo dev-install: restore the official released build.
 dev-uninstall:
 	systemctl --user stop omatalk.service
 	./install.sh
