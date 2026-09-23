@@ -22,7 +22,6 @@ Single-context repo:
 │   ├── 0003-primary-selection-capture.md
 │   └── 0004-plugin-own-repo.md
 ├── daemon/
-└── plugin/          # submodule: listed Omarchy plugin
 ```
 
 ## Use the glossary's vocabulary
