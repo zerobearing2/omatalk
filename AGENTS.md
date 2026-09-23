@@ -17,7 +17,7 @@ push, and `gh release create`. It will not clobber an existing tag.
 GitHub Actions only runs tests on push.
 
 ```sh
-make bump                 # pyproject.toml only; VERSION=x.y.z to set it
+make bump                 # pyproject.toml + uv.lock; VERSION=x.y.z to set it
 make release              # master only; build, verify, commit, push, gh
 
 make plugin-bump          # plugin/manifest.json only

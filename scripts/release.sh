@@ -18,7 +18,7 @@ while IFS= read -r status; do
   fi
   path="${status:3}"
   case "$path" in
-    pyproject.toml|install.sh)
+    pyproject.toml|uv.lock|install.sh)
       ;;
     *)
       if [ -z "$unexpected" ]; then
@@ -60,7 +60,7 @@ fi
 scripts/build.sh
 scripts/verify.sh
 
-git add pyproject.toml install.sh
+git add pyproject.toml uv.lock install.sh
 if git diff --cached --quiet; then
   echo "version and pin already committed"
 else

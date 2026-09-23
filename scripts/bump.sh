@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Update pyproject.toml version only. Does not commit. Then make release.
+# Update the pyproject.toml version and re-lock uv.lock. Does not commit. Then make release.
 # VERSION=x.y.z to set it explicitly.
 set -euo pipefail
 
@@ -23,4 +23,5 @@ else
 fi
 
 sed -i "s/^version = \".*\"/version = \"$new\"/" "$file"
-printf 'Bumped %s -> %s in %s (not committed)\n' "$current" "$new" "$file"
+uv lock --quiet
+printf 'Bumped %s -> %s in %s and uv.lock (not committed)\n' "$current" "$new" "$file"
