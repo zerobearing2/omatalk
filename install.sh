@@ -147,7 +147,8 @@ systemctl --user daemon-reload
 systemctl --user enable --now omatalk.service
 
 # 7. F8 binding. Ask before writing bindings.lua; stay silent when an
-# omatalk bind already exists; never take F8 from another command.
+# omatalk o.bind already exists (comments do not count, matching what
+# uninstall removes); never take F8 from another command.
 bindings="$HOME/.config/hypr/bindings.lua"
 bind_line='o.bind("F8", "Omatalk", "omatalk speak")'
 print_bind_command() {
@@ -159,7 +160,7 @@ EOF
 already_bound=0
 f8_taken=0
 if [ -f "$bindings" ]; then
-  if grep -q omatalk "$bindings"; then
+  if grep -qE 'o\.bind.*omatalk' "$bindings"; then
     already_bound=1
   else
     if grep -qF 'o.bind("F8"' "$bindings"; then

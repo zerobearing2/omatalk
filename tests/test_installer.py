@@ -658,3 +658,36 @@ def test_every_download_is_https_only_and_bounded(site, tmp_path):
             "--speed-time ",
         ):
             assert flag in line, (flag, line)
+
+
+def test_install_rebinds_after_uninstall_leaves_a_comment(site, tmp_path):
+    site.publish(make_source())
+    env, _state, _log = fake_environment(site, tmp_path)
+    bindings = bindings_file(env)
+    bindings.parent.mkdir(parents=True)
+    bindings.write_text(
+        "-- F8 speaks selection (installed via ~/Work/omatalk/install.sh)\n"
+        f"{BIND_LINE}\n"
+    )
+
+    uninstalled = run_uninstall(env, answer="y\n")
+    reinstalled = run_install(env, site, answer="y\n")
+
+    assert uninstalled.returncode == 0, uninstalled.stderr
+    assert reinstalled.returncode == 0, reinstalled.stderr
+    assert bindings.read_text().endswith(f"\n{BIND_LINE}\n")
+    assert bindings.read_text().count(BIND_LINE) == 1
+
+
+def test_installer_pins_are_not_read_from_the_environment():
+    script = (ROOT / "install.sh").read_text()
+    for name in (
+        "RELEASE_TAG",
+        "TARBALL_SHA256",
+        "RELEASE_BASE",
+        "PLUGIN_REPO",
+        "MODEL_BASE",
+        "MODEL_SHA256",
+        "VOICES_SHA256",
+    ):
+        assert re.search(rf'^{name}="[^$]', script, re.M), name
