@@ -8,8 +8,8 @@ set -euo pipefail
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
 # Fixed, not read from the environment: what this script downloads is
 # exactly what it names here.
-RELEASE_TAG="v0.5.0"
-TARBALL_SHA256="1b1c82f6535926c58d35efcaeb2c9b24ccb18036e93ebbcafed7da50b1dca8c0"
+RELEASE_TAG="v0.5.1"
+TARBALL_SHA256="692857f2b680be2e2bcb67816b6bf2ee412a321d6606544a20bcbaba74baad56"
 RELEASE_BASE="https://github.com/zerobearing2/omatalk/releases/download/${RELEASE_TAG}"
 PLUGIN_REPO="https://github.com/zerobearing2/omarchy-omatalk-plugin.git"
 MODEL_BASE="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1"
