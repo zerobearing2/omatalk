@@ -135,7 +135,11 @@ rm -f "$OMATALK_HOME/omatalk-src.tar.gz"
 # --clear makes reinstalls and version upgrades work over an existing install.
 msg "Setting up Python environment with uv"
 uv venv --quiet --clear "$OMATALK_HOME/venv"
-uv pip install --quiet --python "$OMATALK_HOME/venv/bin/python" "$OMATALK_HOME/src"
+# Dependencies come only from the hashed requirements.txt in the tarball
+# (exported from uv.lock); the project itself installs with no resolution
+# and no build-time fetch.
+uv pip install --quiet --require-hashes --python "$OMATALK_HOME/venv/bin/python" -r "$OMATALK_HOME/src/requirements.txt"
+uv pip install --quiet --no-deps --no-build-isolation --python "$OMATALK_HOME/venv/bin/python" "$OMATALK_HOME/src"
 
 # 6. Client and systemd user unit.
 msg "Installing systemd user unit"

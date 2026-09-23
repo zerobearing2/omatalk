@@ -59,6 +59,7 @@ tar --sort=name \
   systemd \
   pyproject.toml \
   README.md \
+  requirements.txt \
   uninstall.sh \
   | gzip -n > "$tmp"
 actual="$(sha256sum "$tmp")"

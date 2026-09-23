@@ -38,6 +38,7 @@ def make_source(stale=False):
         "pyproject.toml": "[project]\nname = 'omatalk'\n",
         "systemd/omatalk.service": "[Service]\nExecStart=fake\n",
         "current.py": "new source\n",
+        "requirements.txt": "kokoro-onnx==0.6.1 --hash=sha256:00\n",
     }
     if stale:
         files["stale.py"] = "old source\n"
@@ -691,3 +692,19 @@ def test_installer_pins_are_not_read_from_the_environment():
         "VOICES_SHA256",
     ):
         assert re.search(rf'^{name}="[^$]', script, re.M), name
+
+
+def test_install_uses_only_hashed_dependencies(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+
+    result = run_install(env, site)
+
+    assert result.returncode == 0, result.stderr
+    installs = [line for line in command_log(log) if line.startswith("uv pip install")]
+    home = env["OMATALK_HOME"]
+    assert len(installs) == 2
+    assert "--require-hashes" in installs[0]
+    assert installs[0].endswith(f"-r {home}/src/requirements.txt")
+    assert "--no-deps --no-build-isolation" in installs[1]
+    assert installs[1].endswith(f"{home}/src")
