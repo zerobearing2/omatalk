@@ -6,13 +6,17 @@
 set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
-RELEASE_TAG="${RELEASE_TAG:-v0.5.0}"
-TARBALL_SHA256="${TARBALL_SHA256:-1b1c82f6535926c58d35efcaeb2c9b24ccb18036e93ebbcafed7da50b1dca8c0}"
-RELEASE_BASE="${RELEASE_BASE:-https://github.com/zerobearing2/omatalk/releases/download/${RELEASE_TAG}}"
-PLUGIN_REPO="${PLUGIN_REPO:-https://github.com/zerobearing2/omarchy-omatalk-plugin.git}"
-MODEL_BASE="${MODEL_BASE:-https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1}"
-MODEL_SHA256="${MODEL_SHA256:-f3a290d384fbb27966d462905c71a46cef9e5fd00516b40df32a0b4afe77ac96}"
-VOICES_SHA256="${VOICES_SHA256:-bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d}"
+# Fixed, not read from the environment: what this script downloads is
+# exactly what it names here.
+RELEASE_TAG="v0.5.0"
+TARBALL_SHA256="1b1c82f6535926c58d35efcaeb2c9b24ccb18036e93ebbcafed7da50b1dca8c0"
+RELEASE_BASE="https://github.com/zerobearing2/omatalk/releases/download/${RELEASE_TAG}"
+PLUGIN_REPO="https://github.com/zerobearing2/omarchy-omatalk-plugin.git"
+MODEL_BASE="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1"
+MODEL_SHA256="f3a290d384fbb27966d462905c71a46cef9e5fd00516b40df32a0b4afe77ac96"
+VOICES_SHA256="bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
+TARBALL_MAX_BYTES=10485760
+MODEL_MAX_BYTES=268435456
 MODEL_FILE="kokoro-v1.0.fp16.onnx"
 
 msg() {
@@ -45,22 +49,31 @@ download_model() {
 
   rm -f "$path"
   msg "Downloading $file (~185MB total) — this can take a few minutes depending on your connection"
-  download "$MODEL_BASE/$file" "$path" --progress-bar
+  download "$MODEL_BASE/$file" "$path" "$MODEL_MAX_BYTES" --progress-bar
   echo "$sha256  $path" | sha256sum -c --quiet
 }
 
+# HTTPS only, including redirects (GitHub release assets redirect once to
+# their CDN). Bounded in size and time; a stalled transfer aborts.
 download() {
   local url="$1"
   local dest="$2"
-  shift 2
-  case "$url" in
-    https://*)
-      curl --fail --proto '=https' --tlsv1.2 --location --max-redirs 5 "$@" -o "$dest" "$url"
-      ;;
-    *)
-      curl --fail --location --max-redirs 5 "$@" -o "$dest" "$url"
-      ;;
-  esac
+  local max_bytes="$3"
+  shift 3
+  curl --fail \
+    --proto '=https' \
+    --proto-redir '=https' \
+    --tlsv1.2 \
+    --location \
+    --max-redirs 5 \
+    --max-filesize "$max_bytes" \
+    --connect-timeout 30 \
+    --speed-limit 1024 \
+    --speed-time 60 \
+    --max-time 3600 \
+    "$@" \
+    -o "$dest" \
+    "$url"
 }
 
 add_bar_plugin() {
@@ -88,7 +101,7 @@ fi
 # beside the artifact.
 mkdir -p "$OMATALK_HOME"
 msg "Downloading $RELEASE_TAG from GitHub"
-download "$RELEASE_BASE/omatalk-src.tar.gz" "$OMATALK_HOME/omatalk-src.tar.gz"
+download "$RELEASE_BASE/omatalk-src.tar.gz" "$OMATALK_HOME/omatalk-src.tar.gz" "$TARBALL_MAX_BYTES"
 echo "$TARBALL_SHA256  $OMATALK_HOME/omatalk-src.tar.gz" | sha256sum -c --quiet
 
 # 3. Models (~185MB, skipped when their checksums match). fp16 half-size

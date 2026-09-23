@@ -1,11 +1,10 @@
 import hashlib
-import http.server
 import io
 import os
+import re
 import shutil
 import subprocess
 import tarfile
-import threading
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -21,22 +20,6 @@ PLUGIN_ADD_CMD = (
 def site(tmp_path):
     root = tmp_path / "site"
     root.mkdir()
-    requests = []
-
-    class Handler(http.server.SimpleHTTPRequestHandler):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, directory=root, **kwargs)
-
-        def do_GET(self):
-            requests.append(self.path)
-            super().do_GET()
-
-        def log_message(self, format, *args):
-            pass
-
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
 
     def publish(source_files):
         archive = root / "omatalk-src.tar.gz"
@@ -46,21 +29,8 @@ def site(tmp_path):
                 info = tarfile.TarInfo(f"omatalk/{name}")
                 info.size = len(content)
                 tar.addfile(info, io.BytesIO(content))
-        digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-        (root / "omatalk-src.tar.gz.sha256").write_text(
-            f"{digest}  omatalk-src.tar.gz\n"
-        )
 
-    try:
-        yield SimpleNamespace(
-            root=root,
-            requests=requests,
-            url=f"http://127.0.0.1:{server.server_port}",
-            publish=publish,
-        )
-    finally:
-        server.shutdown()
-        thread.join(timeout=5)
+    return SimpleNamespace(root=root, url="https://release.test", publish=publish)
 
 
 def make_source(stale=False):
@@ -151,6 +121,34 @@ set -eu
 printf 'omarchy-shell %s\\n' "$*" >> "$FAKE_LOG"
 """
     )
+    (fake_bin / "curl").write_text(
+        """#!/bin/sh
+set -eu
+printf 'curl %s\\n' "$*" >> "$FAKE_LOG"
+dest=""
+url=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o)
+      dest="$2"
+      shift 2
+      ;;
+    https://*)
+      url="$1"
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+src="$FAKE_SITE/${url#https://*/}"
+if [ ! -f "$src" ]; then
+  exit 22
+fi
+cp "$src" "$dest"
+"""
+    )
     (fake_bin / "hyprctl").write_text(
         """#!/bin/sh
 set -eu
@@ -174,16 +172,18 @@ printf 'hyprctl %s\\n' "$*" >> "$FAKE_LOG"
         **os.environ,
         "HOME": str(tmp_path / "home"),
         "PATH": f"{fake_bin}:{os.environ['PATH']}",
-        "RELEASE_BASE": site.url,
         "OMATALK_HOME": str(tmp_path / "omatalk"),
-        "MODEL_BASE": f"{site.url}/models",
-        "MODEL_SHA256": hashlib.sha256(model).hexdigest(),
-        "VOICES_SHA256": hashlib.sha256(voices).hexdigest(),
         "FAKE_LOG": str(log),
         "FAKE_STATE": str(state),
+        "FAKE_SITE": str(site.root),
         "ASK_FROM": "/dev/stdin",
         "XDG_RUNTIME_DIR": str(tmp_path / "runtime"),
-        "PLUGIN_REPO": "https://example.test/omarchy-omatalk-plugin.git",
+        # PIN_* rewrite install.sh's fixed constants; see pinned_installer.
+        "PIN_RELEASE_BASE": site.url,
+        "PIN_MODEL_BASE": f"{site.url}/models",
+        "PIN_MODEL_SHA256": hashlib.sha256(model).hexdigest(),
+        "PIN_VOICES_SHA256": hashlib.sha256(voices).hexdigest(),
+        "PIN_PLUGIN_REPO": "https://example.test/omarchy-omatalk-plugin.git",
     }
     Path(env["HOME"]).mkdir()
     return env, state, log
@@ -215,17 +215,32 @@ def without_omarchy(env):
     return env
 
 
+def pinned_installer(env, pins):
+    """install.sh with its fixed constants rewritten for the fake site."""
+    script = (ROOT / "install.sh").read_text()
+    for name, value in pins.items():
+        script, count = re.subn(
+            rf"^{name}=.*$", f'{name}="{value}"', script, count=1, flags=re.M
+        )
+        assert count == 1, name
+    path = Path(env["HOME"]).parent / "install.sh"
+    path.write_text(script)
+    return path
+
+
 def run_install(env, site, answer="", tarball_sha=None):
     if tarball_sha is None:
         tarball_sha = hashlib.sha256(
             (site.root / "omatalk-src.tar.gz").read_bytes()
         ).hexdigest()
-    env = {
-        **env,
-        "TARBALL_SHA256": tarball_sha,
+    pins = {
+        name.removeprefix("PIN_"): value
+        for name, value in env.items()
+        if name.startswith("PIN_")
     }
+    pins["TARBALL_SHA256"] = tarball_sha
     return subprocess.run(
-        ["bash", str(ROOT / "install.sh")],
+        ["bash", str(pinned_installer(env, pins))],
         cwd=ROOT,
         env=env,
         input=answer,
@@ -249,9 +264,10 @@ def bindings_file(env):
     return Path(env["HOME"]) / ".config/hypr/bindings.lua"
 
 
-def model_requests(site, filename):
+def model_requests(log, filename):
     return sum(
-        request.split("?", 1)[0] == f"/models/{filename}" for request in site.requests
+        line.startswith("curl ") and line.endswith(f"/models/{filename}")
+        for line in command_log(log)
     )
 
 
@@ -282,8 +298,8 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     assert (install_home / "src/stale.py").is_file()
     assert "To bind F8" in first.stdout
     assert not (Path(env["HOME"]) / ".config/omatalk/config.toml").exists()
-    assert model_requests(site, "kokoro-v1.0.fp16.onnx") == 1
-    assert model_requests(site, "voices-v1.0.bin") == 1
+    assert model_requests(log, "kokoro-v1.0.fp16.onnx") == 1
+    assert model_requests(log, "voices-v1.0.bin") == 1
 
     config = Path(env["HOME"]) / ".config/omatalk/config.toml"
     config.parent.mkdir(parents=True)
@@ -303,14 +319,14 @@ def test_reinstall_converges_and_preserves_user_files(site, tmp_path):
     assert config.read_bytes() == config_before
     assert bindings.read_text() == 'o.bind("F8", "Omatalk", "omatalk speak")\n'
     assert "To bind F8" not in second.stdout
-    assert model_requests(site, "kokoro-v1.0.fp16.onnx") == 1
-    assert model_requests(site, "voices-v1.0.bin") == 1
+    assert model_requests(log, "kokoro-v1.0.fp16.onnx") == 1
+    assert model_requests(log, "voices-v1.0.bin") == 1
 
     (install_home / "models/kokoro-v1.0.fp16.onnx").write_bytes(b"corrupt")
     third = run_install(env, site)
 
     assert third.returncode == 0, third.stderr
-    assert model_requests(site, "kokoro-v1.0.fp16.onnx") == 2
+    assert model_requests(log, "kokoro-v1.0.fp16.onnx") == 2
     assert (install_home / "models/kokoro-v1.0.fp16.onnx").read_bytes() == b"fake model"
 
     (site.root / "models/kokoro-v1.0.fp16.onnx").write_bytes(b"bad download")
@@ -599,3 +615,46 @@ def test_uninstall_skips_bind_prompt_without_omatalk_bind(tmp_path, site):
     assert result.returncode == 0, result.stderr
     assert "Omatalk binding" not in result.stdout + result.stderr
     assert "o.bind line" not in result.stdout
+
+
+def test_installer_ignores_environment_overrides_of_its_pins(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+    for name in ("RELEASE_TAG", "RELEASE_BASE", "MODEL_BASE", "PLUGIN_REPO"):
+        env[name] = "https://evil.test/x"
+    env["TARBALL_SHA256"] = "0" * 64
+
+    subprocess.run(
+        ["bash", str(ROOT / "install.sh")],
+        cwd=ROOT,
+        env=env,
+        input="",
+        capture_output=True,
+        text=True,
+    )
+
+    downloads = [line for line in command_log(log) if line.startswith("curl ")]
+    assert downloads
+    assert not any("evil.test" in line for line in downloads)
+    release = "https://github.com/zerobearing2/omatalk/releases/download/v"
+    assert release in downloads[0]
+
+
+def test_every_download_is_https_only_and_bounded(site, tmp_path):
+    site.publish(make_source())
+    env, _state, log = fake_environment(site, tmp_path)
+
+    result = run_install(env, site)
+
+    assert result.returncode == 0, result.stderr
+    downloads = [line for line in command_log(log) if line.startswith("curl ")]
+    assert len(downloads) == 3
+    for line in downloads:
+        for flag in (
+            "--proto =https",
+            "--proto-redir =https",
+            "--max-filesize ",
+            "--max-time ",
+            "--speed-time ",
+        ):
+            assert flag in line, (flag, line)

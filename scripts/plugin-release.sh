@@ -113,9 +113,8 @@ daemon_tag=""
 while IFS= read -r line; do
   case "$line" in
     RELEASE_TAG=*)
-      daemon_tag="${line#*:-}"
+      daemon_tag="${line#*=\"}"
       daemon_tag="${daemon_tag%\"}"
-      daemon_tag="${daemon_tag%\}}"
       ;;
   esac
 done < "$plugin/install.sh"
