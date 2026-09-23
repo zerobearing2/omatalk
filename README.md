@@ -26,7 +26,7 @@ the active color while Omatalk is speaking.
 The bar keeps one megaphone icon in the same spot and changes its color:
 
 - `not installed`: normal bar color; tooltip says Omatalk is not installed.
-  Open the panel for Install Omatalk.
+  The panel shows the install command to copy.
 - `idle`: normal bar color; the Daemon is ready.
 - `speaking`: theme accent; selected text is being read.
 - `unavailable`: urgent color after a 3-second disconnect grace period, only
@@ -56,16 +56,17 @@ The Daemon has been disconnected long enough to show the urgent color.
 
 Two doors, one installer.
 
-**Plugin store.** Add the megaphone, then install the Daemon from the panel if
-it is missing:
+**Plugin store.** Add the megaphone. Until the Daemon is installed, its panel
+shows the site command below with a copy button:
 
 ```sh
 omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable
 ```
 
-Click the megaphone and choose Install Omatalk. Models are about 185MB.
+Paste it into a terminal. The plugin never runs an installer itself. Models
+are about 185MB.
 
-**Site.** The same installer from a terminal:
+**Site.** The installer from a terminal:
 
 ```sh
 curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
