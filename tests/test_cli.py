@@ -87,6 +87,70 @@ def test_upgrade_rejects_extra_arguments(installer_site, tmp_path):
     assert not requests
 
 
+def seed_uninstaller(tmp_path, body):
+    home = tmp_path / "omatalk"
+    (home / "src").mkdir(parents=True)
+    (home / "src/uninstall.sh").write_text(body)
+    return home
+
+
+def test_uninstall_runs_the_shipped_uninstaller_from_a_temp_copy(tmp_path):
+    marker = tmp_path / "uninstall-marker"
+    # Like the real uninstaller, delete OMATALK_HOME, then record where it ran.
+    home = seed_uninstaller(
+        tmp_path,
+        'rm -rf "$OMATALK_HOME"\nprintf \'%s\' "$0" > "$UNINSTALL_MARKER"\n',
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "daemon.cli", "uninstall"],
+        cwd=ROOT,
+        env={
+            **os.environ,
+            "OMATALK_HOME": str(home),
+            "UNINSTALL_MARKER": str(marker),
+            "OMATALK_SOCKET": str(tmp_path / "missing.sock"),
+        },
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    ran_from = Path(marker.read_text())
+    assert ran_from != home / "src/uninstall.sh"
+    assert not ran_from.exists()
+    assert not home.exists()
+
+
+def test_uninstall_without_shipped_uninstaller_points_at_the_site(tmp_path):
+    result = subprocess.run(
+        [sys.executable, "-m", "daemon.cli", "uninstall"],
+        cwd=ROOT,
+        env={**os.environ, "OMATALK_HOME": str(tmp_path / "missing")},
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash" in (
+        result.stderr
+    )
+
+
+def test_uninstall_rejects_extra_arguments(tmp_path):
+    home = seed_uninstaller(tmp_path, "exit 0\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "daemon.cli", "uninstall", "now"],
+        cwd=ROOT,
+        env={**os.environ, "OMATALK_HOME": str(home)},
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert result.stderr.startswith("usage: omatalk")
+
+
 def make_notify_environment(tmp_path):
     config = tmp_path / "config.toml"
     config.write_text(f'notify = ["{FAKES}/notify"]\n')

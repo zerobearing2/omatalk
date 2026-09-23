@@ -120,6 +120,13 @@ leaves the Daemon, venv, models, and config. F8 still speaks.
 ## Uninstall
 
 ```sh
+omatalk uninstall
+```
+
+Runs the uninstaller that shipped with the installed release. If the
+`omatalk` command is already gone, use the site copy:
+
+```sh
 curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
 ```
 
@@ -139,6 +146,7 @@ omatalk stop                        # cut off the current utterance
 omatalk status                      # idle | speaking | error
 omatalk version                     # print the installed release (--version works too)
 omatalk upgrade                     # install the latest release
+omatalk uninstall                   # remove Omatalk (asks about models, config, F8)
 omatalk config get [--json]         # print the effective config
 omatalk config set voice af_bella   # set voice or speed; auto-applies
 omatalk config set speed 1.25       # (0.5-2.0)
