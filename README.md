@@ -54,22 +54,22 @@ The Daemon has been disconnected long enough to show the urgent color.
 
 ## Install
 
-Two doors, one installer.
-
-**Plugin store.** Add the megaphone. Until the Daemon is installed, its panel
-links to the install instructions here:
-
-```sh
-omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable
-```
-
-Paste it into a terminal. The plugin never runs an installer itself. Models
-are about 185MB.
-
-**Site.** The installer from a terminal:
+Omatalk has two parts: the Daemon, which does the speaking, and the bar
+plugin, the megaphone and voice panel. One command installs both:
 
 ```sh
 curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
+```
+
+Models are about 185MB. If you added the plugin from the Omarchy
+Marketplace first, its panel links to these steps; run the command above and it keeps
+the plugin you have.
+
+**Bar plugin only.** The installer already adds it. Use this only if that
+failed or you removed the plugin; it does nothing without the Daemon:
+
+```sh
+omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable
 ```
 
 The script downloads a pinned GitHub release tarball (SHA-256 is in the
