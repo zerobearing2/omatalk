@@ -69,8 +69,8 @@ does not ship or run the Daemon installer. See `docs/adr/0004-plugin-own-repo.md
 
 ## Panel states
 
-- Not installed: setup (shows the site install command with a copy
-  button; the user runs it in a terminal).
+- Not installed: setup (links to the site install page; the user runs the
+  install command in a terminal).
   Plugin version from the plugin's `manifest.json`. No `omatalk config` /
   `version` / preview `speak`.
 - Installed: voice, speed, plugin version, Daemon version (`omatalk version`).

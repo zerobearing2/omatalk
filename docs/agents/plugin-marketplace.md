@@ -23,8 +23,8 @@ maintainer notes against the current `master` SHA. Do not reuse #4712.
 
 Keep tags as `bar, media, quickshell`, category `Productivity`, and
 `manual-setup` as a stated fact in Maintainer notes. Setup is manual: the
-panel shows `curl -fsSL https://omatalk.zerobearing.com/install.sh | bash`
-with a copy button. The plugin downloads and executes nothing. It calls the
+panel links to https://omatalk.zerobearing.com/#install and shows no
+command. The plugin downloads and executes nothing. It calls the
 `omatalk` CLI once `~/.local/bin/omatalk` exists.
 
 Done when the bot validation comment names current plugin `master` HEAD,
