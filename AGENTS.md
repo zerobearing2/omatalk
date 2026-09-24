@@ -64,9 +64,10 @@ installed; required in plugin CI).
 
 ### Marketplace listing
 
-Not listed yet; #4712 was closed and a new submission is needed. After
-listing, each plugin release files a `[Verify]:` issue for the plugin's
-`master` HEAD. See `docs/agents/plugin-marketplace.md`.
+Listed: https://omarchyplugins.com/plugin.html?id=zerobearing.omatalk
+(approved on omacom/omarchy-plugin-marketplace#8407 at plugin v1.2.2). Each
+plugin release files a `[Verify]:` issue for the plugin's `master` HEAD.
+See `docs/agents/plugin-marketplace.md`.
 
 ### Tests
 

@@ -13,23 +13,20 @@ Read [SUBMISSION.md](https://github.com/omacom/omarchy-plugin-marketplace/blob/m
 and [VERIFICATION.md](https://github.com/omacom/omarchy-plugin-marketplace/blob/main/VERIFICATION.md)
 when the recipe below is not enough.
 
-## Until the first listing
+## Listing
 
-The first submission, #4712, was closed for inactivity after a security
-review. Its objection was the old installer path, which fetched a mutable
-tarball and checksum. The plugin now ships no installer at all. File a new
-`[Plugin]: Omatalk` issue with the submit-plugin form, and write fresh
-maintainer notes against the current `master` SHA. Do not reuse #4712.
+Listed at https://omarchyplugins.com/plugin.html?id=zerobearing.omatalk,
+approved on #8407 at plugin v1.2.2 (`c0d145f`). The first submission,
+#4712, was closed after review objected to an installer in the plugin.
+#8407's review objected to the panel displaying and copying the site
+`curl | bash`; the fix was a link to https://omatalk.zerobearing.com/#install
+with no command shown. Keep it that way: the plugin downloads, executes,
+displays, and copies no install command. It calls the `omatalk` CLI once
+`~/.local/bin/omatalk` exists. `manual-setup` stays.
 
-Keep tags as `bar, media, quickshell`, category `Productivity`, and
-`manual-setup` as a stated fact in Maintainer notes. Setup is manual: the
-panel links to https://omatalk.zerobearing.com/#install and shows no
-command. The plugin downloads and executes nothing. It calls the
-`omatalk` CLI once `~/.local/bin/omatalk` exists.
-
-Done when the bot validation comment names current plugin `master` HEAD,
-the baseline is `passed`, and labels include `validated` and
-`manual-setup`. Then stop. A maintainer applies `approved-and-verified`.
+The baseline scanner also flags `curl | bash` in the plugin README and
+`git fetch` followed by running scripts, including maintainer-only release
+scripts.
 
 ## After listing, each plugin release
 
