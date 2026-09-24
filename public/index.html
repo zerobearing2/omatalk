@@ -413,6 +413,15 @@
     border-radius: 10px;
     background: var(--ink-alt);
   }
+  .install-step {
+    margin-top: 34px;
+    color: var(--fg);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
   .bar-state-head {
     padding: 13px 15px 10px;
     color: var(--fg);
@@ -860,24 +869,12 @@
   <section id="install">
     <div class="eyebrow">install</div>
     <h2>Get it running</h2>
-    <p class="prose" style="margin-top:14px;">Models are about 185MB.</p>
+    <p class="prose" style="margin-top:14px;">Omatalk has two parts: the Daemon, which does the speaking, and the bar plugin, the megaphone and voice panel. One command installs both.</p>
 
-    <p class="prose" style="margin-top:26px;">Marketplace: add the plugin. Until the Daemon is installed, its panel links here. Then run the CLI command further down.</p>
+    <p class="prose" style="margin-top:14px;">Run it in a terminal. It installs the speech Daemon and the <code class="inline-code">omatalk</code> command, downloads the models (about 185MB), asks before binding F8, and adds the bar plugin. If you added the plugin from the Omarchy Marketplace first, its panel links here: run this, and it keeps the plugin you have.</p>
     <div class="code-card" style="margin-top:12px;">
       <div class="cc-title">
-        marketplace
-        <button class="copy-btn" type="button">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
-          <span class="copy-label">copy</span>
-        </button>
-      </div>
-      <pre>omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable</pre>
-    </div>
-
-    <p class="prose" style="margin-top:26px;">CLI: the installer, from a terminal.</p>
-    <div class="code-card" style="margin-top:12px;">
-      <div class="cc-title">
-        cli
+        install
         <button class="copy-btn" type="button">
           <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
           <span class="copy-label">copy</span>
@@ -886,7 +883,21 @@
       <pre>curl -fsSL https://omatalk.zerobearing.com/install.sh | bash</pre>
     </div>
 
-    <p class="prose" style="margin-top:26px;">Uninstall: Daemon, launcher, and plugin. Asks before deleting models and config.</p>
+    <h3 class="install-step">Bar plugin only</h3>
+    <p class="prose" style="margin-top:10px;">The installer already adds it. Use this only if that failed or you removed the plugin. The plugin does nothing without the Daemon.</p>
+    <div class="code-card" style="margin-top:12px;">
+      <div class="cc-title">
+        plugin
+        <button class="copy-btn" type="button">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+          <span class="copy-label">copy</span>
+        </button>
+      </div>
+      <pre>omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable</pre>
+    </div>
+
+    <h3 class="install-step">Uninstall</h3>
+    <p class="prose" style="margin-top:10px;">Removes the Daemon, launcher, and plugin. Asks before deleting models and config. Once installed, <code class="inline-code">omatalk uninstall</code> does the same.</p>
     <div class="code-card" style="margin-top:12px;">
       <div class="cc-title">
         uninstall
