@@ -34,8 +34,8 @@ re-export (`tests/test_requirements.py` fails with the exact command).
 Build and verify live in `scripts/` and run from release. Do not add
 Make targets for them.
 
-The plugin never installs the Daemon. Its setup screen shows the site curl
-command. `omatalk upgrade` and the site curl fetch
+The plugin never installs the Daemon. Its setup screen links to the site
+install page and shows no command. `omatalk upgrade` and the site curl fetch
 `releases/latest/download/install.sh`, which build pins to that release's
 tarball (`RELEASE_TAG` / `TARBALL_SHA256`).
 
