@@ -1,10 +1,10 @@
 //! The actor driven through the connection-thread `speak`.
 
-use super::actor::{Actor, Command};
+use super::actor::{Actor, Command, Gen};
 use super::*;
 use crate::protocol::State;
 use crate::speech::fake::{Call, RecordingEngine};
-use crate::stream::{Gen, Outcome, REST_AFTER};
+use crate::stream::{Outcome, REST_AFTER};
 use crate::testutil::{TempDir, fake_commands, fake_env, log_lines, wait_for};
 use crate::voices::VoiceName;
 use std::collections::BTreeMap;

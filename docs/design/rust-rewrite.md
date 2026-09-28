@@ -58,7 +58,7 @@ if outcome == Some(SpeakOutcome::NothingToRead) {
 
 // daemon.rs, actor thread: the whole Utterance lifecycle is one match on Phase.
 match decide(self.phase.playing(), press) {
-    Decision::Start(text) => self.phase = Phase::Speaking { text, stream: Stream::start(utterance, io, generation, &self.synth, on_end) },
+    Decision::Start(text) => self.phase = Phase::Speaking { text, generation, _stream: Stream::start(text, config, &self.synth, report) },
     Decision::Stop        => self.phase = Phase::Idle,          // dropping the Stream interrupts it
     Decision::Keep        => {}                                 // a Clipboard follow-up that lost a race
     Decision::NeedClipboard => return SpeakOutcome::NeedClipboard,
