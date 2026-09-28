@@ -6,7 +6,8 @@
 //! - the synth thread owns the engine; it only sends PCM down a bounded
 //!   channel and never talks to the actor.
 //! - the playback thread owns the player process and is the single
-//!   reporter of the Utterance's outcome (`on_end`).
+//!   reporter of the Utterance's outcome: it notifies an error, then calls
+//!   `report`.
 
 use std::io::Write;
 use std::os::fd::AsRawFd;
@@ -15,9 +16,10 @@ use std::process::{Child, ChildStdin, Stdio};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, SyncSender};
 use std::time::{Duration, Instant};
 
-use crate::exec::Argv;
+use crate::config::Config;
+use crate::exec::{self, Argv};
 use crate::sink::WakeLead;
-use crate::speech::{Engine, SAMPLE_RATE, SpeechError, StopToken, Utterance};
+use crate::speech::{Engine, SAMPLE_RATE, SpeechError, StopToken, Text, Utterance};
 
 /// How often the playback thread checks its token while waiting for PCM or
 /// for pipe space. Bounds Interrupt latency; only ticks while speaking.
@@ -32,11 +34,6 @@ pub const SYNTH_THREAD: &str = "omatalk-synth";
 /// Quiet time after the last synthesis before the engine rests.
 pub const REST_AFTER: Duration = Duration::from_secs(60);
 
-/// Monotonic per Daemon. The actor ignores any report whose Gen is not the
-/// current Stream's.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Gen(pub u64);
-
 #[derive(Debug, PartialEq)]
 pub enum Outcome {
     /// All audio was written and the speech player exited after EOF.
@@ -45,14 +42,6 @@ pub enum Outcome {
     Failed(String),
     /// The token fired first. Never notified; the actor has moved on.
     Stopped,
-}
-
-/// The per-Utterance processes a Stream needs, from the config snapshot
-/// taken at Utterance start.
-#[derive(Clone, Debug)]
-pub struct StreamIo {
-    pub player: Argv,
-    pub wake: WakeLead,
 }
 
 /// Handle to the single synth thread. Cloneable sender; the thread exits when
@@ -150,51 +139,61 @@ fn panic_message(panic: &(dyn std::any::Any + Send)) -> &str {
 
 /// One Utterance in flight. Not Clone: exactly one owner can stop it.
 pub struct Stream {
-    generation: Gen,
     stop: StopToken,
 }
 
 impl Stream {
-    /// Queues synthesis and starts the playback thread, which spawns the
-    /// speech player and probes the sink in parallel with the first ORT run.
-    /// `on_end` is called exactly once, from the playback thread.
+    /// Speaks `text` with the config snapshot taken at the press. Queues
+    /// synthesis and starts the playback thread, which spawns the speech
+    /// player and probes the sink in parallel with the first ORT run.
+    /// `report` is called exactly once, from the playback thread, after any
+    /// `error:` notify.
     pub fn start(
-        utterance: Utterance,
-        io: StreamIo,
-        generation: Gen,
+        text: Text,
+        config: Config,
         synth: &Synth,
-        on_end: impl FnOnce(Gen, Outcome) + Send + 'static,
+        report: impl FnOnce(Outcome) + Send + 'static,
     ) -> Stream {
+        let Config {
+            voice,
+            speed,
+            player,
+            notify,
+            sink_probe,
+            wake_lead,
+            ..
+        } = config;
+        let wake = WakeLead {
+            probe: sink_probe,
+            lead: wake_lead,
+        };
         let stop = StopToken::default();
         let (pcm_tx, pcm_rx) = std::sync::mpsc::sync_channel(PCM_QUEUE);
         let playback_stop = stop.clone();
         std::thread::Builder::new()
             .name("omatalk-play".into())
             .spawn(move || {
-                let outcome = playback(&io, pcm_rx, &playback_stop);
-                // Stopped wins: an interrupted Utterance is never an error.
-                on_end(
-                    generation,
-                    if playback_stop.is_fired() {
-                        Outcome::Stopped
-                    } else {
-                        outcome
-                    },
+                let outcome = settle(
+                    playback(&player, &wake, pcm_rx, &playback_stop),
+                    playback_stop.is_fired(),
                 );
+                // Notify before the report, so the error is shown by the
+                // time state flips to `error`.
+                if let Outcome::Failed(msg) = &outcome {
+                    eprintln!("error: {msg}");
+                    exec::notify(&notify, &format!("error: {msg}"));
+                }
+                report(outcome);
             })
             .expect("spawn playback thread");
         let job = Job {
-            utterance,
+            utterance: Utterance { text, voice, speed },
             stop: stop.clone(),
             pcm: pcm_tx,
         };
         // The synth thread only exits with the process, so this cannot fail.
         let _ = synth.jobs.send(job);
-        Stream { generation, stop }
-    }
-
-    pub fn generation(&self) -> Gen {
-        self.generation
+        Stream { stop }
     }
 }
 
@@ -207,17 +206,23 @@ impl Drop for Stream {
     }
 }
 
+/// Stopped wins: an interrupted Utterance is never an error, even when the
+/// player or engine failed after the token fired.
+fn settle(outcome: Outcome, stopped: bool) -> Outcome {
+    if stopped { Outcome::Stopped } else { outcome }
+}
+
 /// Playback thread body.
 ///
 /// Invariant: on every exit path `pcm` is dropped BEFORE any player is cut.
 /// A synth thread blocked on a full queue then unblocks at once instead of
 /// waiting out REAP_GRACE, so the next Utterance's first ORT run is not delayed.
-fn playback(io: &StreamIo, pcm: Receiver<Pcm>, stop: &StopToken) -> Outcome {
-    let Ok(mut speech) = Player::spawn(&io.player) else {
+fn playback(player: &Argv, wake: &WakeLead, pcm: Receiver<Pcm>, stop: &StopToken) -> Outcome {
+    let Ok(mut speech) = Player::spawn(player) else {
         return PlayerExited.into();
     };
     // Synthesis runs meanwhile; the probe is bounded well under first PCM.
-    let lead_frames = io.wake.measure().as_millis() as usize * SAMPLE_RATE as usize / 1000;
+    let lead_frames = wake.measure().as_millis() as usize * SAMPLE_RATE as usize / 1000;
     let fed = speech
         .write(&s16le(&vec![0.0; lead_frames]), stop)
         .map_err(Outcome::from)
@@ -386,10 +391,8 @@ fn reap(mut child: Child) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Speed;
-    use crate::speech::{Audio, Text};
+    use crate::speech::Audio;
     use crate::testutil::{TempDir, log_lines, wait_for};
-    use crate::voices::VoiceName;
     use std::fs;
     use std::path::Path;
     use std::sync::{Arc, Mutex};
@@ -418,26 +421,23 @@ mod tests {
         }
     }
 
-    fn utterance() -> Utterance {
-        Utterance {
-            text: Text::new("Hello.").unwrap(),
-            voice: VoiceName::parse("af_heart").unwrap(),
-            speed: Speed::parse("1").unwrap(),
-        }
+    fn text() -> Text {
+        Text::new("Hello.").unwrap()
     }
 
     fn argv(path: &Path) -> Argv {
         Argv::new(vec![path.display().to_string()]).unwrap()
     }
 
-    /// A probe that fails, so no lead: the pre-lead behavior.
-    fn io(player: &Path) -> StreamIo {
-        StreamIo {
+    /// A probe that fails, so no lead: the pre-lead behavior. The notify
+    /// does nothing.
+    fn config(player: &Path) -> Config {
+        Config {
             player: argv(player),
-            wake: WakeLead {
-                probe: Argv::new(vec!["false".into()]).unwrap(),
-                lead: Duration::from_millis(600),
-            },
+            notify: Argv::new(vec!["true".into()]).unwrap(),
+            sink_probe: Argv::new(vec!["false".into()]).unwrap(),
+            wake_lead: Duration::from_millis(600),
+            ..Config::defaults()
         }
     }
 
@@ -456,17 +456,42 @@ mod tests {
         engine: impl Engine + 'static,
         player: &Path,
     ) -> (Stream, std::sync::mpsc::Receiver<Outcome>) {
-        start_io(engine, io(player))
+        start_with(engine, config(player))
     }
 
-    fn start_io(
+    fn start_with(
         engine: impl Engine + 'static,
-        io: StreamIo,
+        config: Config,
     ) -> (Stream, std::sync::mpsc::Receiver<Outcome>) {
         let synth = Synth::spawn(Box::new(engine), REST_AFTER);
         let (tx, rx) = std::sync::mpsc::channel();
-        let stream = Stream::start(utterance(), io, Gen(1), &synth, move |_, outcome| {
+        let stream = Stream::start(text(), config, &synth, move |outcome| {
             tx.send(outcome).unwrap();
+        });
+        (stream, rx)
+    }
+
+    /// Starts one Stream whose notify appends to a log; the receiver yields
+    /// the outcome with that log as it stood when `report` ran.
+    fn start_notified(
+        engine: impl Engine + 'static,
+        player: &Path,
+        dir: &TempDir,
+    ) -> (Stream, std::sync::mpsc::Receiver<(Outcome, String)>) {
+        let log = dir.path().join("notify.log");
+        let notify = argv(&dir.script(
+            "notify",
+            &format!("#!/bin/sh\nprintf '%s\\n' \"$1\" >> {}\n", log.display()),
+        ));
+        let synth = Synth::spawn(Box::new(engine), REST_AFTER);
+        let (tx, rx) = std::sync::mpsc::channel();
+        let config = Config {
+            notify,
+            ..config(player)
+        };
+        let stream = Stream::start(text(), config, &synth, move |outcome| {
+            let notified = fs::read_to_string(&log).unwrap_or_default();
+            tx.send((outcome, notified)).unwrap();
         });
         (stream, rx)
     }
@@ -569,14 +594,12 @@ mod tests {
             (BT, "SUSPENDED", 0, 0),
         ] {
             let dir = TempDir::new("lead");
-            let io = StreamIo {
-                wake: WakeLead {
-                    probe: probe(&dir, sink, state),
-                    lead: Duration::from_millis(lead_ms),
-                },
-                ..io(&echo_player(&dir))
+            let config = Config {
+                sink_probe: probe(&dir, sink, state),
+                wake_lead: Duration::from_millis(lead_ms),
+                ..config(&echo_player(&dir))
             };
-            let (_stream, rx) = start_io(batches(vec![samples.clone()]), io);
+            let (_stream, rx) = start_with(batches(vec![samples.clone()]), config);
             assert_eq!(outcome(&rx), Outcome::Finished);
             let want = [vec![0; want_lead_bytes], s16le(&samples)].concat();
             assert_eq!(
@@ -599,9 +622,11 @@ mod tests {
         ] {
             let run = TempDir::new("bad-probe-run");
             let started = Instant::now();
-            let mut io = io(&echo_player(&run));
-            io.wake.probe = probe.clone();
-            let (_stream, rx) = start_io(batches(vec![samples.clone()]), io);
+            let config = Config {
+                sink_probe: probe.clone(),
+                ..config(&echo_player(&run))
+            };
+            let (_stream, rx) = start_with(batches(vec![samples.clone()]), config);
             wait_for("speech bytes", Duration::from_secs(5), || {
                 captured(&run).contains(&s16le(&samples)).then_some(())
             });
@@ -627,15 +652,13 @@ mod tests {
         );
         // Two seconds of lead is more than a pipe holds, so playback is
         // parked in the lead write when stopped.
-        let io = StreamIo {
-            wake: WakeLead {
-                probe: probe(&dir, "bluez_output.X.1", "SUSPENDED"),
-                lead: Duration::from_secs(2),
-            },
-            ..io(&player)
+        let config = Config {
+            sink_probe: probe(&dir, "bluez_output.X.1", "SUSPENDED"),
+            wake_lead: Duration::from_secs(2),
+            ..config(&player)
         };
         let (engine, _release) = gated(vec![vec![0.1; 24]], 0);
-        let (stream, rx) = start_io(engine, io);
+        let (stream, rx) = start_with(engine, config);
         wait_for("players started", Duration::from_secs(5), || {
             (!log_lines(&log, "start").is_empty()).then_some(())
         });
@@ -790,9 +813,8 @@ mod tests {
         );
         let run = |player: &Path| {
             let (tx, rx) = std::sync::mpsc::channel();
-            let stream = Stream::start(utterance(), io(player), Gen(1), &synth, move |_, o| {
-                tx.send(o).unwrap()
-            });
+            let stream =
+                Stream::start(text(), config(player), &synth, move |o| tx.send(o).unwrap());
             (stream, rx)
         };
         // Kept alive, so only the closed PCM channel can end its synthesis.
@@ -820,17 +842,15 @@ mod tests {
         let dir = TempDir::new("rest");
         let rests = Arc::new(Mutex::new(0));
         let synth = Synth::spawn(Box::new(Rests(rests.clone())), quiet);
-        let io = io(&echo_player(&dir));
+        let config = config(&echo_player(&dir));
         let count = || *rests.lock().unwrap();
         std::thread::sleep(quiet * 3);
         assert_eq!(count(), 0, "no rest before any speech");
-        for generation in 1..=2 {
+        for want in 1..=2 {
             let (tx, rx) = std::sync::mpsc::channel();
-            let _stream = Stream::start(utterance(), io.clone(), Gen(generation), &synth, {
-                move |_, o| tx.send(o).unwrap()
-            });
+            let _stream =
+                Stream::start(text(), config.clone(), &synth, move |o| tx.send(o).unwrap());
             assert_eq!(outcome(&rx), Outcome::Finished);
-            let want = generation as usize;
             wait_for("rest", Duration::from_secs(5), || {
                 (count() == want).then_some(())
             });
@@ -843,20 +863,71 @@ mod tests {
     fn engine_panic_becomes_internal_error_and_synth_keeps_serving() {
         let dir = TempDir::new("panic");
         let synth = Synth::spawn(Box::new(Panics), REST_AFTER);
-        let io = io(&echo_player(&dir));
-        for generation in 1..=2 {
+        let config = config(&echo_player(&dir));
+        for _ in 0..2 {
             let (tx, rx) = std::sync::mpsc::channel();
-            let _stream = Stream::start(
-                utterance(),
-                io.clone(),
-                Gen(generation),
-                &synth,
-                move |_, o| tx.send(o).unwrap(),
-            );
+            let _stream =
+                Stream::start(text(), config.clone(), &synth, move |o| tx.send(o).unwrap());
             assert_eq!(
                 outcome(&rx),
                 Outcome::Failed("internal error: odd input".into())
             );
         }
+    }
+
+    #[test]
+    fn a_failure_is_notified_before_it_is_reported() {
+        let dir = TempDir::new("notify-player");
+        let (_stream, rx) = start_notified(
+            batches(vec![vec![0.1]]),
+            &dir.path().join("no-such-player"),
+            &dir,
+        );
+        assert_eq!(
+            rx.recv_timeout(Duration::from_secs(10)).unwrap(),
+            (
+                Outcome::Failed("player exited".into()),
+                "error: player exited\n".into()
+            )
+        );
+
+        let dir = TempDir::new("notify-engine");
+        let (_stream, rx) = start_notified(Panics, &echo_player(&dir), &dir);
+        assert_eq!(
+            rx.recv_timeout(Duration::from_secs(10)).unwrap(),
+            (
+                Outcome::Failed("internal error: odd input".into()),
+                "error: internal error: odd input\n".into()
+            )
+        );
+    }
+
+    #[test]
+    fn finished_and_stopped_are_never_notified() {
+        let dir = TempDir::new("notify-finished");
+        let (_stream, rx) = start_notified(batches(vec![vec![0.1]]), &echo_player(&dir), &dir);
+        assert_eq!(
+            rx.recv_timeout(Duration::from_secs(10)).unwrap(),
+            (Outcome::Finished, String::new())
+        );
+
+        let dir = TempDir::new("notify-stopped");
+        let (engine, release) = gated(vec![vec![0.1; 24]], 0);
+        let (stream, rx) = start_notified(engine, &echo_player(&dir), &dir);
+        drop(stream);
+        drop(release);
+        assert_eq!(
+            rx.recv_timeout(Duration::from_secs(10)).unwrap(),
+            (Outcome::Stopped, String::new())
+        );
+    }
+
+    #[test]
+    fn stopped_wins_over_every_outcome() {
+        let failed = || Outcome::Failed("player exited".into());
+        assert_eq!(settle(failed(), true), Outcome::Stopped);
+        assert_eq!(settle(Outcome::Finished, true), Outcome::Stopped);
+        assert_eq!(settle(failed(), false), failed());
+        assert_eq!(settle(Outcome::Finished, false), Outcome::Finished);
     }
 }

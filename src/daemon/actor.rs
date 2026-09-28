@@ -5,11 +5,14 @@ use std::os::unix::net::UnixStream;
 use std::sync::mpsc::{Receiver, Sender};
 
 use crate::config::Config;
-use crate::exec;
 use crate::protocol::State;
-use crate::sink::WakeLead;
-use crate::speech::{Text, Utterance};
-use crate::stream::{Gen, Outcome, Stream, StreamIo, Synth};
+use crate::speech::Text;
+use crate::stream::{Outcome, Stream, Synth};
+
+/// Monotonic per Daemon. The actor ignores any report whose Gen is not the
+/// current Stream's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Gen(pub(super) u64);
 
 /// Everything the actor can be told. Replies travel on one-shot channels so
 /// the connection thread, not the actor, writes to the client.
@@ -91,7 +94,9 @@ enum Phase {
     Idle,
     Speaking {
         text: Text,
-        stream: Stream,
+        /// Held only to be dropped: dropping it interrupts the Utterance.
+        _stream: Stream,
+        generation: Gen,
     },
     /// Persists until `stop` or a successful start.
     Error,
@@ -170,7 +175,7 @@ impl Actor {
                 generation,
                 outcome,
             } => {
-                let current = matches!(&self.phase, Phase::Speaking { stream, .. } if stream.generation() == generation);
+                let current = matches!(&self.phase, Phase::Speaking { generation: g, .. } if *g == generation);
                 if current {
                     self.phase = match outcome {
                         Outcome::Finished | Outcome::Stopped => Phase::Idle,
@@ -190,48 +195,19 @@ impl Actor {
             Decision::Start(text) => {
                 self.last_gen += 1;
                 let generation = Gen(self.last_gen);
-                let Config {
-                    voice,
-                    speed,
-                    player,
-                    notify,
-                    sink_probe,
-                    wake_lead,
-                    ..
-                } = config;
-                let utterance = Utterance {
-                    text: text.clone(),
-                    voice,
-                    speed,
-                };
-                let io = StreamIo {
-                    player,
-                    wake: WakeLead {
-                        probe: sink_probe,
-                        lead: wake_lead,
-                    },
-                };
                 let commands = self.commands.clone();
-                let stream = Stream::start(
-                    utterance,
-                    io,
-                    generation,
-                    &self.synth,
-                    // Notify before the report, so the error is shown by the
-                    // time state flips to `error`.
-                    move |generation, outcome| {
-                        if let Outcome::Failed(msg) = &outcome {
-                            eprintln!("error: {msg}");
-                            exec::notify(&notify, &format!("error: {msg}"));
-                        }
-                        let _ = commands.send(Command::StreamEnded {
-                            generation,
-                            outcome,
-                        });
-                    },
-                );
+                let stream = Stream::start(text.clone(), config, &self.synth, move |outcome| {
+                    let _ = commands.send(Command::StreamEnded {
+                        generation,
+                        outcome,
+                    });
+                });
                 // The old Stream (if any) drops here: Interrupt.
-                self.phase = Phase::Speaking { text, stream };
+                self.phase = Phase::Speaking {
+                    text,
+                    _stream: stream,
+                    generation,
+                };
             }
         }
         SpeakOutcome::Ok
