@@ -6,8 +6,8 @@
 # makepkg --printsrcinfo > .SRCINFO.
 
 pkgname=omatalk-bin
-pkgver=0.9.0dev0
-_tag=v0.9.0-dev.0
+pkgver=0.9.0
+_tag=v0.9.0
 pkgrel=1
 pkgdesc='Local text-to-speech for Omarchy: hotkey, and the machine speaks your selected text'
 arch=('x86_64')
