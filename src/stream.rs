@@ -173,13 +173,10 @@ impl Stream {
         std::thread::Builder::new()
             .name("omatalk-play".into())
             .spawn(move || {
-                let outcome = playback(&player, &wake, pcm_rx, &playback_stop);
-                // Stopped wins: an interrupted Utterance is never an error.
-                let outcome = if playback_stop.is_fired() {
-                    Outcome::Stopped
-                } else {
-                    outcome
-                };
+                let outcome = settle(
+                    playback(&player, &wake, pcm_rx, &playback_stop),
+                    playback_stop.is_fired(),
+                );
                 // Notify before the report, so the error is shown by the
                 // time state flips to `error`.
                 if let Outcome::Failed(msg) = &outcome {
@@ -207,6 +204,12 @@ impl Drop for Stream {
     fn drop(&mut self) {
         self.stop.fire();
     }
+}
+
+/// Stopped wins: an interrupted Utterance is never an error, even when the
+/// player or engine failed after the token fired.
+fn settle(outcome: Outcome, stopped: bool) -> Outcome {
+    if stopped { Outcome::Stopped } else { outcome }
 }
 
 /// Playback thread body.
@@ -917,5 +920,14 @@ mod tests {
             rx.recv_timeout(Duration::from_secs(10)).unwrap(),
             (Outcome::Stopped, String::new())
         );
+    }
+
+    #[test]
+    fn stopped_wins_over_every_outcome() {
+        let failed = || Outcome::Failed("player exited".into());
+        assert_eq!(settle(failed(), true), Outcome::Stopped);
+        assert_eq!(settle(Outcome::Finished, true), Outcome::Stopped);
+        assert_eq!(settle(failed(), false), failed());
+        assert_eq!(settle(Outcome::Finished, false), Outcome::Finished);
     }
 }

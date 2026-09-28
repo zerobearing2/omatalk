@@ -58,7 +58,7 @@ if outcome == Some(SpeakOutcome::NothingToRead) {
 
 // daemon.rs, actor thread: the whole Utterance lifecycle is one match on Phase.
 match decide(self.phase.playing(), press) {
-    Decision::Start(text) => self.phase = Phase::Speaking { text, generation, _stream: Stream::start(text, config, &self.synth, report) },
+    Decision::Start(text) => self.phase = Phase::Speaking { text: text.clone(), generation, _stream: Stream::start(text, config, &self.synth, report) },  // report sends StreamEnded { generation, outcome }
     Decision::Stop        => self.phase = Phase::Idle,          // dropping the Stream interrupts it
     Decision::Keep        => {}                                 // a Clipboard follow-up that lost a race
     Decision::NeedClipboard => return SpeakOutcome::NeedClipboard,
@@ -121,7 +121,7 @@ Hotkey to first audio reads in three files: `cli.rs` → `daemon.rs` → `stream
 - **Capture off the actor, Clipboard on demand.** The connection thread runs `capture_primary` and sends `Press::Selection`. The pure `decide(playing, press)` answers `NeedClipboard` only when the Selection is empty and nothing is playing; only then does the connection thread run `capture_clipboard` and send `Press::Clipboard`. A press that stops speech never waits on a clipboard read. If another press started speech between the two round trips, the follow-up decides `Keep`. Both captures are side-effect-free reads (ADR-0003).
 - **Interrupt and stop latency.** `StopToken::fire()` does three things. It sets an atomic. It calls the registered ORT `RunOptions::terminate()`, which aborts an in-flight run of up to ~3 s mid-graph instead of waiting for it. It wakes the playback thread. The playback thread notices within one 10 ms poll tick. It sends SIGTERM (pw-cat must not drain), then closes stdin (pw-cat ignores TERM while stdin is open), then waits 1 s, then SIGKILLs. Nothing waits on reaping. The new Stream's player spawns immediately, while the old one is being killed.
 - **Queue release before reaping.** On every exit path the playback thread drops its PCM receiver before it cuts a player. A synth thread blocked on a full queue unblocks at once, so the next Utterance's first ORT run never waits out the 1 s reap grace.
-- **Single reporter.** Synth never talks to the actor. Engine errors travel down the PCM channel as `Pcm::Failed(msg)`. The playback thread alone decides the outcome: `Finished`, `Failed("player exited")`, or `Failed(engine msg)`. If its token has not fired, it runs `notify("error: …")` synchronously, so the log line exists before the state flips. Then it sends `StreamEnded`. When playback exits, the channel closes, synth's next `send` fails, and synth stops pulling batches.
+- **Single reporter.** Synth never talks to the actor. Engine errors travel down the PCM channel as `Pcm::Failed(msg)`. The playback thread alone decides the outcome: `Finished`, `Failed("player exited")`, or `Failed(engine msg)`. If its token has not fired, it runs `notify("error: …")` synchronously, so the log line exists before the state flips. Then it calls `report`, which sends the actor `StreamEnded`. When playback exits, the channel closes, synth's next `send` fails, and synth stops pulling batches.
 - **Error** persists until `stop` or a successful `Start`. An empty press while in Error behaves as if idle and leaves the state unchanged.
 
 **Speech pipeline and first audio** (the numbers are the prototype's measurements):
