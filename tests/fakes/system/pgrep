@@ -1,0 +1,3 @@
+#!/bin/sh
+printf 'pgrep %s\n' "$*" >> "$FAKE_LOG"
+exit "${FAKE_STRAY_STATUS:-1}"

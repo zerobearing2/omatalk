@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+printf 'systemctl %s\n' "$*" >> "$FAKE_LOG"
+case "$*" in
+  --user\ stop*)
+    rm -f "$FAKE_STATE/ready"
+    exit "${FAKE_STOP_STATUS:-0}"
+    ;;
+  --user\ enable\ --now*)
+    if [ "${FAKE_DAEMON_DOWN:-0}" != 1 ]; then
+      touch "$FAKE_STATE/ready"
+    fi
+    ;;
+esac
