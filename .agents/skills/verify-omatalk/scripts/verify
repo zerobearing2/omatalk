@@ -1,0 +1,706 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT=$(readlink -f "$0")
+SCRIPT_DIR=$(dirname "$SCRIPT")
+REPO=$(readlink -f "$SCRIPT_DIR/../../../..")
+source "$REPO/scripts/lib.sh"
+
+usage() {
+  printf '%s\n' \
+    "usage: verify launch" \
+    "       verify doctor RUN" \
+    "       verify run RUN -- ARG..." \
+    "       verify drive-speak RUN [-- SPEAK-ARG...]" \
+    "       verify drive-stop RUN [-- SPEAK-ARG...]" \
+    "       verify await-status RUN WORD SECONDS" \
+    "       verify pcm RUN" \
+    "       verify cleanup RUN" \
+    "       verify record-pcm|--rate ... is the player" \
+    "       verify record-notify MESSAGE is the notify command" \
+    "       verify capture-primary|capture-clipboard prints the fixture file"
+}
+
+die() {
+  printf 'verify: %s\n' "$1" >&2
+  exit 1
+}
+
+user_socket() {
+  local runtime
+  runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+  printf '%s\n' "$runtime/omatalk/omatalk.sock"
+}
+
+ensure_binary() {
+  local bin newer
+  bin="$REPO/target/release/omatalk"
+  newer=""
+  if [ ! -x "$bin" ]; then
+    newer="missing"
+  else
+    newer=$(find "$REPO/src" "$REPO/data" "$REPO/Cargo.toml" "$REPO/Cargo.lock" -type f -newer "$bin" -print -quit)
+  fi
+  if [ -n "$newer" ]; then
+    cargo build --release --locked --manifest-path "$REPO/Cargo.toml"
+  fi
+  if [ ! -x "$bin" ]; then
+    die "release binary missing after cargo build --release"
+  fi
+  printf '%s\n' "$bin"
+}
+
+load_run() {
+  local run_id root
+  run_id=$1
+  root="/tmp/omatalk-verify/$run_id"
+  if [ ! -f "$root/state.env" ]; then
+    die "no run $run_id"
+  fi
+  # shellcheck disable=SC1090
+  source "$root/state.env"
+  if [ "$SOCKET" = "$(user_socket)" ]; then
+    die "run $run_id points at the user daemon socket"
+  fi
+  case "$SOCKET" in
+    "$root"/instance/*) ;;
+    *) die "run $run_id socket is outside its instance directory" ;;
+  esac
+}
+
+export_run_env() {
+  unset OMATALK_TEST_FAKE_ENGINE
+  export OMATALK_SOCKET="$SOCKET"
+  export OMATALK_CONFIG="$CONFIG"
+  export OMATALK_MODELS="$MODELS"
+  export OMATALK_VERIFY_PCM_DIR="$PCM_DIR"
+  export OMATALK_VERIFY_NOTIFY_LOG="$NOTIFY_LOG"
+  export OMATALK_VERIFY_SELECTION="$SELECTION"
+  export OMATALK_VERIFY_CLIPBOARD="$CLIPBOARD"
+}
+
+omatalk() {
+  env -u OMATALK_TEST_FAKE_ENGINE "$BIN" "$@"
+}
+
+status_word() {
+  local word
+  if word=$(omatalk status 2>/dev/null); then
+    printf '%s\n' "$word"
+  else
+    printf '%s\n' "down"
+  fi
+}
+
+require_libs() {
+  local ort espeak
+  ort="${ORT_DYLIB_PATH:-}"
+  if [ -n "$ort" ]; then
+    if [ ! -e "$ort" ]; then
+      die "ORT_DYLIB_PATH does not exist: $ort"
+    fi
+  else
+    if [ ! -e /usr/lib/libonnxruntime.so.1 ] && [ ! -e /usr/lib/libonnxruntime.so ]; then
+      die "libonnxruntime.so.1 is not in /usr/lib"
+    fi
+  fi
+  espeak="/usr/lib/libespeak-ng.so.1"
+  if [ ! -e "$espeak" ]; then
+    die "libespeak-ng.so.1 is not in /usr/lib"
+  fi
+}
+
+require_models() {
+  local pin file
+  for pin in MODEL_FILE VOICES_FILE; do
+    file=$(installer_pin "$REPO/install.sh" "$pin")
+    if [ ! -f "$MODELS/$file" ]; then
+      die "missing $MODELS/$file"
+    fi
+  done
+}
+
+daemon_alive() {
+  local pid
+  if [ ! -f "$PID_FILE" ]; then
+    return 1
+  fi
+  pid=$(cat "$PID_FILE")
+  if [ -z "$pid" ]; then
+    return 1
+  fi
+  if kill -0 "$pid" 2>/dev/null; then
+    return 0
+  fi
+  return 1
+}
+
+cmd_launch() {
+  local run_id root instance evidence bin models socket config pcm notify
+  local selection clipboard pidfile daemon_log version i word
+  run_id="$(date +%Y%m%dT%H%M%S)-$$"
+  root="/tmp/omatalk-verify/$run_id"
+  instance="$root/instance"
+  evidence="$root/evidence"
+  bin=$(ensure_binary)
+  version=$(cargo_version "$REPO/Cargo.toml")
+  if [ "$(env -u OMATALK_TEST_FAKE_ENGINE "$bin" version)" != "$version" ]; then
+    die "binary version does not match Cargo.toml ($version)"
+  fi
+  models="${OMATALK_VERIFY_MODELS:-$HOME/.local/share/omatalk/models}"
+  require_libs
+  MODELS="$models"
+  require_models
+  mkdir -p "$instance/pcm" "$evidence"
+  chmod 700 "/tmp/omatalk-verify" "$root" "$instance" "$evidence"
+  socket="$instance/omatalk.sock"
+  config="$instance/config.toml"
+  pcm="$instance/pcm"
+  notify="$instance/notify.log"
+  selection="$instance/selection.txt"
+  clipboard="$instance/clipboard.txt"
+  pidfile="$instance/daemon.pid"
+  daemon_log="$instance/daemon.log"
+  if [ "$socket" = "$(user_socket)" ]; then
+    die "refusing to use the user daemon socket"
+  fi
+  cat > "$config" <<EOF
+voice = "af_heart"
+speed = 1.0
+capture_primary = ["$SCRIPT", "capture-primary"]
+capture_clipboard = ["$SCRIPT", "capture-clipboard"]
+player = ["$SCRIPT", "record-pcm"]
+notify = ["$SCRIPT", "record-notify"]
+sink_probe = ["false"]
+EOF
+  printf '%s\n' "The selection says hello from omatalk." > "$selection"
+  printf '%s\n' "The clipboard says hello from omatalk." > "$clipboard"
+  : > "$notify"
+  cat > "$root/state.env" <<EOF
+RUN_ID='$run_id'
+REPO='$REPO'
+BIN='$bin'
+ROOT='$root'
+INSTANCE='$instance'
+EVIDENCE='$evidence'
+SOCKET='$socket'
+CONFIG='$config'
+MODELS='$models'
+PCM_DIR='$pcm'
+NOTIFY_LOG='$notify'
+SELECTION='$selection'
+CLIPBOARD='$clipboard'
+PID_FILE='$pidfile'
+DAEMON_LOG='$daemon_log'
+SCRIPT='$SCRIPT'
+EOF
+  load_run "$run_id"
+  export_run_env
+  "$BIN" daemon >"$DAEMON_LOG" 2>&1 &
+  printf '%s\n' "$!" > "$PID_FILE"
+  i=0
+  word=""
+  while [ "$i" -lt 90 ]; do
+    if ! daemon_alive; then
+      cmd_cleanup "$run_id"
+      die "daemon exited during launch; see $evidence/daemon.log"
+    fi
+    if grep -F "model warm" "$DAEMON_LOG" >/dev/null 2>&1; then
+      word=$(status_word)
+      if [ "$word" = "idle" ]; then
+        break
+      fi
+    fi
+    sleep 1
+    i=$((i + 1))
+  done
+  if [ "$word" != "idle" ]; then
+    cmd_cleanup "$run_id"
+    die "daemon was not idle within 90s"
+  fi
+  printf '%s\n' "$run_id"
+}
+
+cmd_doctor() {
+  local run_id word version pid
+  run_id=$1
+  load_run "$run_id"
+  export_run_env
+  version=$(cargo_version "$REPO/Cargo.toml")
+  if [ "$(omatalk version)" != "$version" ]; then
+    die "binary version does not match Cargo.toml ($version)"
+  fi
+  require_libs
+  require_models
+  if ! daemon_alive; then
+    die "daemon pid is not running"
+  fi
+  pid=$(cat "$PID_FILE")
+  if ! grep -F "model warm" "$DAEMON_LOG" >/dev/null 2>&1; then
+    die "daemon log has no model warm line"
+  fi
+  word=$(status_word)
+  if [ "$word" != "idle" ] && [ "$word" != "speaking" ]; then
+    die "status is $word"
+  fi
+  printf '%s\n' \
+    "binary: $BIN" \
+    "version: $version" \
+    "models: $MODELS" \
+    "socket: $SOCKET" \
+    "config: $CONFIG" \
+    "pid: $pid" \
+    "status: $word" \
+    "selection: $SELECTION" \
+    "clipboard: $CLIPBOARD" \
+    "notify: $NOTIFY_LOG" \
+    "pcm: $PCM_DIR" \
+    "evidence: $EVIDENCE"
+}
+
+append_transcript() {
+  local code stdout_file stderr_file
+  code=$1
+  stdout_file=$2
+  stderr_file=$3
+  shift 3
+  {
+    printf '$ omatalk'
+    printf ' %q' "$@"
+    printf '\n'
+    printf 'exit: %s\n' "$code"
+    printf 'stdout:\n'
+    cat "$stdout_file"
+    printf '\nstderr:\n'
+    cat "$stderr_file"
+    printf '\n'
+  } >> "$EVIDENCE/transcript.txt"
+}
+
+cmd_run() {
+  local run_id code stdout_file stderr_file
+  run_id=$1
+  shift
+  if [ "${1:-}" = "--" ]; then
+    shift
+  fi
+  load_run "$run_id"
+  export_run_env
+  mkdir -p "$EVIDENCE"
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+  code=0
+  if omatalk "$@" >"$stdout_file" 2>"$stderr_file"; then
+    code=0
+  else
+    code=$?
+  fi
+  append_transcript "$code" "$stdout_file" "$stderr_file" "$@"
+  cat "$stdout_file"
+  cat "$stderr_file" >&2
+  rm -f "$stdout_file" "$stderr_file"
+  return "$code"
+}
+
+start_status_recorder() {
+  local seconds file
+  seconds=$1
+  file=$2
+  : > "$file"
+  (
+    local end line
+    end=$((SECONDS + seconds))
+    while [ "$SECONDS" -lt "$end" ]; do
+      line=$(status_word)
+      printf '%s\n' "$line" >> "$file"
+      sleep 0.05
+    done
+  ) &
+  STATUS_RECORDER_PID=$!
+}
+
+stop_status_recorder() {
+  if [ -n "${STATUS_RECORDER_PID:-}" ]; then
+    if kill -0 "$STATUS_RECORDER_PID" 2>/dev/null; then
+      if kill -TERM "$STATUS_RECORDER_PID" 2>/dev/null; then
+        true
+      fi
+      if wait "$STATUS_RECORDER_PID"; then
+        true
+      fi
+    fi
+  fi
+  STATUS_RECORDER_PID=""
+}
+
+# Prints the line number of the first WANT after line AFTER. Fails on a
+# later "error" line or after SECONDS.
+wait_for_line() {
+  local file want seconds after i found
+  file=$1
+  want=$2
+  seconds=$3
+  after=${4:-0}
+  i=0
+  while [ "$i" -lt "$((seconds * 20))" ]; do
+    found=$(awk -v n="$after" -v w="$want" 'NR > n && $0 == w { print NR; exit }' "$file")
+    if [ -n "$found" ]; then
+      printf '%s\n' "$found"
+      return 0
+    fi
+    if awk -v n="$after" 'NR > n && $0 == "error" { found = 1; exit } END { exit !found }' "$file"; then
+      return 1
+    fi
+    sleep 0.05
+    i=$((i + 1))
+  done
+  return 1
+}
+
+# sink_probe = ["false"] means no wake lead, so any nonzero sample is speech.
+pcm_is_audio() {
+  local file size
+  file=$1
+  size=$(wc -c < "$file")
+  size=${size// /}
+  if [ "$size" -eq 0 ]; then
+    return 1
+  fi
+  if cmp -s -n "$size" "$file" /dev/zero; then
+    return 1
+  fi
+  return 0
+}
+
+write_pcm_report() {
+  local dest file size kind audio
+  dest=$1
+  audio=1
+  : > "$dest"
+  mkdir -p "$(dirname "$dest")"
+  shopt -s nullglob
+  for file in "$PCM_DIR"/*.pcm; do
+    size=$(wc -c < "$file")
+    size=${size// /}
+    if pcm_is_audio "$file"; then
+      kind="audio"
+      audio=0
+    else
+      kind="not-audio"
+    fi
+    printf '%s %s %s\n' "$kind" "$size" "$(basename "$file")" >> "$dest"
+    if [ -f "${file%.pcm}.args" ]; then
+      printf 'args %s %s\n' "$(basename "$file")" "$(cat "${file%.pcm}.args")" >> "$dest"
+    fi
+  done
+  shopt -u nullglob
+  return "$audio"
+}
+
+copy_pcm() {
+  local dest
+  dest=$1
+  mkdir -p "$dest"
+  shopt -s nullglob
+  for file in "$PCM_DIR"/*; do
+    cp -a "$file" "$dest/"
+  done
+  shopt -u nullglob
+}
+
+clear_pcm() {
+  shopt -s nullglob
+  for file in "$PCM_DIR"/*; do
+    rm -f "$file"
+  done
+  shopt -u nullglob
+}
+
+begin_drive() {
+  load_run "$1"
+  export_run_env
+  DRIVE_DIR="$EVIDENCE/drives/$(date +%Y%m%dT%H%M%S%N)"
+  mkdir -p "$DRIVE_DIR"
+  clear_pcm
+  STATUS_FILE="$DRIVE_DIR/status.txt"
+  start_status_recorder 60 "$STATUS_FILE"
+  sleep 0.05
+}
+
+fail_drive() {
+  stop_status_recorder
+  printf '%s\n' "$1" > "$DRIVE_DIR/result.txt"
+  die "$2"
+}
+
+# Runs one CLI call, records it in the transcript and exit.txt, sets CODE.
+drive_cli() {
+  local stdout_file stderr_file
+  stdout_file=$1
+  stderr_file=$2
+  shift 2
+  if omatalk "$@" >"$stdout_file" 2>"$stderr_file"; then
+    CODE=0
+  else
+    CODE=$?
+  fi
+  printf '%s\n' "$CODE" > "$DRIVE_DIR/exit.txt"
+  append_transcript "$CODE" "$stdout_file" "$stderr_file" "$@"
+}
+
+cmd_drive_speak() {
+  local run_id stdout_file speak_line
+  run_id=$1
+  shift
+  if [ "${1:-}" = "--" ]; then
+    shift
+  fi
+  begin_drive "$run_id"
+  stdout_file="$DRIVE_DIR/stdout.txt"
+  printf '%q ' omatalk speak "$@" > "$DRIVE_DIR/argv.txt"
+  printf '\n' >> "$DRIVE_DIR/argv.txt"
+  drive_cli "$stdout_file" "$DRIVE_DIR/stderr.txt" speak "$@"
+  if ! speak_line=$(wait_for_line "$STATUS_FILE" "speaking" 15); then
+    fail_drive "fail: status never reached speaking" "drive-speak: status never reached speaking (see $DRIVE_DIR)"
+  fi
+  if ! wait_for_line "$STATUS_FILE" "idle" 60 "$speak_line" >/dev/null; then
+    fail_drive "fail: status never returned to idle" "drive-speak: status never returned to idle (see $DRIVE_DIR)"
+  fi
+  stop_status_recorder
+  if [ "$CODE" -ne 0 ]; then
+    fail_drive "fail: speak exit $CODE" "drive-speak: speak exited $CODE"
+  fi
+  if ! cmp -s "$stdout_file" <(printf 'ok\n'); then
+    fail_drive "fail: stdout was not ok" "drive-speak: stdout was not ok"
+  fi
+  if ! write_pcm_report "$DRIVE_DIR/pcm.txt"; then
+    fail_drive "fail: no utterance audio" "drive-speak: no PCM with a nonzero sample"
+  fi
+  copy_pcm "$DRIVE_DIR/pcm"
+  printf '%s\n' "ok" > "$DRIVE_DIR/result.txt"
+  printf '%s\n' "$DRIVE_DIR"
+}
+
+cmd_drive_stop() {
+  local run_id stdout_file speak_line
+  run_id=$1
+  shift
+  if [ "${1:-}" = "--" ]; then
+    shift
+  fi
+  if [ "$#" -eq 0 ]; then
+    set -- "Stop this omatalk verification utterance before it finishes. The sentence keeps going so a later stop still lands while status says speaking. One more sentence holds the player open."
+  fi
+  begin_drive "$run_id"
+  stdout_file="$DRIVE_DIR/stop-stdout.txt"
+  if ! omatalk speak "$@" >"$DRIVE_DIR/speak-stdout.txt" 2>"$DRIVE_DIR/speak-stderr.txt"; then
+    stop_status_recorder
+    die "drive-stop: speak failed"
+  fi
+  if ! speak_line=$(wait_for_line "$STATUS_FILE" "speaking" 15); then
+    fail_drive "fail: never saw speaking" "drive-stop: status never reached speaking"
+  fi
+  drive_cli "$stdout_file" "$DRIVE_DIR/stop-stderr.txt" stop
+  if ! wait_for_line "$STATUS_FILE" "idle" 15 "$speak_line" >/dev/null; then
+    fail_drive "fail: not idle after stop" "drive-stop: status did not return to idle"
+  fi
+  stop_status_recorder
+  if [ "$CODE" -ne 0 ]; then
+    die "drive-stop: stop exited $CODE"
+  fi
+  if ! cmp -s "$stdout_file" <(printf 'ok\n'); then
+    die "drive-stop: stdout was not ok"
+  fi
+  if write_pcm_report "$DRIVE_DIR/pcm.txt"; then
+    true
+  fi
+  copy_pcm "$DRIVE_DIR/pcm"
+  printf '%s\n' "ok" > "$DRIVE_DIR/result.txt"
+  printf '%s\n' "$DRIVE_DIR"
+}
+
+cmd_await_status() {
+  local run_id want seconds i word
+  run_id=$1
+  want=$2
+  seconds=$3
+  load_run "$run_id"
+  export_run_env
+  mkdir -p "$EVIDENCE"
+  i=0
+  while [ "$i" -lt "$((seconds * 20))" ]; do
+    word=$(status_word)
+    printf '%s\n' "$word" >> "$EVIDENCE/await-status.txt"
+    if [ "$word" = "$want" ]; then
+      printf '%s\n' "$word"
+      return 0
+    fi
+    sleep 0.05
+    i=$((i + 1))
+  done
+  die "status did not become $want within ${seconds}s"
+}
+
+cmd_pcm() {
+  local run_id
+  run_id=$1
+  load_run "$run_id"
+  export_run_env
+  mkdir -p "$EVIDENCE"
+  if ! write_pcm_report "$EVIDENCE/pcm.txt"; then
+    cat "$EVIDENCE/pcm.txt" >&2
+    die "no utterance audio in $PCM_DIR"
+  fi
+  cat "$EVIDENCE/pcm.txt"
+}
+
+kill_daemon() {
+  local pid i
+  if [ ! -f "$PID_FILE" ]; then
+    return 0
+  fi
+  pid=$(cat "$PID_FILE")
+  if [ -z "$pid" ]; then
+    return 0
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    return 0
+  fi
+  if kill -TERM "$pid" 2>/dev/null; then
+    true
+  fi
+  i=0
+  while [ "$i" -lt 50 ]; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      return 0
+    fi
+    sleep 0.1
+    i=$((i + 1))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -KILL "$pid" 2>/dev/null
+  fi
+}
+
+cmd_cleanup() {
+  local run_id
+  run_id=$1
+  load_run "$run_id"
+  kill_daemon
+  mkdir -p "$EVIDENCE"
+  if [ -f "$DAEMON_LOG" ]; then
+    cp -a "$DAEMON_LOG" "$EVIDENCE/daemon.log"
+  fi
+  if [ -d "$PCM_DIR" ]; then
+    copy_pcm "$EVIDENCE/pcm-leftover"
+  fi
+  if [ -f "$NOTIFY_LOG" ]; then
+    cp -a "$NOTIFY_LOG" "$EVIDENCE/notify.log"
+  fi
+  rm -rf "$INSTANCE"
+  printf '%s\n' "$EVIDENCE"
+}
+
+cmd_record_pcm() {
+  local dir id
+  dir="${OMATALK_VERIFY_PCM_DIR:-}"
+  if [ -z "$dir" ]; then
+    die "record-pcm requires OMATALK_VERIFY_PCM_DIR"
+  fi
+  mkdir -p "$dir"
+  id=$$
+  printf '%s\n' "$*" > "$dir/$id.args"
+  exec cat > "$dir/$id.pcm"
+}
+
+cmd_record_notify() {
+  local log msg
+  log="${OMATALK_VERIFY_NOTIFY_LOG:-}"
+  if [ -z "$log" ]; then
+    die "record-notify requires OMATALK_VERIFY_NOTIFY_LOG"
+  fi
+  msg=""
+  if [ "$#" -gt 0 ]; then
+    msg=${!#}
+  fi
+  printf '%s\n' "$msg" >> "$log"
+}
+
+cmd_capture_primary() {
+  cat "${OMATALK_VERIFY_SELECTION:?}"
+}
+
+cmd_capture_clipboard() {
+  cat "${OMATALK_VERIFY_CLIPBOARD:?}"
+}
+
+need_args() {
+  local count
+  count=$1
+  shift
+  if [ -z "${!count:-}" ]; then
+    usage >&2
+    exit 2
+  fi
+}
+
+main() {
+  local cmd
+  cmd=${1:-}
+  case "$cmd" in
+    launch)
+      cmd_launch
+      ;;
+    doctor)
+      need_args 2 "$@"
+      cmd_doctor "$2"
+      ;;
+    run)
+      need_args 2 "$@"
+      shift
+      cmd_run "$@"
+      ;;
+    drive-speak)
+      need_args 2 "$@"
+      shift
+      cmd_drive_speak "$@"
+      ;;
+    drive-stop)
+      need_args 2 "$@"
+      shift
+      cmd_drive_stop "$@"
+      ;;
+    await-status)
+      need_args 4 "$@"
+      cmd_await_status "$2" "$3" "$4"
+      ;;
+    pcm)
+      need_args 2 "$@"
+      cmd_pcm "$2"
+      ;;
+    cleanup)
+      need_args 2 "$@"
+      cmd_cleanup "$2"
+      ;;
+    record-pcm)
+      shift
+      cmd_record_pcm "$@"
+      ;;
+    record-notify)
+      shift
+      cmd_record_notify "$@"
+      ;;
+    capture-primary)
+      cmd_capture_primary
+      ;;
+    capture-clipboard)
+      cmd_capture_clipboard
+      ;;
+    *)
+      usage >&2
+      exit 2
+      ;;
+  esac
+}
+
+main "$@"
