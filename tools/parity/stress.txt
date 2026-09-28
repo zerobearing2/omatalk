@@ -1,0 +1,14 @@
+Café owners in Zürich said the naïve résumé was “très chic” — ½ of them, anyway.
+Email me at jane.doe@example.com or visit https://example.org/docs?id=42&lang=en before 5pm.
+The ² and ³ superscripts, the ① circled digit, and the Ⅻ numeral all look odd in text.
+Ελληνικά, русский язык, 日本語 and 한국어 appear next to English in the same line.
+I can't believe y'all ain't gonna do it; we'd've gone, but they'll say it's 'cause of me.
+Run `cargo build --release` then call fn tag(&self, words: &[&str]) -> Vec<String>.
+LOL!!! OMG 😂😂 that's sooo cool :-) #winning @dave
+Mr. and Mrs. Smith met Dr. Jones at 10am on Jan. 5th, 2024, in Washington D.C.
+The U.S.A. and the U.K. signed the NATO treaty; NASA's budget rose 3.5% to $25.4 billion.
+ŁÓDŹ, İstanbul, ǅemal and ﬁnance: odd capitals, dotted I, titlecase and a ligature.
+She read the lead article and then led the lead singer to the wind-up of the tour.
+Do you live near the live music venue? I object to that object being moved.
+TODO: refactor this function; it's O(n²) and the cache invalidation is wrong.
+The   spacing    here  is   irregular,	and there's a tab too.
