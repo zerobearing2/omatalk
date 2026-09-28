@@ -54,6 +54,8 @@ System dependencies change from `python` and `uv` to `onnxruntime-cpu` and
 `espeak-ng`. The installer migrates a v0.5 install in place and deletes its
 venv, source, and fp16 model. Resident memory stays in the 450 to 750 MB range
 because the onnxruntime arena dominates it in either language. The idle
-self-recycle from ADR-0002 is gone: every run is capped at 510 phonemes, which
-bounds the arena. A 200-Utterance soak decides whether that bound holds. The
+self-recycle from ADR-0002 is replaced by an idle rest. Every run is capped at
+510 phonemes, which bounds the arena at about 1.3 GB, and a minute after the
+last synthesis the synth thread runs one small inference that shrinks it back
+to about 600 MB, with no restart. The
 design and its measurements live in `docs/design/rust-rewrite.md`.

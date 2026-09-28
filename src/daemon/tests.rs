@@ -4,7 +4,7 @@ use super::actor::{Actor, Command};
 use super::*;
 use crate::protocol::State;
 use crate::speech::fake::{Call, RecordingEngine};
-use crate::stream::{Gen, Outcome};
+use crate::stream::{Gen, Outcome, REST_AFTER};
 use crate::testutil::{TempDir, fake_commands, fake_env, log_lines, wait_for};
 use crate::voices::VoiceName;
 use std::collections::BTreeMap;
@@ -40,7 +40,7 @@ impl Harness {
         let engine = make(dir.path());
         let (commands, inbox) = channel();
         let calls = engine.calls.clone();
-        let actor = Actor::new(Synth::spawn(Box::new(engine)), commands.clone());
+        let actor = Actor::new(Synth::spawn(Box::new(engine), REST_AFTER), commands.clone());
         std::thread::spawn(move || actor.run(inbox));
         let h = Harness {
             config: dir.path().join("config.toml"),

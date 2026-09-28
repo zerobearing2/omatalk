@@ -68,6 +68,10 @@ impl Kokoro {
     /// One throwaway pass through G2P (normalize, tagger, lexicon, espeak for
     /// the unknown "Omatalk") and ORT, so the first real press is not cold.
     pub fn warm(&mut self) {
+        self.tiny_run(Arena::Keep);
+    }
+
+    fn tiny_run(&mut self, arena: Arena) {
         let phonemes = known(&self.vocab, &self.g2p.line("Warm up, Omatalk."));
         let tokens = tokens(&self.vocab, &phonemes);
         let style = [0.0; STYLE_WIDTH];
@@ -78,8 +82,18 @@ impl Kokoro {
             &style,
             1.0,
             &StopToken::default(),
+            arena,
         );
     }
+}
+
+/// ORT's CPU arena grows to the largest batch and keeps it. Shrinking after
+/// every run costs first audio (a third of presses +150 ms), so only the
+/// idle `rest` shrinks it: a long Utterance's ~700 MB goes back to the system.
+#[derive(Clone, Copy)]
+enum Arena {
+    Keep,
+    Shrink,
 }
 
 impl Engine for Kokoro {
@@ -101,7 +115,15 @@ impl Engine for Kokoro {
                 Ok(style) => style,
                 Err(e) => return Some(Err(e)),
             };
-            let audio = infer(session, input, &tokens, style, u.speed.get(), stop)?;
+            let audio = infer(
+                session,
+                input,
+                &tokens,
+                style,
+                u.speed.get(),
+                stop,
+                Arena::Keep,
+            )?;
             Some(audio.map(|audio| {
                 let mut audio = trim(&audio).to_vec();
                 audio.resize(
@@ -111,6 +133,11 @@ impl Engine for Kokoro {
                 audio
             }))
         }))
+    }
+
+    /// ORT shrinks the arena only at the end of a run that asks for it.
+    fn rest(&mut self) {
+        self.tiny_run(Arena::Shrink);
     }
 }
 
@@ -230,10 +257,17 @@ fn infer(
     style: &[f32],
     speed: f32,
     stop: &StopToken,
+    arena: Arena,
 ) -> Option<Result<Vec<f32>, SpeechError>> {
     let failed = |e: ort::Error| SpeechError(format!("synthesis failed: {e}"));
-    let options = match RunOptions::new() {
-        Ok(options) => Arc::new(options),
+    let options = RunOptions::new().and_then(|mut options| {
+        if let Arena::Shrink = arena {
+            options.set("memory.enable_memory_arena_shrinkage", "cpu:0")?;
+        }
+        Ok(Arc::new(options))
+    });
+    let options = match options {
+        Ok(options) => options,
         Err(e) => return Some(Err(failed(e))),
     };
     let abort = {

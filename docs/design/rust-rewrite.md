@@ -138,7 +138,7 @@ Expected first audio from pressing the key is ~15 ms (CLI, socket, `wl-paste`) +
 
 **Native libraries are dlopened only by the Daemon.** ORT uses `load-dynamic` against Arch's `onnxruntime-cpu`. espeak-ng uses `libloading`. The CLI path (`version`, `config`, `speak`) touches no native library, so the plugin's `omatalk version` works even if a system package breaks. CI builds with no native libraries installed.
 
-**Idle recycle is dropped.** It existed because Python's ORT arena grew to fit the longest run. Here every run is capped at 510 phonemes, so the arena high-water mark is bounded by one max batch, not by Utterance length. The restart gap (RestartSec plus load, ~2.7 s) was also a bar-flash risk. The gate is a 200-Utterance soak that must show an RSS plateau. The fallback ladder if it fails: ORT's `memory.enable_memory_arena_shrinkage` run option after each Utterance; then rebuilding the ORT session in place on the synth thread while idle (no socket rebind, followers stay connected); process recycling last.
+**Idle recycle becomes an idle rest.** Recycling existed because Python's ORT arena grew to fit the longest run and never shrank. Here every run is capped at 510 phonemes, so the arena is bounded by one max batch, but the bound is high: a soak of 30 short and 30 long Utterances, 20 stops, and 20 replacements plateaued at 1.3 GB after the first long one. A restart would release it at the cost of a ~1.2 s gap that flashes the bar red. Instead, `REST_AFTER` (60 s) after the last synthesis the synth thread calls `Engine::rest`, which runs the warm-up sentence with ORT's `memory.enable_memory_arena_shrinkage` run option; RSS drops to about 600 MB. Shrinking after every run was measured and rejected: first audio rose from at most 325 ms to 440 to 516 ms on 11 of 30 presses. The first press after a rest measured 284 to 299 ms.
 
 **Panics.** A panic hook aborts the process for a panic on any thread except the synth thread, and systemd restarts the Daemon (`RestartSec=500ms`, gap under 1.5 s), so a half-poisoned actor never keeps running. The synth thread wraps each job in `catch_unwind`: a G2P or engine panic on odd input becomes `Pcm::Failed("internal error: ...")`, so the user gets the `error:` notify and the Daemon stays up (the engine holds no state across jobs that a panic can corrupt). The parity corpus (28,759 lines plus 2,139 held out) doubles as the no-panic fuzz set for the G2P port.
 
@@ -163,7 +163,6 @@ Arena with two runners on the architect rubric (`contract fidelity, interface de
 
 Grafted from B:
 - Clipboard on demand (B's `NeedClipboard` two-phase decision). A read the Clipboard whenever the Selection was empty, so a stop press could wait up to 2 s on `wl-paste`. Now `decide` returns `NeedClipboard` and the connection thread reads the Clipboard only then.
-- A middle rung on the memory fallback ladder: rebuild the ORT session in place before resorting to a process restart.
 
 Changed by the orchestrator: crash-only `panic = "abort"` became a panic hook that aborts outside the synth thread plus `catch_unwind` per synth job, so odd input produces an `error:` notify instead of a silent restart.
 
@@ -187,7 +186,8 @@ Rejected from B: tokio (ORT and espeak are blocking and thread-affine; the load-
 - **An async runtime (tokio) with one task per connection and follower.** Cancellation is simpler to express, but ORT and espeak are blocking and thread-affine, so the load-bearing work runs in `spawn_blocking` anyway. It adds a runtime, a second concurrency model, and ~2 MB for a Daemon with at most a handful of connections.
 - **Two binaries (`omatalk` + `omatalkd`).** This matches today's layout, but it doubles install, launcher, and AUR artifacts and forces a shared library crate for types both need. `omatalk daemon` gives the same separation with one file.
 - **Synth writes PCM straight into pw-cat** (no playback thread). This has fewer threads, but a full pipe (1.3 s of audio) blocks synthesis, which defeats overlap, and interrupt then waits on a blocked write.
-- **Keeping the idle recycle.** It costs a ~2.7 s restart gap that flashes the bar red, and the reason for it (unbounded arena) is removed by the 510-phoneme batch cap.
+- **Keeping the idle recycle.** It costs a restart gap that flashes the bar red; the idle rest releases the same memory in place.
+- **Disabling the CPU arena.** It returns 450 to 700 MB between Utterances but makes long text about 15% slower and raises the peak during speech.
 
 ## Implementation reconciliation
 
@@ -214,7 +214,7 @@ Unit 2 (speech: G2P port, Kokoro engine, batching, Ramp):
 - The sample corpus is `tools/parity/sample.jsonl` (450 rows of `misaki.jsonl`, 50 of the held-out set), not `tests/parity/`, because `tests/` belongs to Unit 1. Its floor is 499/500. The miss is misaki's markdown link syntax, which the port skips on purpose.
 - `examples/speak.rs` is a second lever. It loads, warms, speaks, and reports first audio, per-batch gaps, RTF, stop latency, and peak RSS, and `--rate` refits the Ramp constants.
 - `.gitignore` ignores `*.bin` for models, so it gains `!/data/tagger.bin`.
-- Measured peak RSS is about 600 MB after a short sentence, 750 MB after one paragraph, and 1.0 GB after 42 s of speech in 510-phoneme batches. The 510 cap bounds the arena, but the bound is high. The 200-Utterance soak gate still decides whether the memory fallback ladder is needed.
+- Measured peak RSS is about 600 MB after a short sentence, 750 MB after one paragraph, and 1.0 GB after 42 s of speech in 510-phoneme batches. The 510 cap bounds the arena, but the bound is high, so the idle rest shrinks it back to about 600 MB.
 
 Wake lead (replaces the wake shim, which resolves the open question "does spawning the speech `pw-cat` early make the wake shim redundant?"):
 

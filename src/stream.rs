@@ -29,6 +29,8 @@ pub const REAP_GRACE: Duration = Duration::from_secs(1);
 /// The panic hook in `daemon::serve` lets this thread's panics unwind into
 /// the per-job `catch_unwind`; a panic anywhere else aborts the process.
 pub const SYNTH_THREAD: &str = "omatalk-synth";
+/// Quiet time after the last synthesis before the engine rests.
+pub const REST_AFTER: Duration = Duration::from_secs(60);
 
 /// Monotonic per Daemon. The actor ignores any report whose Gen is not the
 /// current Stream's.
@@ -75,26 +77,45 @@ enum Pcm {
 impl Synth {
     /// Moves the engine onto its own thread. Jobs run one at a time in order;
     /// a job whose token already fired is skipped without touching the engine.
-    pub fn spawn(engine: Box<dyn Engine>) -> Synth {
+    /// When no job follows a synthesis within `rest_after`, the engine rests once.
+    pub fn spawn(engine: Box<dyn Engine>, rest_after: Duration) -> Synth {
         let (jobs, rx) = std::sync::mpsc::channel();
         std::thread::Builder::new()
             .name(SYNTH_THREAD.into())
-            .spawn(move || synth_loop(engine, rx))
+            .spawn(move || synth_loop(engine, rx, rest_after))
             .expect("spawn synth thread");
         Synth { jobs }
     }
 }
 
-fn synth_loop(mut engine: Box<dyn Engine>, jobs: Receiver<Job>) {
-    for Job {
-        utterance,
-        stop,
-        pcm,
-    } in jobs
-    {
+fn synth_loop(mut engine: Box<dyn Engine>, jobs: Receiver<Job>, rest_after: Duration) {
+    let mut rested = true;
+    loop {
+        let job = if rested {
+            jobs.recv().ok()
+        } else {
+            match jobs.recv_timeout(rest_after) {
+                Ok(job) => Some(job),
+                Err(RecvTimeoutError::Timeout) => {
+                    let _ = panic::catch_unwind(AssertUnwindSafe(|| engine.rest()));
+                    rested = true;
+                    continue;
+                }
+                Err(RecvTimeoutError::Disconnected) => None,
+            }
+        };
+        let Some(Job {
+            utterance,
+            stop,
+            pcm,
+        }) = job
+        else {
+            return;
+        };
         if stop.is_fired() {
             continue;
         }
+        rested = false;
         // The engine keeps no state across jobs that a panic could corrupt,
         // so odd input costs one Utterance, not the Daemon.
         let result = panic::catch_unwind(AssertUnwindSafe(|| {
@@ -442,7 +463,7 @@ mod tests {
         engine: impl Engine + 'static,
         io: StreamIo,
     ) -> (Stream, std::sync::mpsc::Receiver<Outcome>) {
-        let synth = Synth::spawn(Box::new(engine));
+        let synth = Synth::spawn(Box::new(engine), REST_AFTER);
         let (tx, rx) = std::sync::mpsc::channel();
         let stream = Stream::start(utterance(), io, Gen(1), &synth, move |_, outcome| {
             tx.send(outcome).unwrap();
@@ -760,10 +781,13 @@ mod tests {
         let dir = TempDir::new("gone");
         let pulled = Arc::new(Mutex::new(0));
         let seen = pulled.clone();
-        let synth = Synth::spawn(Box::new(Scripted {
-            batches: vec![vec![0.1; 24]; 100],
-            before: Arc::new(move |_| *seen.lock().unwrap() += 1),
-        }));
+        let synth = Synth::spawn(
+            Box::new(Scripted {
+                batches: vec![vec![0.1; 24]; 100],
+                before: Arc::new(move |_| *seen.lock().unwrap() += 1),
+            }),
+            REST_AFTER,
+        );
         let run = |player: &Path| {
             let (tx, rx) = std::sync::mpsc::channel();
             let stream = Stream::start(utterance(), io(player), Gen(1), &synth, move |_, o| {
@@ -782,9 +806,43 @@ mod tests {
     }
 
     #[test]
+    fn engine_rests_once_per_quiet_spell_after_speech() {
+        struct Rests(Arc<Mutex<usize>>);
+        impl Engine for Rests {
+            fn speak<'a>(&'a mut self, _: &'a Utterance, _: &'a StopToken) -> Audio<'a> {
+                Box::new(std::iter::once(Ok(vec![0.1; 24])))
+            }
+            fn rest(&mut self) {
+                *self.0.lock().unwrap() += 1;
+            }
+        }
+        let quiet = Duration::from_millis(100);
+        let dir = TempDir::new("rest");
+        let rests = Arc::new(Mutex::new(0));
+        let synth = Synth::spawn(Box::new(Rests(rests.clone())), quiet);
+        let io = io(&echo_player(&dir));
+        let count = || *rests.lock().unwrap();
+        std::thread::sleep(quiet * 3);
+        assert_eq!(count(), 0, "no rest before any speech");
+        for generation in 1..=2 {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let _stream = Stream::start(utterance(), io.clone(), Gen(generation), &synth, {
+                move |_, o| tx.send(o).unwrap()
+            });
+            assert_eq!(outcome(&rx), Outcome::Finished);
+            let want = generation as usize;
+            wait_for("rest", Duration::from_secs(5), || {
+                (count() == want).then_some(())
+            });
+            std::thread::sleep(quiet * 3);
+            assert_eq!(count(), want, "one rest per quiet spell");
+        }
+    }
+
+    #[test]
     fn engine_panic_becomes_internal_error_and_synth_keeps_serving() {
         let dir = TempDir::new("panic");
-        let synth = Synth::spawn(Box::new(Panics));
+        let synth = Synth::spawn(Box::new(Panics), REST_AFTER);
         let io = io(&echo_player(&dir));
         for generation in 1..=2 {
             let (tx, rx) = std::sync::mpsc::channel();

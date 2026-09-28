@@ -52,6 +52,10 @@ pub trait Engine: Send {
     /// wants PCM; work in flight when `stop` fires registers its abort with
     /// `stop.guard` and ends the iterator.
     fn speak<'a>(&'a mut self, u: &'a Utterance, stop: &'a StopToken) -> Audio<'a>;
+
+    /// Called once when the Daemon goes quiet after speaking: release memory
+    /// the last Utterance grew.
+    fn rest(&mut self) {}
 }
 
 /// Display is the text after `error: ` in the notify, e.g. `unknown voice af_nope`.

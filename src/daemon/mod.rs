@@ -16,7 +16,7 @@ use crate::config::{Config, Paths};
 use crate::exec;
 use crate::protocol::{self, Request, SpeakRequest};
 use crate::speech::{self, Text};
-use crate::stream::{SYNTH_THREAD, Synth};
+use crate::stream::{REST_AFTER, SYNTH_THREAD, Synth};
 
 mod actor;
 #[cfg(test)]
@@ -34,7 +34,7 @@ pub fn serve(paths: &Paths) -> Result<std::convert::Infallible, String> {
     eprintln!("model warm");
 
     let (commands, inbox) = std::sync::mpsc::channel();
-    let actor = Actor::new(Synth::spawn(engine), commands.clone());
+    let actor = Actor::new(Synth::spawn(engine, REST_AFTER), commands.clone());
     std::thread::Builder::new()
         .name("omatalk-actor".into())
         .spawn(move || actor.run(inbox))
