@@ -1,46 +1,50 @@
 #!/usr/bin/env bash
-# Pack the runtime tarball and write RELEASE_TAG + TARBALL_SHA256 into
-# install.sh. Tag is v$(pyproject version).
+# Build the release binary, pack the runtime tarball, and write RELEASE_TAG
+# + TARBALL_SHA256 into install.sh. Tag is v$(Cargo.toml version).
+# --pack-only packs the binary already in target/release and leaves
+# install.sh alone (tests/pack.rs uses it).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+source scripts/lib.sh
+
+TARBALL="omatalk-x86_64.tar.gz"
 
 pack_only=0
 if [ "${1:-}" = "--pack-only" ]; then
   pack_only=1
 fi
 
-version="$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml)"
-if [ -z "$version" ]; then
-  echo "could not read version from pyproject.toml" >&2
+tag="v$(cargo_version Cargo.toml)"
+
+if [ "$pack_only" -eq 0 ]; then
+  cargo build --release --locked
+fi
+
+release_dir="${CARGO_TARGET_DIR:-$ROOT/target}/release"
+if [ ! -f "$release_dir/omatalk" ]; then
+  echo "missing $release_dir/omatalk (run cargo build --release --locked)" >&2
   exit 1
 fi
-tag="v$version"
 
-# Reproducible: bytes depend only on the listed paths. install.sh is not
-# in this archive; it is a sibling GitHub release asset.
+# Reproducible: bytes depend only on the three files. install.sh and
+# uninstall.sh are not in this archive; they are sibling release assets.
 tar --sort=name \
   --mtime=@0 \
   --owner=0 \
   --group=0 \
   --numeric-owner \
   --mode=u=rwX,go=rX \
-  --exclude=__pycache__ \
-  --exclude='*.pyc' \
-  --exclude='*.pyo' \
   --transform=s,^,omatalk/, \
   -cf - \
-  daemon \
-  systemd \
-  pyproject.toml \
-  README.md \
-  requirements.txt \
-  uninstall.sh \
-  | gzip -n > omatalk-src.tar.gz
+  -C "$release_dir" omatalk \
+  -C "$ROOT/systemd" omatalk.service \
+  -C "$ROOT" LICENSE \
+  | gzip -n > "$TARBALL"
 
-sha256sum omatalk-src.tar.gz > omatalk-src.tar.gz.sha256
-digest="$(sha256sum omatalk-src.tar.gz)"
+sha256sum "$TARBALL" > "$TARBALL.sha256"
+digest="$(sha256sum "$TARBALL")"
 digest="${digest%% *}"
 
 if [ "$pack_only" -eq 1 ]; then

@@ -4,10 +4,10 @@ After=graphical-session.target
 PartOf=graphical-session.target
 
 [Service]
-ExecStart=%h/.local/share/omatalk/venv/bin/omatalkd
+ExecStart=%h/.local/bin/omatalk daemon
 Environment=OMATALK_MODELS=%h/.local/share/omatalk/models
 Restart=always
-RestartSec=2
+RestartSec=500ms
 
 [Install]
 WantedBy=default.target

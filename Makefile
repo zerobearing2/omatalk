@@ -1,24 +1,18 @@
-OMATALK_HOME ?= $(HOME)/.local/share/omatalk
-REPO := $(CURDIR)
-
-.PHONY: test lint format clean bump release \
-	dev-install dev-restart dev-uninstall
+.PHONY: test lint format clean bump release
 
 test:
-	uv run --group dev pytest tests/
+	cargo test --locked
 
 lint:
-	uv run --group dev ruff check .
+	cargo fmt --check
+	cargo clippy --locked --all-targets -- -D warnings
 
 format:
-	uv run --group dev ruff format .
+	cargo fmt
 
 clean:
-	rm -f omatalk-src.tar.gz omatalk-src.tar.gz.sha256
-	rm -rf build dist .pytest_cache .ruff_cache
-	rm -rf *.egg-info
-	find . -path ./.venv -prune -o -type d -name __pycache__ -print0 | xargs -0 -r rm -rf
-	find . -path ./.venv -prune -o -type f \( -name '*.pyc' -o -name '*.pyo' \) -print0 | xargs -0 -r rm -f
+	cargo clean
+	rm -f omatalk-x86_64.tar.gz omatalk-x86_64.tar.gz.sha256
 
 # Version file only, no commit. Then make release.
 bump:
@@ -26,16 +20,3 @@ bump:
 
 release:
 	scripts/release.sh
-
-dev-install:
-	systemctl --user stop omatalk.service
-	uv pip install --quiet --python "$(OMATALK_HOME)/venv/bin/python" -e "$(REPO)"
-	systemctl --user start omatalk.service
-	@echo "Dev install active: Daemon runs from $(REPO)"
-
-dev-restart:
-	systemctl --user restart omatalk.service
-
-dev-uninstall:
-	systemctl --user stop omatalk.service
-	./install.sh

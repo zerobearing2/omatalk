@@ -1,0 +1,30 @@
+# Maintainer: Dave Bradford <dbradford@hey.com>
+# Draft, not published. See "Open questions and risks" in
+# docs/design/rust-rewrite.md for the launcher probe and model location.
+# Before publishing: set sha256sums from the release's
+# omatalk-x86_64.tar.gz.sha256, then regenerate .SRCINFO with
+# makepkg --printsrcinfo > .SRCINFO.
+
+pkgname=omatalk-bin
+pkgver=0.9.0dev0
+_tag=v0.9.0-dev.0
+pkgrel=1
+pkgdesc='Local text-to-speech for Omarchy: hotkey, and the machine speaks your selected text'
+arch=('x86_64')
+url='https://omatalk.zerobearing.com'
+license=('MIT')
+depends=('onnxruntime-cpu' 'espeak-ng' 'pipewire' 'wl-clipboard' 'libnotify')
+provides=('omatalk')
+conflicts=('omatalk')
+source=("omatalk-x86_64-${_tag}.tar.gz::https://github.com/zerobearing2/omatalk/releases/download/${_tag}/omatalk-x86_64.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  cd omatalk
+  install -Dm755 omatalk "$pkgdir/usr/bin/omatalk"
+  # The release unit runs the per-user launcher; a package runs /usr/bin.
+  sed 's|^ExecStart=%h/.local/bin/omatalk daemon$|ExecStart=/usr/bin/omatalk daemon|' \
+    omatalk.service > omatalk.service.pkg
+  install -Dm644 omatalk.service.pkg "$pkgdir/usr/lib/systemd/user/omatalk.service"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

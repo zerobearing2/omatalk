@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Omatalk uninstaller: stops and removes the unit, launcher, source, and
-# optionally models and config. The bar plugin is removed with
+# Omatalk uninstaller: stops and removes the unit and the omatalk binary,
+# and optionally the models and config. The bar plugin is removed with
 # `omarchy plugin remove`. Safe to run via curl | bash (prompts read
 # the terminal, not the pipe).
 set -euo pipefail
@@ -31,6 +31,8 @@ systemctl --user disable --now omatalk.service 2>/dev/null
 set -e
 rm -f "$UNIT"
 systemctl --user daemon-reload
+# Stray Daemons from v0.5 and 1.x. The regex dot in "[o]matalk.daemon" also
+# matches the space in 1.x's `omatalk daemon`.
 if pgrep -f "[o]matalk.daemon" >/dev/null 2>&1; then
   set +e
   pkill -f "[o]matalk.daemon"
@@ -53,7 +55,9 @@ rm -rf "$PLUGIN_DIR"
 msg "Daemon stopped and removed; stray Daemons killed; launcher and bar plugin removed"
 
 if [ -d "$OMATALK_HOME" ]; then
-  read -r -p "Remove $OMATALK_HOME (source, venv, ~340MB models)? [y/N] " answer < "$ASK_FROM"
+  if ! read -r -p "Remove $OMATALK_HOME (models, ~355MB)? [y/N] " answer < "$ASK_FROM"; then
+    answer=""
+  fi
   if [[ "$answer" =~ ^[Yy]$ ]]; then
     rm -rf "$OMATALK_HOME"
     msg "Removed $OMATALK_HOME"
@@ -63,7 +67,9 @@ if [ -d "$OMATALK_HOME" ]; then
 fi
 
 if [ -d "$HOME/.config/omatalk" ]; then
-  read -r -p "Remove config $HOME/.config/omatalk? [y/N] " answer < "$ASK_FROM"
+  if ! read -r -p "Remove config $HOME/.config/omatalk? [y/N] " answer < "$ASK_FROM"; then
+    answer=""
+  fi
   if [[ "$answer" =~ ^[Yy]$ ]]; then
     rm -rf "$HOME/.config/omatalk"
     msg "Removed config"

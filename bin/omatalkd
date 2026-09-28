@@ -1,3 +1,0 @@
-#!/bin/sh
-here=$(dirname "$(readlink -f "$0")")
-PYTHONPATH="$here/.." exec "${OMATALK_PYTHON:-$HOME/.local/share/omatalk/venv/bin/python}" -m daemon.omatalkd "$@"

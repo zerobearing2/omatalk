@@ -3,8 +3,6 @@ name: Test
 on:
   push:
     branches: [master]
-    paths-ignore:
-      - public/**
   pull_request:
 
 permissions:
@@ -19,5 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv run --group dev pytest tests/ -q
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      # No onnxruntime or espeak-ng here: the Daemon dlopens them, and the
+      # fake engine (OMATALK_TEST_FAKE_ENGINE) covers it in these tests.
+      - run: make lint
+      - run: make test

@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# Daemon publish: build, verify, commit version+pin, push, gh release create
-# from the tarball just packed. Does not clobber an existing tag.
+# Daemon publish: test, lint, build, commit version+pin, push, gh release create
+# from the tarball just packed. Does not clobber an existing tag. A version
+# with a prerelease suffix (0.9.0-dev.N) publishes a GitHub prerelease, so
+# releases/latest (the site installer and omatalk upgrade) keeps serving the
+# last stable release.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+source scripts/lib.sh
 
 if [ "$(git rev-parse --abbrev-ref HEAD)" != master ]; then
   echo "need master; git switch master" >&2
@@ -18,7 +22,7 @@ while IFS= read -r status; do
   fi
   path="${status:3}"
   case "$path" in
-    pyproject.toml|uv.lock|install.sh)
+    Cargo.toml|Cargo.lock|install.sh)
       ;;
     *)
       if [ -z "$unexpected" ]; then
@@ -39,11 +43,7 @@ fi
 
 git fetch origin master --tags
 
-version="$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml)"
-if [ -z "$version" ]; then
-  echo "could not read version from pyproject.toml" >&2
-  exit 1
-fi
+version="$(cargo_version Cargo.toml)"
 tag="v$version"
 
 remote_tag="$(git ls-remote --tags origin "refs/tags/$tag")"
@@ -57,10 +57,11 @@ if [ "$(git merge-base HEAD origin/master)" != "$(git rev-parse origin/master)" 
   exit 1
 fi
 
+cargo test --locked
+make lint
 scripts/build.sh
-scripts/verify.sh
 
-git add pyproject.toml uv.lock install.sh
+git add Cargo.toml Cargo.lock install.sh
 if git diff --cached --quiet; then
   echo "version and pin already committed"
 else
@@ -69,17 +70,22 @@ fi
 
 git push origin master
 
-if [ ! -f omatalk-src.tar.gz ]; then
-  echo "missing omatalk-src.tar.gz after build" >&2
+if [ ! -f omatalk-x86_64.tar.gz ]; then
+  echo "missing omatalk-x86_64.tar.gz after build" >&2
   exit 1
 fi
-if [ ! -f omatalk-src.tar.gz.sha256 ]; then
-  echo "missing omatalk-src.tar.gz.sha256 after build" >&2
+if [ ! -f omatalk-x86_64.tar.gz.sha256 ]; then
+  echo "missing omatalk-x86_64.tar.gz.sha256 after build" >&2
   exit 1
 fi
 
-gh release create "$tag" --title "$tag" --generate-notes \
+prerelease=()
+if [[ "$version" == *-* ]]; then
+  prerelease=(--prerelease)
+fi
+
+gh release create "$tag" --title "$tag" --generate-notes "${prerelease[@]}" \
   --target "$(git rev-parse HEAD)" \
-  omatalk-src.tar.gz omatalk-src.tar.gz.sha256 install.sh uninstall.sh
+  omatalk-x86_64.tar.gz omatalk-x86_64.tar.gz.sha256 install.sh uninstall.sh
 
 echo "Released $tag"

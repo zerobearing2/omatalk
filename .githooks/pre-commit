@@ -1,4 +1,4 @@
 #!/bin/sh
 set -e
-uv run --group dev ruff check .
-uv run --group dev ruff format --check .
+cargo fmt --check
+cargo clippy --quiet --all-targets -- -D warnings
