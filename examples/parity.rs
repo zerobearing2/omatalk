@@ -141,7 +141,7 @@ fn matched(want: &[(String, String)], got: &[(String, String)]) -> usize {
 
 fn tag(rows: &[Row]) -> (usize, String) {
     let tagger = Tagger::load().expect("tagger");
-    let lexicon = misaki::Lexicon::load().expect("lexicon");
+    let lexicon = misaki::Lexicon::load();
     let espeak = espeak::espeak().expect("espeak").lock().unwrap();
     let (mut same, mut tokens, mut right) = (0, 0, 0);
     let mut diffs = String::new();

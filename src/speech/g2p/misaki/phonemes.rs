@@ -20,16 +20,6 @@ pub(super) fn lower(s: &str) -> String {
 pub(super) fn upper(s: &str) -> String {
     s.to_uppercase()
 }
-pub(super) fn capitalize(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        Some(first) => first
-            .to_uppercase()
-            .chain(lower(chars.as_str()).chars())
-            .collect(),
-        None => String::new(),
-    }
-}
 pub(super) fn is_alpha(s: &str) -> bool {
     !s.is_empty() && s.chars().all(char::is_alphabetic)
 }

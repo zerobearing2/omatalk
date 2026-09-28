@@ -2,72 +2,77 @@
 //! and the -s, -ed and -ing stems. Numbers are in `number.rs`.
 use super::number::currency_units;
 use super::phonemes::{
-    PRIMARY, SECONDARY, US_TAUS, apply_stress, ascii_digit, capitalize, drop_end, is_alpha, len,
-    lexicon_ords, lower, tail, upper,
+    PRIMARY, SECONDARY, US_TAUS, apply_stress, ascii_digit, drop_end, is_alpha, len, lexicon_ords,
+    lower, tail, upper,
 };
 use super::{Ctx, Tok};
-use crate::speech::LoadError;
-use serde::Deserialize;
-use std::collections::HashMap;
+use std::cmp::Ordering;
 use unicode_normalization::UnicodeNormalization;
 
-#[derive(Clone, Deserialize)]
-#[serde(untagged)]
+/// A lexicon compiled by `build.rs` into a sorted table and searched in
+/// place: key -> phonemes, or tag -> phonemes for words that vary by tag.
+#[derive(Clone, Copy)]
+struct Dict(&'static [u8]);
+
+#[derive(Clone, Copy)]
 enum Entry {
-    Plain(String),
+    Plain(&'static str),
     Tagged(Tagged),
 }
 
-/// A lexicon entry that varies by tag. `None` phonemes send the word to
-/// espeak-ng.
-#[derive(Clone, Deserialize)]
-#[serde(try_from = "HashMap<String, Option<String>>")]
-struct Tagged {
-    default: String,
-    by_tag: Vec<(String, Option<String>)>,
-}
-
-impl TryFrom<HashMap<String, Option<String>>> for Tagged {
-    type Error = &'static str;
-
-    fn try_from(mut m: HashMap<String, Option<String>>) -> Result<Tagged, &'static str> {
-        let default = m.remove("DEFAULT").flatten().ok_or("no DEFAULT")?;
-        Ok(Tagged {
-            default,
-            by_tag: m.into_iter().collect(),
-        })
-    }
-}
+/// `tag 0x1f phonemes` pairs joined by 0x1e; 0x02 phonemes send the word to
+/// espeak-ng. `build.rs` guarantees a DEFAULT.
+#[derive(Clone, Copy)]
+struct Tagged(&'static str);
 
 impl Tagged {
-    fn get(&self, tag: &str) -> Option<&Option<String>> {
-        self.by_tag.iter().find(|(t, _)| t == tag).map(|(_, ps)| ps)
+    fn get(&self, tag: &str) -> Option<Option<&'static str>> {
+        self.0.split('\x1e').find_map(|pair| {
+            let (t, ps) = pair.split_once('\x1f')?;
+            (t == tag).then_some((ps != "\x02").then_some(ps))
+        })
+    }
+
+    fn default(&self) -> &'static str {
+        self.get("DEFAULT").flatten().unwrap()
     }
 }
 
-/// en.py's `grow_dictionary`: lowercase keys also under their capitalized
-/// form and capitalized keys under their lowercase one, the JSON's own keys
-/// winning (`{**e, **d}`).
-fn load(name: &str, json: &str) -> Result<HashMap<String, Entry>, LoadError> {
-    let raw: HashMap<String, Entry> =
-        serde_json::from_str(json).map_err(|e| LoadError(format!("lexicon {name}: {e}")))?;
-    let mut grown = HashMap::with_capacity(raw.len() * 2);
-    for (k, v) in &raw {
-        if len(k) < 2 {
-            continue;
-        }
-        let low = lower(k);
-        if *k == low {
-            let cap = capitalize(k);
-            if *k != cap {
-                grown.insert(cap, v.clone());
-            }
-        } else if *k == capitalize(&low) {
-            grown.insert(low, v.clone());
-        }
+impl Dict {
+    fn u32_at(&self, i: usize) -> usize {
+        u32::from_le_bytes(self.0[i * 4..i * 4 + 4].try_into().unwrap()) as usize
     }
-    grown.extend(raw);
-    Ok(grown)
+
+    fn record(&self, i: usize) -> (&'static [u8], &'static [u8]) {
+        let base = 4 * (self.u32_at(0) + 2);
+        let record = &self.0[base + self.u32_at(i + 1)..base + self.u32_at(i + 2)];
+        let nul = record.iter().position(|&b| b == 0).unwrap();
+        (&record[..nul], &record[nul + 1..])
+    }
+
+    fn get(&self, word: &str) -> Option<Entry> {
+        let (mut lo, mut hi) = (0, self.u32_at(0));
+        let body = loop {
+            if lo >= hi {
+                return None;
+            }
+            let mid = (lo + hi) / 2;
+            let (key, body) = self.record(mid);
+            match key.cmp(word.as_bytes()) {
+                Ordering::Less => lo = mid + 1,
+                Ordering::Greater => hi = mid,
+                Ordering::Equal => break std::str::from_utf8(body).unwrap(),
+            }
+        };
+        Some(match body.strip_prefix('\x01') {
+            Some(tags) => Entry::Tagged(Tagged(tags)),
+            None => Entry::Plain(body),
+        })
+    }
+
+    fn contains_key(&self, word: &str) -> bool {
+        self.get(word).is_some()
+    }
 }
 
 fn parent_tag(tag: &str) -> &str {
@@ -95,31 +100,25 @@ fn symbol_word(word: &str) -> Option<&'static str> {
 }
 
 pub struct Lexicon {
-    golds: HashMap<String, Entry>,
-    silvers: HashMap<String, Entry>,
+    golds: Dict,
+    silvers: Dict,
 }
 
 impl Lexicon {
-    pub fn load() -> Result<Lexicon, LoadError> {
-        Ok(Lexicon {
-            golds: load(
-                "us_gold",
-                include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/us_gold.json")),
-            )?,
-            silvers: load(
-                "us_silver",
-                include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/us_silver.json")),
-            )?,
-        })
+    pub fn load() -> Lexicon {
+        Lexicon {
+            golds: Dict(include_bytes!(concat!(env!("OUT_DIR"), "/us_gold.lex"))),
+            silvers: Dict(include_bytes!(concat!(env!("OUT_DIR"), "/us_silver.lex"))),
+        }
     }
 
     /// `None` is the entry's DEFAULT.
     fn gold(&self, word: &str, tag: Option<&str>) -> Option<String> {
         match self.golds.get(word)? {
-            Entry::Plain(s) => Some(s.clone()),
+            Entry::Plain(s) => Some(s.to_owned()),
             Entry::Tagged(m) => match tag {
-                None => Some(m.default.clone()),
-                Some(tag) => m.get(tag).cloned().flatten(),
+                None => Some(m.default().to_owned()),
+                Some(tag) => m.get(tag).flatten().map(str::to_owned),
             },
         }
     }
@@ -261,7 +260,7 @@ impl Lexicon {
         }
         let ps: Option<String> = match entry {
             None => None,
-            Some(Entry::Plain(s)) => Some(s.clone()),
+            Some(Entry::Plain(s)) => Some(s.to_owned()),
             Some(Entry::Tagged(m)) => {
                 let tag =
                     if ctx.is_some_and(|c| c.future_vowel.is_none()) && m.get("None").is_some() {
@@ -272,8 +271,8 @@ impl Lexicon {
                         tag
                     };
                 match tag.and_then(|t| m.get(t)) {
-                    Some(ps) => ps.clone(),
-                    None => Some(m.default.clone()),
+                    Some(ps) => ps.map(str::to_owned),
+                    None => Some(m.default().to_owned()),
                 }
             }
         };
@@ -490,10 +489,71 @@ impl Lexicon {
 
 #[cfg(test)]
 mod tests {
-    /// en.py asserts every tagged entry has a DEFAULT.
+    use super::{Entry, Lexicon};
+    use serde_json::Value;
+    use std::collections::BTreeMap;
+
+    fn read(entry: Option<Entry>) -> Option<Value> {
+        Some(match entry? {
+            Entry::Plain(ps) => Value::from(ps),
+            Entry::Tagged(m) => {
+                let tags =
+                    m.0.split('\x1e')
+                        .map(|pair| pair.split_once('\x1f').unwrap().0);
+                Value::Object(
+                    tags.map(|t| {
+                        (
+                            t.to_owned(),
+                            m.get(t).unwrap().map_or(Value::Null, Value::from),
+                        )
+                    })
+                    .collect(),
+                )
+            }
+        })
+    }
+
     #[test]
-    fn tagged_entries_need_a_default() {
-        assert!(super::load("t", r#"{"ab": {"NOUN": "ˈAb"}}"#).is_err());
-        assert!(super::load("t", r#"{"ab": {"NOUN": "ˈAb", "DEFAULT": "ɐb"}}"#).is_ok());
+    fn every_json_entry_reads_back_from_its_table() {
+        let lexicon = Lexicon::load();
+        for (dict, json) in [
+            (lexicon.golds, include_str!("../../../../data/us_gold.json")),
+            (
+                lexicon.silvers,
+                include_str!("../../../../data/us_silver.json"),
+            ),
+        ] {
+            let raw: BTreeMap<String, Value> = serde_json::from_str(json).unwrap();
+            for (word, value) in raw {
+                assert_eq!(read(dict.get(&word)).as_ref(), Some(&value), "{word}");
+            }
+        }
+    }
+
+    #[test]
+    fn tables_grow_case_variants_and_keep_json_keys_first() {
+        let golds = Lexicon::load().golds;
+        let plain = |w| match golds.get(w) {
+            Some(Entry::Plain(ps)) => Some(ps),
+            _ => None,
+        };
+        assert_eq!(plain("Apple"), Some("ˈæpᵊl"), "grown from apple");
+        assert_eq!(
+            plain("August"),
+            Some("ˈɔɡəst"),
+            "JSON key beats growth from august"
+        );
+        assert_eq!(plain("august"), Some("ɔɡˈʌst"));
+        assert!(golds.get("zzqxv").is_none());
+        let Some(Entry::Tagged(aa)) = golds.get("AA") else {
+            panic!("AA is tagged")
+        };
+        assert_eq!(aa.default(), "ˈɑˌɑ");
+        assert_eq!(
+            aa.get("NOUN"),
+            Some(None),
+            "null sends the word to espeak-ng"
+        );
+        assert_eq!(aa.get("VERB"), None);
     }
 }

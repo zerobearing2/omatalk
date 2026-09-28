@@ -22,13 +22,14 @@ pub struct G2p {
 }
 
 impl G2p {
-    /// Parses the embedded lexicons (~110 ms), tokenizer rules, and tagger
-    /// (~5 ms); dlopens libespeak-ng. Called once, on a loader thread.
+    /// Parses the embedded tokenizer rules and tagger (~15 ms together; the
+    /// lexicons need no parsing); dlopens libespeak-ng. Called once, on a
+    /// loader thread.
     pub fn load() -> Result<G2p, LoadError> {
         Ok(G2p {
             tokenizer: tokenize::Tokenizer::load()?,
             tagger: tagger::Tagger::load()?,
-            lexicon: misaki::Lexicon::load()?,
+            lexicon: misaki::Lexicon::load(),
             espeak: espeak::espeak()?,
         })
     }
@@ -135,7 +136,7 @@ mod tests {
     /// Rows that never reach espeak, so misaki alone must match Python.
     #[test]
     fn misaki_matches_python_without_espeak() {
-        let lexicon = misaki::Lexicon::load().unwrap();
+        let lexicon = misaki::Lexicon::load();
         let mut checked = 0;
         for row in rows(SAMPLE) {
             let tokens = row
