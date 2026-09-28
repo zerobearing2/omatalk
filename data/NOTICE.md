@@ -1,7 +1,8 @@
 # Embedded data
 
-These files are compiled into the binary (`include_bytes!`) and are
-version-locked to the parity tests in `tools/parity/`.
+These files are compiled into the binary and are version-locked to the
+parity tests in `tools/parity/`. `build.rs` turns the lexicons into sorted
+tables that are searched in place.
 
 | File | Source | License |
 | --- | --- | --- |

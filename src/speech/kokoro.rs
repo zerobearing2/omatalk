@@ -35,7 +35,7 @@ pub struct Kokoro {
 
 impl Kokoro {
     /// Loads the ORT session and the G2P data on parallel threads (~400 ms
-    /// and ~160 ms measured); the total is the session load. Errors name the
+    /// and ~20 ms measured); the total is the session load. Errors name the
     /// missing file or library.
     pub fn load(models: &Path) -> Result<Kokoro, LoadError> {
         load_onnxruntime()?;

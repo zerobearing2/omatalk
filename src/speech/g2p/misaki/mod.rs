@@ -441,7 +441,7 @@ mod tests {
     /// took minutes.
     #[test]
     fn long_groups_go_to_espeak_without_the_search() {
-        let lexicon = Lexicon::load().unwrap();
+        let lexicon = Lexicon::load();
         assert!(read(&lexicon, &"aB".repeat(8)));
         assert!(!read(&lexicon, &"aB".repeat(1000)));
     }

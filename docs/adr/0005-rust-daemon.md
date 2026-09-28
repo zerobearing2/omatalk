@@ -36,7 +36,7 @@ The binary links onnxruntime dynamically (`ort` with `load-dynamic`) against
 Arch's `onnxruntime-cpu`, and it dlopens espeak-ng. Only `omatalk daemon`
 loads them, so `omatalk version` and `omatalk config` work even if a system
 package breaks. Against onnxruntime 1.29, output is bit-identical to Python.
-The binary is about 15 MB, including 10.5 MB of embedded G2P data.
+The binary is about 19 MB, including 14.5 MB of embedded G2P data.
 
 Considered and rejected:
 
@@ -57,5 +57,5 @@ because the onnxruntime arena dominates it in either language. The idle
 self-recycle from ADR-0002 is replaced by an idle rest. Every run is capped at
 510 phonemes, which bounds the arena at about 1.3 GB, and a minute after the
 last synthesis the synth thread runs one small inference that shrinks it back
-to about 600 MB, with no restart. The
+to about 510 MB, with no restart. The
 design and its measurements live in `docs/design/rust-rewrite.md`.

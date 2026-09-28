@@ -186,7 +186,7 @@ mod tests {
     /// `g2p`'s final ɾ -> T.
     #[test]
     fn reads_numbers_past_a_trillion() {
-        let lexicon = Lexicon::load().unwrap();
+        let lexicon = Lexicon::load();
         assert_eq!(
             number(&lexicon, "1234567890123456").as_deref(),
             Some(
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn reads_numbers_past_u64_digit_by_digit() {
-        let lexicon = Lexicon::load().unwrap();
+        let lexicon = Lexicon::load();
         let nines = vec!["nˈIn"; 23].join(" ");
         let big = "99999999999999999999999";
         assert_eq!(number(&lexicon, big), Some(nines.clone()));
@@ -224,7 +224,7 @@ mod tests {
 
     #[test]
     fn reads_non_ascii_digits() {
-        let lexicon = Lexicon::load().unwrap();
+        let lexicon = Lexicon::load();
         assert_eq!(number(&lexicon, "٣").as_deref(), Some("θɹˈi"));
         let cases = [
             ("१२", "12"),
