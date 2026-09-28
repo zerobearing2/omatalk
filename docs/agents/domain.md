@@ -20,8 +20,9 @@ Single-context repo:
 │   ├── 0001-kokoro-onnx-cpu.md
 │   ├── 0002-python-daemon.md
 │   ├── 0003-primary-selection-capture.md
-│   └── 0004-plugin-own-repo.md
-├── daemon/
+│   ├── 0004-plugin-own-repo.md
+│   └── 0005-rust-daemon.md
+├── src/
 ```
 
 ## Use the glossary's vocabulary

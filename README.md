@@ -10,10 +10,10 @@ the machine, it talks to you. Fully local, no network calls at runtime.
 2. Press `F8`, next to Omarchy's `F9` dictation key: F9 speaks you, F8 speaks
    back.
 3. Omatalk reads the highlighted text, or the clipboard if nothing is
-   selected. It streams the text in sentence-first chunks through
+   selected. It streams the text in batches through
    [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (ONNX, CPU) and
-   plays over PipeWire as each chunk is synthesized, so you hear the start
-   before the rest of the Utterance is ready.
+   plays over PipeWire as each batch is synthesized. The first batch is a
+   few words, so you hear speech about a third of a second after the press.
 4. Press `F8` again while it's speaking to interrupt. If the selection hasn't
    changed, speech just stops. If it has, the playing Utterance cuts off and
    the new one starts.
@@ -61,7 +61,7 @@ plugin, the megaphone and voice panel. One command installs both:
 curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
 ```
 
-Models are about 185MB. If you added the plugin from the Omarchy
+Models are about 355MB. If you added the plugin from the Omarchy
 Marketplace first, its panel links to these steps; run the command above and it keeps
 the plugin you have.
 
@@ -73,20 +73,21 @@ omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --
 ```
 
 The script downloads a pinned GitHub release tarball (SHA-256 is in the
-script, not fetched beside the file), then:
+script, not fetched beside the file). The tarball holds the `omatalk` binary
+and its systemd user unit. Then the script:
 
 1. Checks system dependencies and installs any missing ones via
-   `omarchy pkg add` (python, curl, pipewire, wl-clipboard, uv; stock
-   Omarchy usually only lacks uv).
-2. Downloads the Kokoro-82M model and voice files (~185MB) to
-   `~/.local/share/omatalk/models/`, skipped when their checksums match —
-   deliberately while any existing Daemon is still running, since models
-   are only read at startup.
-3. Stops any existing Daemon, rebuilds the uv-managed venv at
-   `~/.local/share/omatalk/venv/`, and installs and enables a fresh
-   `omatalk.service` systemd user unit, so the new Daemon is running
-   before the command exits.
-4. Puts `omatalk` on `PATH`, then runs `omarchy plugin add` for
+   `omarchy pkg add` (curl, pipewire, wl-clipboard, onnxruntime-cpu,
+   espeak-ng, libnotify).
+2. Downloads the Kokoro-82M fp32 model and voice files (~355MB) to
+   `~/.local/share/omatalk/models/`, skipped when their checksums match.
+   The download runs while any existing Daemon is still running, because
+   the Daemon reads models only at startup.
+3. Stops any existing Daemon, installs the binary as `~/.local/bin/omatalk`,
+   and installs and enables a fresh `omatalk.service` systemd user unit, so
+   the new Daemon is running before the command exits. An upgrade from a
+   0.5 Python install deletes its venv, source, and fp16 model.
+4. Runs `omarchy plugin add` for
    https://github.com/zerobearing2/omarchy-omatalk-plugin if the plugin is
    missing, or converts a leftover file copy the same way. An existing git
    checkout is left alone. QML is not in this tarball. When no Omatalk
@@ -103,8 +104,8 @@ shipped with the latest GitHub release.
 
 The script at that URL is a small dispatcher: it fetches and runs the
 installer that shipped with the latest release, so the installer's own
-logic and the source it installs are always a matched pair. Unreleased
-work uses `make dev-install` from a checkout.
+logic and the binary it installs are always a matched pair. To run
+unreleased work, see [Development](#development).
 
 Upgrades never create, merge, rewrite, or delete `~/.config/omatalk/config.toml`.
 An existing config stays byte-for-byte unchanged, and an absent config stays
@@ -114,7 +115,7 @@ The bar widget lives in [omarchy-omatalk-plugin](https://github.com/zerobearing2
 `omarchy plugin update zerobearing.omatalk` updates QML only. Daemon updates
 stay `omatalk upgrade` (or the site curl). `omarchy plugin remove
 zerobearing.omatalk` unloads the megaphone and deletes the plugin checkout; it
-leaves the Daemon, venv, models, and config. F8 still speaks.
+leaves the Daemon, models, and config. F8 still speaks.
 
 ## Uninstall
 
@@ -122,15 +123,15 @@ leaves the Daemon, venv, models, and config. F8 still speaks.
 omatalk uninstall
 ```
 
-Runs the uninstaller that shipped with the installed release. If the
+Runs the uninstaller built into the installed binary. If the
 `omatalk` command is already gone, use the site copy:
 
 ```sh
 curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
 ```
 
-Stops and removes the systemd unit, the launcher, the source, and the
-Omarchy bar plugin. Asks before deleting the models (~185MB) and your config.
+Stops and removes the systemd unit, the `omatalk` binary, and the
+Omarchy bar plugin. Asks before deleting the models (~355MB) and your config.
 Also a thin dispatcher to the latest release uninstaller.
 Asks before removing the Omatalk binding from `~/.config/hypr/bindings.lua`
 (default no). Plugin remove is not uninstall.
@@ -150,6 +151,7 @@ omatalk config get [--json]         # print the effective config
 omatalk config set voice af_bella   # set voice or speed; auto-applies
 omatalk config set speed 1.25       # (0.5-2.0)
 omatalk config voices [--json]      # list available voice names
+omatalk daemon                      # run the Daemon (the unit's ExecStart)
 ```
 
 `systemctl --user start|stop|restart omatalk` controls the daemon.
@@ -159,6 +161,69 @@ alongside the terminal error — they run from hotkeys, where there may be no
 terminal to read. `status` only prints the error, so scripts and installers
 can poll it silently.
 `journalctl --user -u omatalk -f` shows logs.
+
+## Bluetooth and HDMI audio
+
+Bluetooth speakers and HDMI or DisplayPort monitors mute for about half a
+second after they wake. Their sink suspends after 5 seconds of silence, so on
+these devices nearly every F8 press wakes them. You choose how Omatalk
+handles that gap:
+
+| You want | Do this | Result |
+|---|---|---|
+| Power saving (default) | Nothing | A press to a sleeping device waits about 0.65 s. The first word is intact. |
+| No wait and no clipping | [Disable sink suspend](#disable-sink-suspend) | Speech starts at once, every time. The device never sleeps. |
+| No wait, clipping is fine | Set `wake_lead_ms = 0` | Speech starts at once. After 5 s of silence the first word may be lost. |
+
+Analog speakers and headphones are not affected. They play from the first
+sample, so Omatalk never waits for them.
+
+### How the lead works
+
+When the device wakes, its link comes back within about 50 ms, but the
+device stays muted for another 375 to 550 ms. Nothing tells software when it
+is ready, so speech sent in that window is lost.
+
+At each press, Omatalk runs `pactl get-default-sink` and `pactl list sinks
+short`. If the default sink is `SUSPENDED` and is Bluetooth (`bluez_output.*`)
+or HDMI (a name containing `hdmi`, which includes DisplayPort), it plays
+`wake_lead_ms` of silence before the speech. Every other case gets no lead:
+a sink that is already awake, an analog sink, or a `pactl` that fails or
+takes longer than 150 ms.
+
+```toml
+# ~/.config/omatalk/config.toml
+wake_lead_ms = 650   # the default; 0 to 2000; 0 turns the lead off
+```
+
+If the first word is still clipped, raise `wake_lead_ms` in steps of 100.
+
+### Disable sink suspend
+
+With suspend off, the device never sleeps, so Omatalk never adds the lead
+and nothing is clipped. Create
+`~/.config/wireplumber/wireplumber.conf.d/51-disable-suspend.conf`:
+
+```
+monitor.alsa.rules = [
+  {
+    matches = [ { node.name = "~alsa_output.*" } ]
+    actions = { update-props = { session.suspend-timeout-seconds = 0 } }
+  }
+]
+monitor.bluez.rules = [
+  {
+    matches = [ { node.name = "~bluez_output.*" } ]
+    actions = { update-props = { session.suspend-timeout-seconds = 0, node.suspend-on-idle = false } }
+  }
+]
+```
+
+Then run `systemctl --user restart wireplumber`.
+
+Bluetooth also needs `node.suspend-on-idle = false`; setting the timeout
+alone did not keep it awake. Suspend is on by default to save power, which
+matters on a laptop and for a battery speaker.
 
 ## Troubleshooting
 
@@ -186,6 +251,16 @@ normal, or changes color while F8 still fails. Also record whether F8 works,
 and when the problem started, especially after install, upgrade, or a shell
 restart. The widget needs both a running daemon and a live Quickshell
 connection to the daemon socket.
+
+If the first word is clipped on Bluetooth or HDMI, see
+[Bluetooth and HDMI audio](#bluetooth-and-hdmi-audio).
+
+If the journal shows the Daemon exiting at startup with a library error,
+check that `onnxruntime-cpu` and `espeak-ng` are installed:
+`omarchy pkg present onnxruntime-cpu espeak-ng`. The Daemon loads
+`libonnxruntime.so.1` and `libespeak-ng.so.1` at startup. To use another
+onnxruntime build, set `ORT_DYLIB_PATH` to its library in the unit's
+environment.
 
 After collecting the evidence, start an inactive daemon with
 `systemctl --user start omatalk.service`. The widget reconnects to the socket
@@ -230,50 +305,40 @@ Redact credentials, tokens, and unrelated private log content before sharing
 the report.
 ```
 
-### Clipped start of speech
-
-Omatalk already kicks a short silent PipeWire stream in parallel with the
-first synthesis so a suspended sink can wake before speech. If the very first
-fraction of a second is still missing or muffled — usually on Bluetooth or
-HDMI after a pause — but an immediate replay is fine, the sink is still
-coming out of WirePlumber suspend (`session.suspend-timeout-seconds`). For
-Bluetooth, A2DP reauthorization with BlueZ can take a second or more, and
-speech can start before the device is actually live. The PCM Omatalk sends
-is complete; remaining clip is the device, not truncated audio.
-
-Disable suspend for the affected sink if you want to trade that power saving
-for a gap-free start, e.g. in
-`~/.config/wireplumber/wireplumber.conf.d/51-disable-suspend.conf`:
-
-```
-monitor.alsa.rules = [
-  {
-    matches = [ { node.name = "~alsa_output.*" } ]
-    actions = { update-props = { session.suspend-timeout-seconds = 0 } }
-  }
-]
-monitor.bluez.rules = [
-  {
-    matches = [ { node.name = "~bluez_output.*" } ]
-    actions = { update-props = { session.suspend-timeout-seconds = 0, node.suspend-on-idle = false } }
-  }
-]
-```
-
-Setting only the timeout wasn't enough in reports from other affected users —
-`node.suspend-on-idle = false` was also needed for the Bluetooth case. This is
-a deliberate default, not a bug: it saves power by letting idle audio devices
-sleep, which matters on a laptop. Disabling it trades that power saving for
-never hitting this gap.
-
 ## Config
 
 Click the bar icon to open the voice/speed panel, or use `omatalk config`
-(see Usage above) — both auto-save to `~/.config/omatalk/config.toml`. The
-next Utterance binds Voice, Speed, and the other file settings from whatever
-is on disk at that moment; an in-flight Stream keeps what it started with.
-No restart needed. Hand-edited settings (`lang`, `capture_primary`,
-`capture_clipboard`, `player`, `notify`) apply the same way.
+(see Usage above). Both save to `~/.config/omatalk/config.toml`. The file
+does not exist until you set something, and every key is optional.
+
+`omatalk config get` prints every setting with the value in effect,
+defaults included, so it is the quickest way to see what you can change.
+Voice and speed have `config set`. Edit the file by hand for the rest.
+
+Each press reads the file again, so changes apply to the next Utterance
+with no restart. A Stream already playing keeps the settings it started with.
+
+| Key | Default | What it does |
+|---|---|---|
+| `voice` | `"af_heart"` | Voice for every Utterance. `omatalk config voices` lists the names. |
+| `speed` | `1.0` | Speech rate, 0.5 to 2.0. |
+| `wake_lead_ms` | `650` | Silence before speech on a suspended Bluetooth or HDMI sink, 0 to 2000. 0 turns it off. See [Bluetooth and HDMI audio](#bluetooth-and-hdmi-audio). |
+| `capture_primary` | `["wl-paste", "--primary"]` | Command that prints the selection. |
+| `capture_clipboard` | `["wl-paste"]` | Command that prints the clipboard, used when nothing is selected. |
+| `player` | `["pw-cat", "-p", "--raw", "--format", "s16"]` | Command that plays raw s16le mono from stdin. Omatalk appends `--rate 24000 --channels 1 -`. |
+| `notify` | `["notify-send", "Omatalk"]` | Command for desktop notifications. The message is appended as the last argument. |
+| `sink_probe` | `["pactl"]` | pactl-compatible command for the sink check. Omatalk appends `get-default-sink`, then `list sinks short`. |
+| `lang` | `"en-us"` | Accepted for compatibility. Every value reads as `en-us`, the only language. |
+
+Commands are lists of strings, not shell lines. A bad value makes the press
+fail with a notification naming the key, for example
+`config.toml: speed must be between 0.5 and 2.0`. Unknown keys are ignored.
+
+```toml
+voice = "af_bella"
+speed = 1.25
+wake_lead_ms = 800
+```
 
 Picking a voice in the panel immediately speaks a short sample in it, so you
 can compare voices without leaving the panel. `omatalk speak --voice <name>
@@ -281,11 +346,6 @@ can compare voices without leaving the panel. `omatalk speak --voice <name>
 touching your configured default.
 
 ![Omatalk's voice and speed config panel](public/images/omatalk-config-panel.png)
-
-```toml
-voice = "af_heart"
-speed = 1.0
-```
 
 Prerecorded samples of every voice are on the
 [project site](https://omatalk.zerobearing.com).
@@ -304,7 +364,8 @@ Prerecorded samples of every voice are on the
 ┌───────────────────────────────────────────┐
 │      omatalk daemon · systemd --user      │
 │ capture:  wl-paste --primary → wl-paste   │
-│ chunker:  text → sentence-first chunks    │
+│ g2p:      misaki (Rust port) → phonemes   │
+│ batches:  short first, then up to 510     │
 │ engine:   Kokoro-82M · ONNX Runtime · CPU │
 │ player:   pw-cat → PipeWire (streamed)    │
 └───────────────────────────────────────────┘
@@ -315,6 +376,34 @@ daemon does the rest. Its protocol verbs (`speak` / `stop` / `status`) and the
 streaming `follow` command are the single seam: clients, the bar, tests, and
 any future rewrite all go through it.
 
+## Development
+
+The Daemon and the CLI are one Rust crate. `omatalk daemon` is the Daemon;
+every other argument list is the CLI. `cargo test` runs the unit tests and
+the black-box tests in `tests/`, which drive the built binary and the shell
+scripts.
+
+```sh
+cargo test      # unit, actor, and black-box tests
+make lint       # cargo fmt --check, clippy
+make format     # cargo fmt
+```
+
+Tests need neither onnxruntime nor espeak-ng: `OMATALK_TEST_FAKE_ENGINE=1`
+replaces the speech engine. Tests that need the real libraries and models
+are ignored by default. Run them with `cargo test --release -- --ignored`.
+
+The G2P parity tools in `tools/parity/` regenerate the reference data in
+`data/` from Python spaCy and misaki. Each is a standalone uv script with
+pinned dependencies, so run it directly, for example
+`tools/parity/dump_misaki.py lines.txt out.jsonl`. They are not part of the
+test suite.
+
+To dogfood a local build, run `scripts/dev-install.sh`. It builds the release
+binary, replaces `~/.local/bin/omatalk` with it, installs this tree's unit,
+and restarts the Daemon. It does not download models. Run the installer
+once first. To go back to the latest release, run `omatalk upgrade`.
+
 ## Design docs
 
 - [Domain language](CONTEXT.md)
@@ -323,10 +412,11 @@ any future rewrite all go through it.
 ## Credits
 
 The voice is [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) by
-[hexgrad](https://github.com/hexgrad/kokoro). Omatalk runs it through
-[kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) by
-[thewh1teagle](https://github.com/thewh1teagle), the Python ONNX package the
-daemon imports.
+[hexgrad](https://github.com/hexgrad/kokoro). Omatalk downloads the ONNX
+export published by [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx)
+by [thewh1teagle](https://github.com/thewh1teagle). Phonemes come from a Rust
+port of [misaki](https://github.com/hexgrad/misaki), Kokoro's G2P library,
+and the spaCy `en_core_web_sm` tokenizer and tagger.
 
 Built for [Omarchy](https://omarchy.org) by DHH
 ([source](https://github.com/omacom/omarchy)).

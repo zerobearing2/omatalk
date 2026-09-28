@@ -30,3 +30,13 @@ against fp32 plus a live listening test, not a blind comparison. Resident
 memory measured a wash versus fp32 (the CPU provider upcasts at load);
 kokoro-onnx 0.6 is required — the v1.1 exports declare `speed` as float and
 fail on 0.4.x.
+
+Revision 2026-09-27 (Omatalk 0.9, ADR-0005): the shipped artifact is the
+**fp32 export** again (`kokoro-v1.0.onnx`, 310 MB, release `model-files-v1.0`;
+about 355 MB with voices). The fp16 export is slower on CPU, because the CPU
+has no native fp16 and onnxruntime upcasts on every run. On a Ryzen 7840HS,
+fp16 took 278 ms to first audio against 176 ms for fp32, and 693 ms to load
+against 357 ms. The Daemon calls onnxruntime directly, not through
+kokoro-onnx. espeak-ng is no longer the phonemizer. A Rust port of misaki,
+Kokoro's own G2P, is. espeak-ng remains a dependency only as misaki's
+fallback for words outside its lexicon.
