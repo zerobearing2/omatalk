@@ -151,7 +151,9 @@ rm -f "$HOME/.local/bin/omatalkd" \
   "$OMATALK_HOME/omatalk-src.tar.gz"
 
 systemctl --user daemon-reload
-systemctl --user enable --now omatalk.service
+# reenable moves the link of an install that was wanted by default.target.
+systemctl --user reenable omatalk.service
+systemctl --user start omatalk.service
 
 # 7. F8 binding. Ask before writing bindings.lua; stay silent when an
 # omatalk o.bind already exists (comments do not count, matching what

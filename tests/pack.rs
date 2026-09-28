@@ -159,7 +159,7 @@ fn unit_runs_the_launcher_as_the_daemon() {
         "Environment=OMATALK_MODELS=%h/.local/share/omatalk/models",
         "Restart=always",
         "RestartSec=500ms",
-        "WantedBy=default.target",
+        "WantedBy=graphical-session.target",
     ] {
         assert!(lines.contains(&want), "missing {want:?}");
     }
