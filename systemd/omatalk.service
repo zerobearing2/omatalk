@@ -10,4 +10,6 @@ Restart=always
 RestartSec=500ms
 
 [Install]
-WantedBy=default.target
+# Not default.target: at boot that starts the Daemon before uwsm imports
+# WAYLAND_DISPLAY, and wl-paste then cannot read the Selection.
+WantedBy=graphical-session.target

@@ -29,6 +29,6 @@ mv -f "$launcher_tmp" "$LAUNCHER"
 install -m 0644 systemd/omatalk.service "$HOME/.config/systemd/user/omatalk.service"
 
 systemctl --user daemon-reload
-systemctl --user enable omatalk.service
+systemctl --user reenable omatalk.service
 systemctl --user restart omatalk.service
 printf 'Dev install active: %s is %s\n' "$LAUNCHER" "$("$LAUNCHER" version)"

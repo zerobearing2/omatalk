@@ -94,10 +94,11 @@ fn downloads_finish_before_the_daemon_stops() {
     assert_eq!(result.code, 0, "{}", result.stderr);
     let stop = fake.last_index("systemctl --user stop omatalk.service");
     let reload = fake.last_index("systemctl --user daemon-reload");
-    let start = fake.last_index("systemctl --user enable --now omatalk.service");
+    let relink = fake.last_index("systemctl --user reenable omatalk.service");
+    let start = fake.last_index("systemctl --user start omatalk.service");
     let last_download = fake.last_index("curl ");
     assert!(
-        last_download < stop && stop < reload && reload < start,
+        last_download < stop && stop < reload && reload < relink && relink < start,
         "{:?}",
         fake.commands()
     );
