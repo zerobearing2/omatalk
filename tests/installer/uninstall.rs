@@ -65,3 +65,25 @@ fn uninstall_removes_a_rust_install_and_its_models() {
     };
     assert!(patterns.iter().any(matches), "{patterns:?}");
 }
+
+/// `omatalk uninstall` runs the script as `bash -c <script>`, so its own argv
+/// holds the whole text. A pattern given to `pkill -f` that matches that text
+/// makes the script kill itself.
+#[test]
+fn uninstall_script_text_does_not_match_its_own_pkill_patterns() {
+    let script = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/uninstall.sh"))
+        .expect("uninstall.sh");
+    let pkill = fancy_regex::Regex::new(r#"pkill -f "([^"]+)""#).unwrap();
+    let patterns: Vec<String> = pkill
+        .captures_iter(&script)
+        .map(|c| c.unwrap().get(1).unwrap().as_str().to_owned())
+        .collect();
+    assert!(!patterns.is_empty());
+    for pattern in patterns {
+        let regex = fancy_regex::Regex::new(&pattern).unwrap();
+        assert!(
+            !regex.is_match(&script).unwrap(),
+            "uninstall.sh text matches its own pkill pattern {pattern:?}"
+        );
+    }
+}

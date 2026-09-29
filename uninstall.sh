@@ -31,8 +31,10 @@ systemctl --user disable --now omatalk.service 2>/dev/null
 set -e
 rm -f "$UNIT"
 systemctl --user daemon-reload
-# Stray Daemons from v0.5 and 1.x. The regex dot in "[o]matalk.daemon" also
-# matches the space in 1.x's `omatalk daemon`.
+# Stray Daemons from v0.5 and 1.x. The regex dot in the first pattern also
+# matches the space in the 1.x argv. This script must never contain text
+# either pattern matches: `omatalk uninstall` runs it as `bash -c <script>`,
+# so its own argv holds that text and pkill -f would kill it.
 if pgrep -f "[o]matalk.daemon" >/dev/null 2>&1; then
   set +e
   pkill -f "[o]matalk.daemon"
