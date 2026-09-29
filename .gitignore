@@ -11,8 +11,9 @@ models/
 *.sock
 *.pid
 
-# Local markdown issue tracker (see docs/agents/issue-tracker.md)
+# Local scratch space and bot state
 .scratch/
+.grok-bot/
 
 # Editors / OS
 .idea/
