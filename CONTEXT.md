@@ -48,9 +48,10 @@ at login.
 _Avoid_: server, service (the systemd unit wraps the Daemon but is not the term)
 
 **Stream**:
-Speaking a Utterance in sentence-first chunks, starting playback before all
-audio is synthesized. A part over the chunk cap is split at a clause or word
-so the engine never sees the rest of the text.
+Speaking an Utterance batch by batch, starting playback before all audio is
+synthesized. The first batch is a few words, so first audio comes fast. Later
+batches grow up to Kokoro's 510-phoneme limit, and each one is synthesized
+while the previous one plays.
 
 The Omarchy bar widget (megaphone, setup/config panel) lives in
 https://github.com/zerobearing2/omarchy-omatalk-plugin, released on its own.

@@ -1,14 +1,6 @@
-# Packed release tarball (make build / make release)
-omatalk-src.tar.gz
-omatalk-src.tar.gz.sha256
-
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-dist/
-build/
-.venv/
+# Packed release tarball (scripts/build.sh)
+omatalk-x86_64.tar.gz
+omatalk-x86_64.tar.gz.sha256
 
 # Local TTS models and audio caches
 models/
@@ -19,14 +11,19 @@ models/
 *.sock
 *.pid
 
-# Local markdown issue tracker (see docs/agents/issue-tracker.md)
+# Local scratch space and bot state
 .scratch/
+.grok-bot/
 
 # Editors / OS
 .idea/
 .vscode/
 .DS_Store
-.pytest_cache/
 
 # Claude Code worktrees
 .claude/worktrees/
+
+/target
+
+# Embedded G2P data (the *.bin rule above is for models)
+!/data/tagger.bin

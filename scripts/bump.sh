@@ -1,27 +1,33 @@
 #!/usr/bin/env bash
-# Update the pyproject.toml version and re-lock uv.lock. Does not commit. Then make release.
-# VERSION=x.y.z to set it explicitly.
+# Update the Cargo.toml version and Cargo.lock. Does not commit. Then make release.
+# 0.9.0-dev.3 bumps to 0.9.0-dev.4; 0.9.0 bumps to 0.9.1.
+# VERSION=x.y.z (or x.y.z-dev.N) sets it explicitly.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+source scripts/lib.sh
 
-file="pyproject.toml"
-current="$(sed -n 's/^version = "\(.*\)"$/\1/p' "$file")"
-if [ -z "$current" ]; then
-  echo "could not read version from $file" >&2
-  exit 1
-fi
+file="Cargo.toml"
+current="$(cargo_version "$file")"
 
 if [ -n "${VERSION:-}" ]; then
   new="$VERSION"
+elif [[ "$current" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-dev\.([0-9]+)$ ]]; then
+  new="${BASH_REMATCH[1]}-dev.$((BASH_REMATCH[2] + 1))"
+elif [[ "$current" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+  new="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))"
 else
-  major="$(echo "$current" | cut -d. -f1)"
-  minor="$(echo "$current" | cut -d. -f2)"
-  patch="$(echo "$current" | cut -d. -f3)"
-  new="$major.$minor.$((patch + 1))"
+  echo "$file version $current is not x.y.z or x.y.z-dev.N; set VERSION" >&2
+  exit 1
 fi
 
-sed -i "s/^version = \".*\"/version = \"$new\"/" "$file"
-uv lock --quiet
-printf 'Bumped %s -> %s in %s and uv.lock (not committed)\n' "$current" "$new" "$file"
+if [[ ! "$new" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-dev\.[0-9]+)?$ ]]; then
+  echo "$new: version must be x.y.z or x.y.z-dev.N" >&2
+  exit 1
+fi
+
+# Only inside [package]: the range ends at the next table header.
+sed -i "/^\[package\]$/,/^\[/ s/^version = \".*\"$/version = \"$new\"/" "$file"
+cargo update --workspace --offline --quiet
+printf 'Bumped %s -> %s in %s and Cargo.lock (not committed)\n' "$current" "$new" "$file"

@@ -1,5 +1,8 @@
 # Python daemon instead of Rust, with socket protocol as the seam
 
+Status: superseded by ADR-0005 (`0005-rust-daemon.md`). Omatalk 0.9 is a
+Rust binary.
+
 Voxtype — the tool Omatalk mirrors — is Rust, and the omarchy ecosystem
 naturally expects small system daemons to be Rust single binaries. We chose a
 **Python daemon (uv-managed, kokoro-onnx)** anyway. The MVP's risk is

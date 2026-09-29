@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "install-md": {
+      "source": "basecamp/house-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/ai/skills/install-md/SKILL.md",
+      "computedHash": "98b83efc631419b16000710c0eec4a9d0c5e727e9d6b847606247b758e2b5b6e"
+    }
+  }
+}

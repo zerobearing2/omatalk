@@ -845,7 +845,7 @@
     <div class="eyebrow">the reverse of dictation</div>
     <h1>Select text.<br>Press a key.<br><span class="accent">It talks.</span></h1>
     <p class="sub">Omatalk reads your selection out loud through a local neural voice, streamed
-      in sentence-first chunks as it's synthesized. No network call, no API key, no cloud
+      batch by batch as it's synthesized. No network call, no API key, no cloud
       round-trip. The model stays warm on your own CPU.</p>
 
     <div class="demo">
@@ -871,7 +871,7 @@
     <h2>Get it running</h2>
     <p class="prose" style="margin-top:14px;">Omatalk has two parts: the Daemon, which does the speaking, and the bar plugin, the megaphone and voice panel. One command installs both.</p>
 
-    <p class="prose" style="margin-top:14px;">Run it in a terminal. It installs the speech Daemon and the <code class="inline-code">omatalk</code> command, downloads the models (about 185MB), asks before binding F8, and adds the bar plugin. If you added the plugin from the Omarchy Marketplace first, its panel links here: run this, and it keeps the plugin you have.</p>
+    <p class="prose" style="margin-top:14px;">Run it in a terminal. It installs the speech Daemon and the <code class="inline-code">omatalk</code> command, downloads the models (about 355MB), asks before binding F8, and adds the bar plugin. If you added the plugin from the Omarchy Marketplace first, its panel links here: run this, and it keeps the plugin you have.</p>
     <div class="code-card" style="margin-top:12px;">
       <div class="cc-title">
         install
@@ -931,7 +931,7 @@
     <ol class="loop">
       <li><div class="step-body"><b>Highlight text</b> anywhere in Hyprland: a browser tab, a terminal, a GTK app, an editor buffer.</div></li>
       <li><div class="step-body"><b>Press the Speak Key.</b> Omatalk resolves the <b>Source</b>: the Wayland primary selection first (<code>wl-paste --primary</code>), the clipboard if nothing's selected.</div></li>
-      <li><div class="step-body"><b>The daemon streams it.</b> Text is packed into sentence-first chunks and synthesized through Kokoro-82M. First audio lands before the rest has finished rendering.</div></li>
+      <li><div class="step-body"><b>The daemon streams it.</b> Text becomes phonemes, packed into batches that start with a few words, and is synthesized through Kokoro-82M. First audio lands before the rest has finished rendering.</div></li>
       <li><div class="step-body"><b>Press it again to interrupt.</b> The playing <b>Utterance</b> cuts off immediately. Unchanged or empty Selection just stops; a new Selection starts speaking. No queue.</div></li>
     </ol>
   </section>
@@ -1078,10 +1078,10 @@
     <div class="eyebrow">how it's built</div>
     <h2>No cloud in the loop</h2>
     <div class="manifest">
-      <div class="row"><div class="name">Kokoro-82M</div><div class="why">ONNX Runtime, CPU, via <a href="https://github.com/thewh1teagle/kokoro-onnx" target="_blank" rel="noopener">kokoro-onnx</a> by <a href="https://github.com/thewh1teagle" target="_blank" rel="noopener">thewh1teagle</a>. Model and original inference by <a href="https://github.com/hexgrad/kokoro" target="_blank" rel="noopener">hexgrad</a>. Chosen over Piper (fast but audibly robotic) and XTTS/Chatterbox (GPU-sized, restrictive licenses). Near top-of-class naturalness with a ~185MB fp16 download, faster than real time on a mid-range laptop CPU.</div></div>
-      <div class="row"><div class="name">Python daemon (uv)</div><div class="why">Keeps the model warm in memory so a hotkey press never pays a 10–30s cold-load tax. Talks over a Unix socket: <code class="mono" style="background:none;border:none;padding:0;">speak</code> / <code class="mono" style="background:none;border:none;padding:0;">stop</code> / <code class="mono" style="background:none;border:none;padding:0;">status</code>, plus <code class="mono" style="background:none;border:none;padding:0;">follow</code> so the bar can track state.</div></div>
+      <div class="row"><div class="name">Kokoro-82M</div><div class="why">ONNX Runtime, CPU, using the fp32 export published by <a href="https://github.com/thewh1teagle/kokoro-onnx" target="_blank" rel="noopener">kokoro-onnx</a> by <a href="https://github.com/thewh1teagle" target="_blank" rel="noopener">thewh1teagle</a>. Model and original inference by <a href="https://github.com/hexgrad/kokoro" target="_blank" rel="noopener">hexgrad</a>. Chosen over Piper (fast but audibly robotic) and XTTS/Chatterbox (GPU-sized, restrictive licenses). Near top-of-class naturalness, faster than real time on a mid-range laptop CPU.</div></div>
+      <div class="row"><div class="name">Rust daemon</div><div class="why">One binary that keeps the model warm in memory, so a hotkey press never pays the model load. It turns text into phonemes with a Rust port of misaki, Kokoro's own G2P, and starts speaking after the first few words are synthesized. Talks over a Unix socket: <code class="mono" style="background:none;border:none;padding:0;">speak</code> / <code class="mono" style="background:none;border:none;padding:0;">stop</code> / <code class="mono" style="background:none;border:none;padding:0;">status</code>, plus <code class="mono" style="background:none;border:none;padding:0;">follow</code> so the bar can track state.</div></div>
       <div class="row"><div class="name">wl-paste --primary</div><div class="why">Reads the Wayland primary selection directly: no synthetic keystrokes, no clipboard mutation, no keyboard-injection daemon.</div></div>
-      <div class="row"><div class="name">PipeWire</div><div class="why"><code class="mono" style="background:none;border:none;padding:0;">pw-cat</code> streams raw PCM straight over stdin as each chunk is synthesized &mdash; no staged WAV files, layering over whatever else is playing. One player process per Utterance.</div></div>
+      <div class="row"><div class="name">PipeWire</div><div class="why"><code class="mono" style="background:none;border:none;padding:0;">pw-cat</code> streams raw PCM straight over stdin as each batch is synthesized &mdash; no staged WAV files, layering over whatever else is playing. One player process per Utterance.</div></div>
       <div class="row"><div class="name">systemd --user</div><div class="why">Starts the daemon at login and keeps it resident across the session; state and models live under <code class="mono" style="background:none;border:none;padding:0;">~/.local/share/omatalk/</code>.</div></div>
       <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config: the installer asks before adding its one line, and never takes a key that is already bound. F8 sits next to voxtype's F9 dictation key on purpose: F9 speaks you, F8 speaks back.</div></div>
     </div>
@@ -1104,7 +1104,8 @@
 ┌───────────────────────────────────────────┐
 │      omatalk daemon · systemd --user      │
 │ capture:  wl-paste --primary → wl-paste   │
-│ chunker:  text → sentence-first chunks    │
+│ g2p:      misaki (Rust port) → phonemes   │
+│ batches:  short first, then up to 510     │
 │ engine:   <span class="hi">Kokoro-82M</span> · ONNX Runtime · CPU │
 │ player:   pw-cat → PipeWire (streamed)    │
 └───────────────────────────────────────────┘</pre>
@@ -1114,11 +1115,13 @@
   <section id="roadmap">
     <div class="eyebrow">roadmap</div>
     <h2>Shipped and next</h2>
-    <p class="prose">The MVP scope stayed narrow on purpose. Three pieces have shipped; the remaining work is next, in roughly the order it will land.</p>
+    <p class="prose">The MVP scope stayed narrow on purpose. Four pieces have shipped; the remaining work is next, in roughly the order it will land.</p>
     <div class="manifest">
       <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Quickshell widget <span class="roadmap-status">shipped</span></div><div class="why">A megaphone status indicator in Omarchy's own shell. It follows the daemon over a Unix socket, uses the theme accent while speaking, and shows the shell urgent color after a 3-second disconnect grace period.</div></div>
-      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Half-size model <span class="roadmap-status">shipped</span></div><div class="why">The installer now ships the fp16 export (~185MB download, spectral correlation 0.999 against fp32 — audibly identical). Measured honestly: resident memory is a wash (~equal on short utterances, slightly higher under sustained long synthesis) — the win is the halved download, not RAM. A low-resource engine choice (Piper, int8) for potato-class machines remains open.</div></div>
       <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Voice + speed panel <span class="roadmap-status">shipped</span></div><div class="why">Click the bar icon for a voice picker and speed slider, both auto-saving to <code class="mono" style="background:none;border:none;padding:0;">config.toml</code> — the next utterance binds the change, no restart. The same surface is scriptable: <code class="mono" style="background:none;border:none;padding:0;">omatalk config get/set/voices</code>.</div></div>
+      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Rust port <span class="roadmap-status">shipped</span></div><div class="why">Omatalk 0.9 is one Rust binary. <code class="mono" style="background:none;border:none;padding:0;">omatalk daemon</code> is the Daemon, and every other command is the CLI. The install no longer needs a Python environment. The socket, <code class="mono" style="background:none;border:none;padding:0;">config.toml</code>, and the bar plugin stay the same.</div></div>
+      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Performance fixes <span class="roadmap-status">shipped</span></div><div class="why">Speech starts about a third of a second after the press. The first batch is a few words, against more than a second when a whole paragraph was synthesized first. The fp32 model is faster on CPU than the half-size fp16 export. A low-resource engine (Piper, int8) for potato-class machines remains open.</div></div>
+      <div class="row"><div class="name">AUR package</div><div class="why">Publish <code class="mono" style="background:none;border:none;padding:0;">omatalk-bin</code> so Omarchy can install Omatalk from the AUR. The curl installer stays until that package ships.</div></div>
       <div class="row"><div class="name">Media ducking</div><div class="why">Automatically lower other audio while Omatalk is speaking, opt-in via config.</div></div>
       <div class="row"><div class="name">More languages</div><div class="why">Kokoro-82M ships packs for nine languages. Omatalk speaks English only for now.</div></div>
     </div>
@@ -1130,9 +1133,9 @@
     <div class="prose">
       <p>The neural voice is <a href="https://huggingface.co/hexgrad/Kokoro-82M" target="_blank" rel="noopener">Kokoro-82M</a>
         by <a href="https://github.com/hexgrad/kokoro" target="_blank" rel="noopener">hexgrad</a>.
-        Omatalk runs it through <a href="https://github.com/thewh1teagle/kokoro-onnx" target="_blank" rel="noopener">kokoro-onnx</a>
+        Omatalk downloads the ONNX export published by <a href="https://github.com/thewh1teagle/kokoro-onnx" target="_blank" rel="noopener">kokoro-onnx</a>
         by <a href="https://github.com/thewh1teagle" target="_blank" rel="noopener">thewh1teagle</a>,
-        the Python ONNX package the daemon imports.</p>
+        and reads text with a Rust port of <a href="https://github.com/hexgrad/misaki" target="_blank" rel="noopener">misaki</a>, Kokoro's G2P library.</p>
       <p>Omatalk is built for <a href="https://omarchy.org" target="_blank" rel="noopener">Omarchy</a> by DHH.
         The bar plugin, the F8/F9 pairing, and the installer all sit on that desktop.
         Source: <a href="https://github.com/omacom/omarchy" target="_blank" rel="noopener">github.com/omacom/omarchy</a>.</p>

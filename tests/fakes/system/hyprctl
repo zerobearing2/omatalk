@@ -1,0 +1,2 @@
+#!/bin/sh
+printf 'hyprctl %s\n' "$*" >> "$FAKE_LOG"

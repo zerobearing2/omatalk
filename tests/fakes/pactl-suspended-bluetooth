@@ -1,0 +1,6 @@
+#!/bin/sh
+case "$*" in
+  get-default-sink) echo bluez_output.X.1 ;;
+  'list sinks short') printf '98\tbluez_output.X.1\tPipeWire\ts16le 2ch 48000Hz\tSUSPENDED\n' ;;
+  *) exit 1 ;;
+esac

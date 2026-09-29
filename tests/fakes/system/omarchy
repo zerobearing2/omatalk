@@ -1,0 +1,32 @@
+#!/bin/sh
+set -eu
+printf 'omarchy %s\n' "$*" >> "$FAKE_LOG"
+plugin_dir="$HOME/.config/omarchy/plugins/zerobearing.omatalk"
+case "${1:-} ${2:-}" in
+  "pkg present")
+    exit "${FAKE_PKG_PRESENT_STATUS:-0}"
+    ;;
+  "plugin add")
+    if [ "${FAKE_PLUGIN_ADD_FAIL:-0}" = 1 ]; then
+      exit 1
+    fi
+    if [ -e "$plugin_dir" ]; then
+      exit 1
+    fi
+    mkdir -p "$plugin_dir/.git"
+    printf '{"id":"zerobearing.omatalk"}\n' > "$plugin_dir/manifest.json"
+    ;;
+  "plugin remove")
+    if [ "${FAKE_PLUGIN_REMOVE_FAIL:-0}" = 1 ]; then
+      exit 1
+    fi
+    rm -rf "$plugin_dir"
+    ;;
+  "plugin list")
+    if [ -f "$plugin_dir/manifest.json" ]; then
+      printf '[{"id":"zerobearing.omatalk"}]\n'
+    else
+      printf '[]\n'
+    fi
+    ;;
+esac
