@@ -10,7 +10,7 @@ OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
 # Fixed, not read from the environment: what this script downloads is
 # exactly what it names here.
 RELEASE_TAG="v0.9.0"
-TARBALL_SHA256="0000000000000000000000000000000000000000000000000000000000000000"
+TARBALL_SHA256="644b988e36ab8632b9964722953eb08715c16282e0a49c8fc6d8503b53a0b722"
 RELEASE_BASE="https://github.com/zerobearing2/omatalk/releases/download/${RELEASE_TAG}"
 PLUGIN_REPO="https://github.com/zerobearing2/omarchy-omatalk-plugin.git"
 MODEL_BASE="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
