@@ -53,7 +53,7 @@ Marketplace listing after a plugin SHA change:
 
 ### Issue tracker
 
-Issues live as local markdown under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues (`gh` CLI). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
