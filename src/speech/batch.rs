@@ -3,6 +3,7 @@
 //!
 //! Split/pack is the prototype's `split_phonemes` (atoms at sentence, then
 //! clause, then word bounds; balanced packing to <= 510). The ramp is new.
+//! A Voiceover skips the ramp: `script` packs each paragraph on its own.
 
 use std::collections::VecDeque;
 
@@ -22,12 +23,24 @@ pub const SYNTH_MS_PER_PHONEME: f32 = 11.0;
 /// (measured 58-61).
 pub const AUDIO_MS_PER_PHONEME: f32 = 58.0;
 
+/// Voiceover pauses, appended to a trimmed batch. Kokoro's own gaps between
+/// sentences inside one batch measure 480-670 ms, and the trimmed joint between
+/// two batches already adds 110-150 ms, so a sentence joint of 420 ms lands at
+/// 530-570 ms, where the model would have put it. A clause joint tops the same
+/// trimmed joint up to a short breath; a word joint needs nothing on top of it.
+pub const SENTENCE_JOINT_MS: u32 = 420;
+pub const CLAUSE_JOINT_MS: u32 = 170;
+pub const WORD_JOINT_MS: u32 = 0;
+/// A blank line in the script is a beat, longer than any sentence gap.
+pub const PARAGRAPH_MS: u32 = 900;
+
 /// One model call's input plus the silence to append after its audio.
 #[derive(Debug, PartialEq)]
 pub struct Batch {
     pub phonemes: String,
-    /// 250 ms after `.!?…`, 100 ms after `,;:`, 0 otherwise; always 0 on the
-    /// last batch of the Utterance.
+    /// Live: 250 ms after `.!?…`, 100 ms after `,;:`, 0 otherwise. Voiceover:
+    /// the joint constants above, or `PARAGRAPH_MS` at a paragraph's end.
+    /// Always 0 on the last batch of the Utterance.
     pub pause_ms: u32,
 }
 
@@ -178,6 +191,56 @@ fn pause_after(batch: &str) -> u32 {
         Bound::Clause => 100,
         Bound::Word => 0,
     }
+}
+
+/// The pause a Voiceover leaves after a batch that has a successor in its
+/// paragraph, from how the batch ends.
+fn joint_ms(batch: &str) -> u32 {
+    match bound(batch.trim_end().chars().last()) {
+        Bound::Sentence => SENTENCE_JOINT_MS,
+        Bound::Clause => CLAUSE_JOINT_MS,
+        Bound::Word => WORD_JOINT_MS,
+    }
+}
+
+/// The lines of each paragraph of `text`. A paragraph ends at one or more
+/// blank lines, and a line of only whitespace is blank.
+pub fn paragraphs(text: &str) -> Vec<Vec<&str>> {
+    let mut out = Vec::new();
+    let mut current = Vec::new();
+    for line in text.lines() {
+        if !line.trim().is_empty() {
+            current.push(line);
+        } else if !current.is_empty() {
+            out.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        out.push(current);
+    }
+    out
+}
+
+/// A Voiceover's batches. Each paragraph is its phonemized lines joined by a
+/// space; it packs on its own, so a batch never crosses a paragraph and a
+/// paragraph always ends with `PARAGRAPH_MS`.
+pub fn script(paragraphs: impl IntoIterator<Item = impl AsRef<str>>) -> Vec<Batch> {
+    let mut out = Vec::new();
+    for paragraph in paragraphs {
+        let mut packed = split_phonemes(paragraph.as_ref()).into_iter().peekable();
+        while let Some(phonemes) = packed.next() {
+            let pause_ms = if packed.peek().is_some() {
+                joint_ms(&phonemes)
+            } else {
+                PARAGRAPH_MS
+            };
+            out.push(Batch { phonemes, pause_ms });
+        }
+    }
+    if let Some(last) = out.last_mut() {
+        last.pause_ms = 0;
+    }
+    out
 }
 
 /// Byte offset ending the longest prefix of at most `cap` chars that stops
@@ -469,5 +532,126 @@ mod tests {
         assert_eq!(pause_after("a…"), 250);
         assert_eq!(pause_after("a;"), 100);
         assert_eq!(pause_after("a"), 0);
+    }
+
+    fn texts(batches: &[Batch]) -> Vec<&str> {
+        batches.iter().map(|b| b.phonemes.as_str()).collect()
+    }
+
+    #[test]
+    fn paragraphs_split_at_blank_lines_only() {
+        assert_eq!(
+            paragraphs("a\nb\n\nc\n \t\n\n\nd\n"),
+            [vec!["a", "b"], vec!["c"], vec!["d"]]
+        );
+        assert_eq!(paragraphs("a\r\nb\r\n\r\nc"), [vec!["a", "b"], vec!["c"]]);
+        assert!(paragraphs("").is_empty());
+        assert!(paragraphs("\n  \n\n").is_empty());
+    }
+
+    #[test]
+    fn a_script_batch_never_crosses_a_paragraph() {
+        let out = script(["wˈʌn.", "tˈu.", "θɹˈi."]);
+        assert_eq!(texts(&out), ["wˈʌn.", "tˈu.", "θɹˈi."]);
+        let long = [prose(120, 6, 4), prose(5, 6, 5).replace('a', "z")];
+        let out = script(&long);
+        assert!(out.len() > 2);
+        assert!(
+            out.iter()
+                .all(|b| b.phonemes.contains('a') != b.phonemes.contains('z'))
+        );
+        assert_eq!(out.last().unwrap().phonemes, long[1]);
+    }
+
+    #[test]
+    fn script_pauses_follow_the_pause_table() {
+        let out = script(["a.", "b", "c"]);
+        assert_eq!(
+            out,
+            [
+                Batch {
+                    phonemes: "a.".into(),
+                    pause_ms: PARAGRAPH_MS
+                },
+                Batch {
+                    phonemes: "b".into(),
+                    pause_ms: PARAGRAPH_MS
+                },
+                Batch {
+                    phonemes: "c".into(),
+                    pause_ms: 0
+                },
+            ]
+        );
+        assert_eq!(
+            (
+                SENTENCE_JOINT_MS,
+                CLAUSE_JOINT_MS,
+                WORD_JOINT_MS,
+                PARAGRAPH_MS
+            ),
+            (420, 170, 0, 900)
+        );
+    }
+
+    #[test]
+    fn a_long_sentence_falls_to_clause_then_word_joints() {
+        let clauses = (0..30)
+            .map(|_| format!("{},", "a".repeat(30)))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let words = vec!["bbbbb"; 150].join(" ");
+        let sentence = format!("{clauses} {words}.");
+        assert!(len(&sentence) > MAX_PHONEMES);
+        let out = script([sentence.as_str(), "tail."]);
+        assert!(out.len() >= 3);
+        let pauses: Vec<u32> = out.iter().map(|b| b.pause_ms).collect();
+        assert!(pauses.contains(&CLAUSE_JOINT_MS), "{pauses:?}");
+        let joints = &pauses[..pauses.len() - 2];
+        assert!(
+            joints
+                .iter()
+                .all(|&p| p == CLAUSE_JOINT_MS || p == WORD_JOINT_MS)
+        );
+        assert_eq!(pauses[pauses.len() - 2], PARAGRAPH_MS);
+        assert_eq!(pauses[pauses.len() - 1], 0);
+    }
+
+    #[test]
+    fn script_sentences_in_a_paragraph_pack_together_and_joints_follow_the_end() {
+        let sentences: Vec<String> = (0..4).map(|_| prose(1, 200, 1)).collect();
+        let out = script([sentences.join(" ")]);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0].pause_ms, SENTENCE_JOINT_MS);
+        assert_eq!(out[1].pause_ms, 0);
+
+        let out = script([format!("{} {},", prose(1, 400, 1), "b".repeat(300))]);
+        assert_eq!(out[0].pause_ms, SENTENCE_JOINT_MS);
+    }
+
+    #[test]
+    fn every_script_batch_fits_and_nothing_is_lost() {
+        let paragraphs = [
+            prose(900, 5, 7),
+            "ʃˈɔɹt.".into(),
+            "x".repeat(1300),
+            prose(3, 4, 9),
+        ];
+        let out = script(&paragraphs);
+        assert!(
+            out.iter()
+                .all(|b| (1..=MAX_PHONEMES).contains(&len(&b.phonemes)))
+        );
+        assert_eq!(out.last().unwrap().pause_ms, 0);
+        let kept: usize = out.iter().map(|b| len(&b.phonemes)).sum();
+        let wanted: usize = paragraphs.iter().map(|p| len(p)).sum();
+        assert!(kept <= wanted && kept + out.len() >= wanted);
+    }
+
+    #[test]
+    fn empty_paragraphs_make_no_batches() {
+        assert!(script(Vec::<String>::new()).is_empty());
+        assert_eq!(texts(&script(["", "  ", "a."])), ["a."]);
+        assert_eq!(script(["a.", "", " "]).last().unwrap().pause_ms, 0);
     }
 }

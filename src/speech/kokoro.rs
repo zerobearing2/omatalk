@@ -9,9 +9,9 @@ use std::thread;
 use ort::session::{RunOptions, Session};
 use ort::value::Tensor;
 
-use super::batch::Batches;
+use super::batch::{Batch, Batches, paragraphs, script};
 use super::g2p::G2p;
-use super::{Audio, Engine, LoadError, SAMPLE_RATE, SpeechError, StopToken, Utterance};
+use super::{Audio, Delivery, Engine, LoadError, SAMPLE_RATE, SpeechError, StopToken, Utterance};
 use crate::voices::{VOICES_FILE, VoiceName};
 
 pub const MODEL_FILE: &str = "kokoro-v1.0.onnx";
@@ -106,30 +106,43 @@ impl Engine for Kokoro {
             g2p,
         } = self;
         let vocab = &*vocab;
-        let lines = phonemize(u.text.as_str(), stop, move |line| {
-            known(vocab, &g2p.line(line))
-        });
-        Box::new(Batches::new(lines, u.speed.get()).map_while(move |batch| {
+        let speed = u.speed.get();
+        let mut known_line = move |line: &str| known(vocab, &g2p.line(line));
+        // The model's own gaps shrink with speed, so a Voiceover's pauses do
+        // too. Live keeps its fixed 250/100 ms.
+        let (batches, pause_scale): (Box<dyn Iterator<Item = Batch> + 'a>, f32) = match u.delivery {
+            Delivery::Live => {
+                let lines = phonemize(u.text.as_str(), stop, known_line);
+                (Box::new(Batches::new(lines, speed)), 1.0)
+            }
+            Delivery::Voiceover => {
+                let paragraphs = paragraphs(u.text.as_str())
+                    .into_iter()
+                    .map_while(|lines| {
+                        (!stop.is_fired()).then(|| {
+                            let lines: Vec<String> = lines
+                                .into_iter()
+                                .map(&mut known_line)
+                                .filter(|line| !line.is_empty())
+                                .collect();
+                            lines.join(" ")
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                (Box::new(script(paragraphs).into_iter()), 1.0 / speed)
+            }
+        };
+        Box::new(batches.map_while(move |batch| {
             let tokens = tokens(vocab, &batch.phonemes);
             let style = match styles.row(&u.voice, tokens.len()) {
                 Ok(style) => style,
                 Err(e) => return Some(Err(e)),
             };
-            let audio = infer(
-                session,
-                input,
-                &tokens,
-                style,
-                u.speed.get(),
-                stop,
-                Arena::Keep,
-            )?;
+            let audio = infer(session, input, &tokens, style, speed, stop, Arena::Keep)?;
+            let pause_ms = (batch.pause_ms as f32 * pause_scale).round() as u32;
             Some(audio.map(|audio| {
                 let mut audio = trim(&audio).to_vec();
-                audio.resize(
-                    audio.len() + (batch.pause_ms * SAMPLE_RATE / 1000) as usize,
-                    0.0,
-                );
+                audio.resize(audio.len() + (pause_ms * SAMPLE_RATE / 1000) as usize, 0.0);
                 audio
             }))
         }))
@@ -329,7 +342,6 @@ pub fn trim(audio: &[f32]) -> &[f32] {
 mod tests {
     use super::*;
     use crate::config::Speed;
-    use crate::speech::Delivery;
     use std::time::{Duration, Instant};
 
     #[test]
@@ -380,6 +392,37 @@ mod tests {
             speed: Speed::parse("1.0").unwrap(),
             delivery: Delivery::Live,
         }
+    }
+
+    /// Needs the same files as `real_model_speaks_and_stops`.
+    #[test]
+    #[ignore = "needs the real model; run with --ignored"]
+    fn real_model_voiceover_is_deterministic_and_breaks_at_paragraphs() {
+        let models = std::env::var("OMATALK_MODELS").expect("set OMATALK_MODELS");
+        let mut kokoro = Kokoro::load(Path::new(&models)).expect("load");
+        let render = |kokoro: &mut Kokoro, text: &str| -> Vec<Vec<f32>> {
+            let u = Utterance {
+                delivery: Delivery::Voiceover,
+                ..utterance(text)
+            };
+            kokoro
+                .speak(&u, &StopToken::default())
+                .collect::<Result<_, _>>()
+                .unwrap()
+        };
+
+        let two = "The first paragraph is short.\n\nThe second one is short too.";
+        let first = render(&mut kokoro, two);
+        assert_eq!(first, render(&mut kokoro, two));
+        assert_eq!(first.len(), 2, "one batch per paragraph");
+        let beat = (900 * SAMPLE_RATE / 1000) as usize;
+        assert!(first[0].iter().rev().take(beat).all(|&s| s == 0.0));
+
+        let one = render(
+            &mut kokoro,
+            "The first paragraph is short.\nThe second one is short too.",
+        );
+        assert_eq!(one.len(), 1, "a single newline stays in one paragraph");
     }
 
     /// Needs `OMATALK_MODELS` (kokoro-v1.0.onnx fp32 + voices-v1.0.bin),
