@@ -244,3 +244,27 @@ fn dispatcher_fetches_the_latest_release_by_default() {
         );
     }
 }
+
+#[test]
+fn site_deploys_on_a_stable_release_or_by_hand_never_on_push() {
+    let workflow = read(repo(".github/workflows/pages.yml"));
+    let lines: Vec<&str> = workflow.lines().collect();
+
+    assert!(!lines.iter().any(|l| l.trim_start().starts_with("push:")));
+    assert!(lines.contains(&"  release:"));
+    assert!(lines.contains(&"    types: [published]"));
+    assert!(lines.contains(&"  workflow_dispatch:"));
+
+    let guard = lines
+        .iter()
+        .find(|l| l.trim_start().starts_with("if:"))
+        .expect("the deploy job has no if: guard");
+    assert!(
+        guard.contains("github.event_name == 'workflow_dispatch'"),
+        "{guard}"
+    );
+    assert!(
+        guard.contains("!github.event.release.prerelease"),
+        "{guard}"
+    );
+}
