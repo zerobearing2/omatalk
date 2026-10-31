@@ -117,7 +117,7 @@ fn defaults() -> serde_json::Value {
 #[test]
 fn copy_buttons_copy_the_visible_snippet() {
     let cards = copy_cards(&page());
-    assert_eq!(cards.len(), 5);
+    assert_eq!(cards.len(), 7);
     for pre in &cards {
         let text = pre.trim();
         assert!(!text.is_empty());
@@ -208,6 +208,22 @@ fn install_commands_match_readme_and_cname() {
     }
     assert!(public("install.sh").is_file());
     assert!(public("uninstall.sh").is_file());
+}
+
+#[test]
+fn render_commands_match_readme() {
+    let shown: BTreeSet<String> = copy_cards(&page())
+        .iter()
+        .map(|pre| pre.trim().to_owned())
+        .collect();
+    let readme = read(repo("README.md"));
+    for command in [
+        "omatalk render --out talk.wav < script.txt",
+        r#"omatalk render --out talk.wav --voice af_bella --speed 0.95 "Welcome to the demo.""#,
+    ] {
+        assert!(shown.contains(command), "page lacks {command}");
+        assert!(readme.contains(command), "README lacks {command}");
+    }
 }
 
 #[test]
