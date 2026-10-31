@@ -244,3 +244,180 @@ fn dispatcher_fetches_the_latest_release_by_default() {
         );
     }
 }
+
+/// The lines of the top-level job `name` in pages.yml, up to the next job.
+fn pages_job(workflow: &str, name: &str) -> Vec<String> {
+    let header = format!("  {name}:");
+    workflow
+        .lines()
+        .skip_while(|l| *l != header)
+        .skip(1)
+        .take_while(|l| l.is_empty() || l.starts_with("    "))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// The body of the gate job's `run: |` step, dedented.
+fn gate_script(workflow: &str) -> String {
+    let job = pages_job(workflow, "gate");
+    let body: Vec<&str> = job
+        .iter()
+        .skip_while(|l| l.trim() != "run: |")
+        .skip(1)
+        .map(String::as_str)
+        .collect();
+    assert!(!body.is_empty(), "gate job has no run script");
+    body.iter()
+        .map(|l| l.strip_prefix("          ").unwrap_or(l))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn site_deploys_on_a_stable_release_or_by_hand_never_on_push() {
+    let workflow = read(repo(".github/workflows/pages.yml"));
+    let lines: Vec<&str> = workflow.lines().collect();
+
+    assert!(!lines.iter().any(|l| l.trim_start().starts_with("push:")));
+    assert!(lines.contains(&"  release:"));
+    assert!(lines.contains(&"    types: [published]"));
+    assert!(lines.contains(&"  workflow_dispatch:"));
+
+    let gate = pages_job(&workflow, "gate");
+    let guard = gate
+        .iter()
+        .find(|l| l.trim_start().starts_with("if:"))
+        .expect("the gate job has no if: guard");
+    assert!(
+        guard.contains("github.event_name == 'workflow_dispatch'"),
+        "{guard}"
+    );
+    assert!(
+        guard.contains("!github.event.release.prerelease"),
+        "{guard}"
+    );
+    let at = gate.iter().position(|l| l == "    permissions:").unwrap();
+    assert_eq!(gate[at + 1], "      contents: read");
+    assert!(
+        !gate[at + 2].starts_with("      "),
+        "gate has more permissions"
+    );
+
+    let deploy = pages_job(&workflow, "deploy");
+    assert!(deploy.contains(&"    needs: gate".to_owned()));
+    assert!(deploy.contains(&"    if: needs.gate.outputs.deploy == 'true'".to_owned()));
+    assert_eq!(
+        deploy
+            .iter()
+            .filter(|l| l.trim_start().starts_with("if:"))
+            .count(),
+        1
+    );
+}
+
+struct Gate {
+    sys: System,
+    script: String,
+    output: PathBuf,
+}
+
+impl Gate {
+    fn new() -> Gate {
+        let sys = System::new();
+        let script = gate_script(&read(repo(".github/workflows/pages.yml")));
+        let output = sys.path("github_output");
+        write(&output, "");
+        Gate {
+            sys,
+            script,
+            output,
+        }
+    }
+
+    fn latest(self, tag: &str) -> Gate {
+        write(self.sys.path("state/latest"), format!("{tag}\n"));
+        self
+    }
+
+    fn run(&self, event: &str, tag: &str) -> common::Run {
+        let mut cmd = self.sys.command("bash");
+        cmd.args(["-e", "-c", &self.script])
+            .env("EVENT", event)
+            .env("TAG", tag)
+            .env("GH_TOKEN", "token")
+            .env("GITHUB_REPOSITORY", "zerobearing2/omatalk")
+            .env("GITHUB_OUTPUT", &self.output);
+        run(&mut cmd, "")
+    }
+
+    fn outputs(&self) -> String {
+        read(&self.output)
+    }
+}
+
+#[test]
+fn only_the_latest_release_deploys_the_site() {
+    let gate = Gate::new().latest("v0.10.0");
+    let result = gate.run("release", "v0.10.0");
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert_eq!(gate.outputs(), "deploy=true\n");
+
+    let gate = Gate::new().latest("v0.10.0");
+    let result = gate.run("release", "v0.9.1");
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert_eq!(gate.outputs(), "deploy=false\n");
+    assert!(
+        result
+            .stdout
+            .contains("v0.9.1 is not the latest release (v0.10.0)")
+    );
+    assert!(
+        gate.sys
+            .logged("gh api repos/zerobearing2/omatalk/releases/latest")
+    );
+}
+
+#[test]
+fn a_manual_dispatch_deploys_without_asking_github() {
+    let gate = Gate::new().latest("v0.10.0");
+    let result = gate.run("workflow_dispatch", "");
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert_eq!(gate.outputs(), "deploy=true\n");
+    assert_eq!(gate.sys.commands(), Vec::<String>::new());
+}
+
+#[test]
+fn the_gate_rereads_latest_until_it_settles() {
+    let gate = Gate::new().latest("v0.9.0");
+    let sleep = gate.sys.path("bin/sleep");
+    std::fs::remove_file(&sleep).unwrap();
+    common::write_executable(
+        &sleep,
+        &format!(
+            "#!/bin/sh\nprintf 'v0.10.0\\n' > '{}'\n",
+            gate.sys.path("state/latest").display()
+        ),
+    );
+
+    let result = gate.run("release", "v0.10.0");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert_eq!(gate.outputs(), "deploy=true\n");
+    assert_eq!(
+        gate.sys
+            .commands()
+            .iter()
+            .filter(|l| l.starts_with("gh "))
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn an_unreadable_latest_fails_the_gate_instead_of_skipping_the_site() {
+    let gate = Gate::new();
+    let result = gate.run("release", "v0.10.0");
+    assert_eq!(result.code, 1);
+    assert!(result.stderr.contains("could not read releases/latest"));
+    assert_eq!(gate.outputs(), "");
+}

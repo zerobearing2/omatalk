@@ -1,91 +1,253 @@
 #!/usr/bin/env bash
-# Daemon publish: test, lint, build, commit version+pin, push, gh release create
-# from the tarball just packed. Does not clobber an existing tag. A version
-# with a prerelease suffix (0.9.0-dev.N) publishes a GitHub prerelease, so
-# releases/latest (the site installer and omatalk upgrade) keeps serving the
-# last stable release.
+# Publish a release from master or a release-X.Y.x branch: a tag plus its
+# GitHub Release, never a push to any branch.
+#
+#   VERSION=x.y.z scripts/release.sh rc      publishes vX.Y.Z-rc.N as a prerelease
+#   VERSION=x.y.z scripts/release.sh stable  publishes vX.Y.Z, as latest only
+#                                            when it is higher than the current latest
+#
+# On release-X.Y.x, VERSION must be X.Y.z. The version change, the install.sh
+# pin, and the release commit exist only in a temporary worktree. The commit is
+# tagged, and only the tag is pushed. A stable release requires that the
+# highest RC was built from this exact HEAD.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO="zerobearing2/omatalk"
+TARBALL="omatalk-x86_64.tar.gz"
+
 cd "$ROOT"
 source scripts/lib.sh
 
-if [ "$(git rev-parse --abbrev-ref HEAD)" != master ]; then
-  echo "need master; git switch master" >&2
+die() {
+  echo "$1" >&2
   exit 1
+}
+
+# True when x.y.z $1 is higher than x.y.z $2, compared number by number.
+version_gt() {
+  local a b i
+  IFS=. read -r -a a <<< "$1"
+  IFS=. read -r -a b <<< "$2"
+  for i in 0 1 2; do
+    if [ $((10#${a[$i]})) -gt $((10#${b[$i]})) ]; then
+      return 0
+    fi
+    if [ $((10#${a[$i]})) -lt $((10#${b[$i]})) ]; then
+      return 1
+    fi
+  done
+  return 1
+}
+
+mode="${1:-}"
+version="${VERSION:-}"
+
+# Preflight: nothing changes until all of it passes.
+if [ "$mode" != rc ] && [ "$mode" != stable ]; then
+  die "usage: VERSION=x.y.z scripts/release.sh rc|stable"
 fi
 
-unexpected=""
-while IFS= read -r status; do
-  if [ -z "$status" ]; then
+if [ -z "$version" ]; then
+  die "VERSION is required, as x.y.z"
+fi
+
+if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  die "VERSION must be exactly x.y.z, got: $version"
+fi
+
+branch="$(git rev-parse --abbrev-ref HEAD)"
+if [[ "$branch" =~ ^release-([0-9]+)\.([0-9]+)\.x$ ]]; then
+  branch_line="$((10#${BASH_REMATCH[1]})).$((10#${BASH_REMATCH[2]}))"
+  IFS=. read -r -a version_parts <<< "$version"
+  version_line="$((10#${version_parts[0]})).$((10#${version_parts[1]}))"
+  if [ "$version_line" != "$branch_line" ]; then
+    die "$branch releases $branch_line.z only, not $version"
+  fi
+elif [ "$branch" != master ]; then
+  die "need branch master or release-X.Y.x, on $branch"
+fi
+
+if [ -n "$(git status --porcelain)" ]; then
+  die "working tree is not clean; commit or stash first"
+fi
+
+if ! git fetch --quiet origin "$branch" --tags; then
+  die "git fetch origin $branch --tags failed"
+fi
+
+head="$(git rev-parse HEAD)"
+origin_head="$(git rev-parse "refs/remotes/origin/$branch")"
+if [ "$head" != "$origin_head" ]; then
+  die "$branch is not origin/$branch; pull or push first"
+fi
+
+base_tag="v$version"
+
+if [ -n "$(git ls-remote --tags origin "refs/tags/$base_tag")" ]; then
+  die "$base_tag already exists on origin"
+fi
+
+rc_refs="$(git ls-remote --tags origin "refs/tags/$base_tag-rc.*")"
+highest_rc=0
+while read -r _ ref; do
+  if [ -z "$ref" ]; then
     continue
   fi
-  path="${status:3}"
-  case "$path" in
-    Cargo.toml|Cargo.lock|install.sh)
-      ;;
-    *)
-      if [ -z "$unexpected" ]; then
-        unexpected="$path"
-      else
-        unexpected="$unexpected $path"
-      fi
-      ;;
-  esac
+  n="${ref##*-rc.}"
+  if [[ ! "$n" =~ ^[0-9]+$ ]]; then
+    continue
+  fi
+  if [ "$ref" != "refs/tags/$base_tag-rc.$n" ]; then
+    continue
+  fi
+  if [ $((10#$n)) -gt "$highest_rc" ]; then
+    highest_rc=$((10#$n))
+  fi
 done <<EOF
-$(git status --porcelain)
+$rc_refs
 EOF
 
-if [ -n "$unexpected" ]; then
-  echo "unexpected dirty paths: $unexpected" >&2
-  exit 1
+if [ "$mode" = rc ]; then
+  release_version="$version-rc.$((highest_rc + 1))"
+else
+  release_version="$version"
+  if [ "$highest_rc" -eq 0 ]; then
+    die "no $base_tag-rc.N tag on origin; make rc VERSION=$version first"
+  fi
+  rc_tag="$base_tag-rc.$highest_rc"
+  rc_parent="$(git rev-parse "refs/tags/$rc_tag^")"
+  if [ "$rc_parent" != "$head" ]; then
+    die "$branch moved since $rc_tag; cut another RC: make rc VERSION=$version"
+  fi
 fi
 
-git fetch origin master --tags
-
-version="$(cargo_version Cargo.toml)"
-tag="v$version"
-
-remote_tag="$(git ls-remote --tags origin "refs/tags/$tag")"
-if [ -n "$remote_tag" ]; then
-  echo "$tag already exists — make bump first" >&2
-  exit 1
+tag="v$release_version"
+if git rev-parse --quiet --verify "refs/tags/$tag" > /dev/null; then
+  die "local tag $tag already exists; git tag -d $tag"
 fi
 
-if [ "$(git merge-base HEAD origin/master)" != "$(git rev-parse origin/master)" ]; then
-  echo "master is behind origin; pull first" >&2
-  exit 1
+work_parent="$(mktemp -d)"
+work="$work_parent/tree"
+tag_created=0
+tag_pushed=0
+
+cleanup() {
+  set +e
+  cd "$ROOT"
+  if [ "$tag_created" -eq 1 ] && [ "$tag_pushed" -eq 0 ]; then
+    git tag -d "$tag" > /dev/null
+  fi
+  if [ -d "$work" ]; then
+    git worktree remove --force "$work"
+  fi
+  git worktree prune
+  rm -rf "$work_parent"
+}
+trap cleanup EXIT
+
+# Sets LATEST to the tag releases/latest names, or "" when no release exists
+# (HTTP 404). Any other gh failure returns 1 with its first line in LATEST_ERROR.
+read_latest() {
+  local errors="$work_parent/gh.err"
+  if LATEST="$(gh api "repos/$REPO/releases/latest" --jq .tag_name 2> "$errors")"; then
+    return 0
+  fi
+  LATEST_ERROR="$(head -n 1 "$errors")"
+  if grep -q 'HTTP 404' "$errors"; then
+    LATEST=""
+    return 0
+  fi
+  return 1
+}
+
+if ! read_latest; then
+  die "could not read releases/latest ($LATEST_ERROR); nothing was pushed"
 fi
+latest_before="$LATEST"
+if [ -n "$latest_before" ]; then
+  if [[ ! "$latest_before" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    die "releases/latest is '$latest_before', not a vX.Y.Z tag; nothing was pushed"
+  fi
+fi
+
+# Only a stable release higher than the current latest may take it. No
+# release at all counts as lower than any version.
+takes_latest=0
+if [ "$mode" = stable ]; then
+  if [ -z "$latest_before" ]; then
+    takes_latest=1
+  elif version_gt "$version" "${latest_before#v}"; then
+    takes_latest=1
+  fi
+fi
+
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
+
+git worktree add --detach --quiet "$work" "$head"
+cd "$work"
+
+# Only inside [package]: the range ends at the next table header.
+sed -i "/^\[package\]$/,/^\[/ s/^version = \".*\"$/version = \"$release_version\"/" Cargo.toml
+if [ "$(cargo_version Cargo.toml)" != "$release_version" ]; then
+  die "could not set the [package] version to $release_version"
+fi
+cargo update --workspace --offline --quiet
 
 cargo test --locked
 make lint
 scripts/build.sh
 
+for asset in "$TARBALL" "$TARBALL.sha256" install.sh uninstall.sh; do
+  if [ ! -f "$asset" ]; then
+    die "missing $asset after build"
+  fi
+done
+
 git add Cargo.toml Cargo.lock install.sh
-if git diff --cached --quiet; then
-  echo "version and pin already committed"
+git commit --quiet -m "Release $tag"
+git tag "$tag"
+tag_created=1
+
+if ! git push --quiet origin "refs/tags/$tag"; then
+  die "could not push $tag; nothing was published"
+fi
+tag_pushed=1
+
+if [ "$mode" = rc ]; then
+  channel=(--prerelease --latest=false)
+elif [ "$takes_latest" -eq 1 ]; then
+  channel=(--latest)
 else
-  git commit -m "Release $tag"
+  channel=(--latest=false)
+  echo "$tag is not higher than latest $latest_before; it does not take releases/latest."
 fi
 
-git push origin master
-
-if [ ! -f omatalk-x86_64.tar.gz ]; then
-  echo "missing omatalk-x86_64.tar.gz after build" >&2
+if ! gh release create "$tag" --repo "$REPO" --verify-tag --title "$tag" \
+  --generate-notes "${channel[@]}" \
+  "$TARBALL" "$TARBALL.sha256" install.sh uninstall.sh; then
+  echo "$tag is pushed but its GitHub Release was not created." >&2
+  echo "Retry the gh release create, or delete the tag: git push origin :refs/tags/$tag" >&2
   exit 1
 fi
-if [ ! -f omatalk-x86_64.tar.gz.sha256 ]; then
-  echo "missing omatalk-x86_64.tar.gz.sha256 after build" >&2
-  exit 1
-fi
 
-prerelease=()
-if [[ "$version" == *-* ]]; then
-  prerelease=(--prerelease)
+if ! read_latest; then
+  die "could not read releases/latest after publishing $tag ($LATEST_ERROR)"
 fi
+latest_after="$LATEST"
 
-gh release create "$tag" --title "$tag" --generate-notes "${prerelease[@]}" \
-  --target "$(git rev-parse HEAD)" \
-  omatalk-x86_64.tar.gz omatalk-x86_64.tar.gz.sha256 install.sh uninstall.sh
+if [ "$takes_latest" -eq 1 ]; then
+  if [ "$latest_after" != "$tag" ]; then
+    die "$tag is published, but releases/latest is '$latest_after', not $tag"
+  fi
+else
+  if [ "$latest_after" != "$latest_before" ]; then
+    die "$tag is published, but releases/latest moved from '$latest_before' to '$latest_after'"
+  fi
+fi
 
 echo "Released $tag"
+if [ "$mode" = rc ]; then
+  echo "Install it with:"
+  printf 'bash -c "$(curl -fsSL https://github.com/%s/releases/download/%s/install.sh)"\n' "$REPO" "$tag"
+fi

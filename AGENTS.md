@@ -15,28 +15,82 @@ agent docs stay here, because the listed tree must not track `AGENTS.md`,
 
 ## Release
 
-Bump edits the version files and does not commit. Release does test, lint, build, commit, push,
-and `gh release create`. It will not clobber an existing tag. A
-version with a `-dev.N` suffix publishes a GitHub prerelease, so
-`releases/latest` keeps serving the last stable release.
-GitHub Actions runs `make lint` and the tests on pushes to master and on pull
-requests. It never builds or publishes a release.
+`master` is the dev line. Pushing to it publishes nothing: no release, no
+site deploy, no change for stable users or the Omarchy plugin directory.
+Releases are tags from master (`docs/adr/0007-releases-are-tags-from-master.md`).
 
 ```sh
-make bump                 # Cargo.toml + Cargo.lock; -dev.N counts up; VERSION=x.y.z[-dev.N] sets it
-make release              # master only; test, lint, build, commit, push, gh
+make rc VERSION=0.10.0        # v0.10.0-rc.N, a GitHub prerelease
+make release VERSION=0.10.0   # v0.10.0, latest; needs an RC of this exact HEAD
 ```
 
-The plugin has the same `make bump` / `make release` (`manifest.json`;
-test, validate, commit, push, gh), run in its own clone. A Daemon release
-never requires a plugin release, and the reverse.
+Both run `scripts/release.sh` and need `VERSION` as `x.y.z`, branch `master`
+or `release-X.Y.x`, a clean tree, and HEAD equal to that branch's
+`origin/<branch>`. On a release branch `VERSION` must be `X.Y.z`. Any other
+branch is refused. The script builds in a temporary worktree: it sets the version, runs `cargo test --locked`,
+`make lint`, and `scripts/build.sh`, commits `Release vTAG`, tags it, and
+pushes only the tag. Then it runs `gh release create --verify-tag` and checks
+`releases/latest`: unchanged after an RC, the new tag after a stable release.
+A release never writes to master or any branch, so master's `Cargo.toml`
+version and `install.sh` pin do not track releases. Each tag's commit holds
+them. `make release` refuses unless the highest `v$VERSION-rc.*` tag was built
+from the current HEAD (`tag^` equals HEAD), so the real release is the code
+last tested. If the branch moved, cut another RC.
+
+`releases/latest` is decided by the script, never by hand. A stable release
+takes it only when its version is numerically higher than the current latest
+(0.10.0 is above 0.9.2). Otherwise the script publishes with `--latest=false`,
+says so, and checks that latest did not move. If it cannot read
+`releases/latest` (anything but a 404) it refuses before pushing anything.
+
+An RC installs with
+`bash -c "$(curl -fsSL https://github.com/zerobearing2/omatalk/releases/download/TAG/install.sh)"`.
+`releases/latest`, the site installer, and `omatalk upgrade` keep serving the
+last stable release.
+
+GitHub Actions runs `make lint` and the tests on pushes to master and on pull
+requests. It never builds or publishes a release. The site (`.github/workflows/pages.yml`)
+deploys when a non-prerelease is published, or on `gh workflow run pages.yml`.
+The workflow deploys only when the published release is the current
+`releases/latest`, so a hotfix of an old line leaves the site alone. A
+site-only fix on master is not live until that dispatch, which deploys
+everything in `public/` on master.
+
+**Hotfix an old version.** Fix a shipped version from a `release-X.Y.x`
+branch so unreleased master code stays out. Create it once from the version's
+tag and push it:
+
+```sh
+git switch -c release-0.9.x v0.9.0
+git push -u origin release-0.9.x
+```
+
+Land the fix on master first, then cherry-pick it onto the release branch and
+push the branch. If master changed too much for the cherry-pick, fix on the
+branch and port the fix forward to master at once. Then, on the branch:
+
+```sh
+make rc VERSION=0.9.1
+make release VERSION=0.9.1
+```
+
+The tags push alone and no branch ever gets a release commit. A hotfix of an
+old line does not take `releases/latest`, and the site workflow skips any
+release that is not the latest, so the site installer, `omatalk upgrade`, and
+the site keep serving the newest line.
+
+The plugin has its own `make bump` / `make release` (`manifest.json`; test,
+validate, commit, push, gh), run in its own clone. Its tooling is unchanged.
+Plugin RC work stays on a plugin branch and never on plugin master, because
+`omarchy plugin add` and `omarchy plugin update` use mutable HEAD. A Daemon
+release never requires a plugin release, and the reverse.
 
 The release tarball `omatalk-x86_64.tar.gz` holds the `omatalk` binary,
 `omatalk.service`, and `LICENSE`. The binary dlopens `onnxruntime-cpu` and
 `espeak-ng` at Daemon startup only. `install.sh` installs both through
 `omarchy pkg add`.
 
-`scripts/build.sh` runs from release. Do not add a Make target
+`scripts/build.sh` runs from `scripts/release.sh`. Do not add a Make target
 for it. `scripts/dev-install.sh` installs a local release
 build over `~/.local/bin/omatalk` for dogfooding. It is not a Make target
 either.

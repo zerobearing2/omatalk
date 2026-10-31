@@ -1,4 +1,4 @@
-//! scripts/build.sh --pack-only, scripts/bump.sh, and the systemd unit.
+//! scripts/build.sh --pack-only and the systemd unit.
 
 mod common;
 
@@ -6,9 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, UNIX_EPOCH};
 
-use common::{
-    System, TempDir, chmod, read, read_tar_gz, repo, run, sha256, write, write_executable,
-};
+use common::{TempDir, chmod, read, read_tar_gz, repo, run, sha256, write};
 
 const TARBALL: &str = "omatalk-x86_64.tar.gz";
 const FAKE_BINARY: &[u8] = b"\x7fELF fake omatalk binary";
@@ -22,7 +20,6 @@ fn checkout(tmp: &Path) -> PathBuf {
     let tree = tmp.join("tree");
     for name in [
         "scripts/build.sh",
-        "scripts/bump.sh",
         "scripts/lib.sh",
         "systemd/omatalk.service",
         "LICENSE",
@@ -123,29 +120,6 @@ fn tarball_holds_the_binary_the_unit_and_the_license() {
     assert_eq!(
         member("omatalk/omatalk.service").data,
         std::fs::read(repo("systemd/omatalk.service")).unwrap()
-    );
-}
-
-#[test]
-fn bump_rewrites_only_the_package_version() {
-    let tmp = TempDir::new("pack");
-    let tree = checkout(tmp.path());
-    let sys = System::new();
-    write_executable(
-        sys.path("bin/cargo"),
-        "#!/bin/sh\nprintf 'cargo %s\\n' \"$*\" >> \"$FAKE_LOG\"\n",
-    );
-
-    let result = run(sys.command("bash").arg(tree.join("scripts/bump.sh")), "");
-
-    assert_eq!(result.code, 0, "{}", result.stderr);
-    assert_eq!(
-        read(tree.join("Cargo.toml")),
-        MANIFEST.replace("\"9.8.7\"", "\"9.8.8\"")
-    );
-    assert_eq!(
-        sys.commands(),
-        ["cargo update --workspace --offline --quiet"]
     );
 }
 

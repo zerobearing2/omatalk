@@ -1,4 +1,4 @@
-.PHONY: test lint format clean bump release
+.PHONY: test lint format clean rc release
 
 test:
 	cargo test --locked
@@ -14,9 +14,12 @@ clean:
 	cargo clean
 	rm -f omatalk-x86_64.tar.gz omatalk-x86_64.tar.gz.sha256
 
-# Version file only, no commit. Then make release.
-bump:
-	scripts/bump.sh
+# Both run from a clean master or release-X.Y.x equal to its origin branch.
+# They publish a tag and a GitHub Release, and never push to a branch.
+# make rc VERSION=0.10.0       publishes v0.10.0-rc.N as a prerelease
+# make release VERSION=0.10.0  publishes v0.10.0, after an RC of this commit
+rc:
+	VERSION="$(VERSION)" scripts/release.sh rc
 
 release:
-	scripts/release.sh
+	VERSION="$(VERSION)" scripts/release.sh stable
