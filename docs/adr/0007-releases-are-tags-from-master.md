@@ -75,6 +75,8 @@ Considered and rejected:
 Consequences: a hotfix is a release branch plus a cherry-pick, so the fix
 exists twice and can drift if it is not ported or picked promptly. A fix
 released from an old line is not offered to users on the newer one by
-`releases/latest`; they get it from their own line's next release. `master`'s
-`Cargo.toml` version and `install.sh` pin are stale by design, and
-`dev-install.sh` reads the pin only for model file names.
+`releases/latest`; they get it from their own line's next release. Master's
+`Cargo.toml` version is fixed at `0.0.0-dev`, because `omatalk version` reads
+it at build time and a local build must not claim to be a release. Master's
+`install.sh` pin is stale by design, and `dev-install.sh` reads the pin only
+for model file names.
