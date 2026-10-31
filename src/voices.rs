@@ -47,12 +47,17 @@ pub fn list(models: &Path) -> std::io::Result<Vec<VoiceName>> {
 /// The one voice-validity check for the CLI (`config set voice`, `speak
 /// --voice`). Error Display is the exact stderr line.
 pub fn known(models: &Path, raw: &str) -> Result<VoiceName, VoiceError> {
-    let unknown = || VoiceError::Unknown(raw.to_owned());
-    let name = VoiceName::parse(raw).ok_or_else(unknown)?;
+    let name = VoiceName::parse(raw).ok_or_else(|| VoiceError::Unknown(raw.to_owned()))?;
+    in_archive(models, &name)?;
+    Ok(name)
+}
+
+/// `known` for a name already parsed, such as the configured voice.
+pub fn in_archive(models: &Path, name: &VoiceName) -> Result<(), VoiceError> {
     let all = list(models).map_err(VoiceError::Archive)?;
-    all.binary_search(&name)
-        .map(|_| name)
-        .map_err(|_| unknown())
+    all.binary_search(name)
+        .map(|_| ())
+        .map_err(|_| VoiceError::Unknown(name.to_string()))
 }
 
 #[derive(Debug)]

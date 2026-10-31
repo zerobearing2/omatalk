@@ -7,15 +7,24 @@ use std::sync::{Arc, Mutex};
 
 #[cfg(test)]
 use super::SpeechError;
-use super::{Audio, Engine, StopToken, Utterance};
+use super::{Audio, Delivery, Engine, StopToken, Utterance};
 
-/// Splits on sentence ends like the old chunker and yields 0.1 s of silence
-/// per piece, so multi-chunk Utterances still exercise one player per Stream.
+/// The level a Voiceover's pieces carry. A Live piece is silence, so a test
+/// reading the rendered WAV can tell which Delivery the CLI asked for.
+pub const VOICEOVER_LEVEL: f32 = 0.25;
+
+/// Splits on sentence ends like the old chunker and yields 0.1 s per piece,
+/// so multi-chunk Utterances still exercise one player per Stream. The piece
+/// is silent when Live and at `VOICEOVER_LEVEL` for a Voiceover.
 pub struct FakeEngine;
 
 impl Engine for FakeEngine {
     fn speak<'a>(&'a mut self, u: &'a Utterance, _: &'a StopToken) -> Audio<'a> {
-        Box::new(pieces(u.text.as_str()).map(|_| Ok(vec![0.0; 2400])))
+        let level = match u.delivery {
+            Delivery::Live => 0.0,
+            Delivery::Voiceover => VOICEOVER_LEVEL,
+        };
+        Box::new(pieces(u.text.as_str()).map(move |_| Ok(vec![level; 2400])))
     }
 }
 
@@ -64,5 +73,35 @@ impl Engine for RecordingEngine {
                     })
                 }),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Speed;
+    use crate::speech::Text;
+    use crate::voices::VoiceName;
+
+    fn pieces_of(delivery: Delivery) -> Vec<Vec<f32>> {
+        let u = Utterance {
+            text: Text::new("One. Two.").unwrap(),
+            voice: VoiceName::parse("af_heart").unwrap(),
+            speed: Speed::NORMAL,
+            delivery,
+        };
+        FakeEngine
+            .speak(&u, &StopToken::default())
+            .collect::<Result<_, _>>()
+            .unwrap()
+    }
+
+    #[test]
+    fn live_pieces_are_silent_and_voiceover_pieces_are_not() {
+        assert_eq!(pieces_of(Delivery::Live), vec![vec![0.0; 2400]; 2]);
+        assert_eq!(
+            pieces_of(Delivery::Voiceover),
+            vec![vec![VOICEOVER_LEVEL; 2400]; 2]
+        );
     }
 }

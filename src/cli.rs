@@ -1,19 +1,23 @@
-//! argv to a `Cli` value, then run it. Hand-rolled: the surface is ten
+//! argv to a `Cli` value, then run it. Hand-rolled: the surface is eleven
 //! commands, and the usage and error texts are contracts the panel shows
 //! verbatim. Every stderr text lives in a `Display` impl next to its type.
 
 use std::ffi::{OsStr, OsString};
 use std::fmt;
+use std::io::{IsTerminal, Read};
 use std::os::unix::ffi::OsStringExt;
 use std::os::unix::process::CommandExt;
+use std::path::PathBuf;
 use std::process::{Command, ExitCode, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::config::{Config, Paths, Setting};
+use crate::config::{Config, Paths, Setting, Speed};
 use crate::protocol::{self, Request, SpeakRequest};
+use crate::render;
+use crate::speech::{Delivery, Text, Utterance};
 use crate::voices::{self, VoiceName};
 
-pub const USAGE: &str = "usage: omatalk {speak [--voice NAME] [TEXT...] | stop | status | version | \
+pub const USAGE: &str = "usage: omatalk {speak [--voice NAME] [TEXT...] | render --out PATH [--voice NAME] [--speed N] [TEXT...] | stop | status | version | \
 config get [--json] | config set voice|speed VALUE | config voices [--json] | upgrade | uninstall}";
 
 /// The Hyprland binding has no terminal, so a failed speak/stop also notifies.
@@ -28,6 +32,14 @@ pub enum Cli {
     Speak {
         text: Option<String>,
         voice: Option<String>,
+    },
+    /// Same word rules as `Speak`. `speed` stays raw so a bad one is a
+    /// reported failure, not a usage error. `None` text reads stdin.
+    Render {
+        out: String,
+        text: Option<String>,
+        voice: Option<String>,
+        speed: Option<String>,
     },
     Stop,
     Status,
@@ -76,28 +88,62 @@ pub fn parse(args: &[String]) -> Result<Cli, Usage> {
             value: value.to_string(),
         }),
         ["speak", rest @ ..] => parse_speak(rest),
+        ["render", rest @ ..] => parse_render(rest),
         _ => Err(Usage),
     }
 }
 
-fn parse_speak(rest: &[&str]) -> Result<Cli, Usage> {
+/// The words and flag values of a `speak` or `render` argv. `accepted` names
+/// the `--flag`s the command takes; each is `--flag VALUE` or `--flag=VALUE`,
+/// and its value comes back in the same slot. After `--` everything is text,
+/// and any other `--` word is a usage error.
+fn parse_flags<const N: usize>(
+    rest: &[&str],
+    accepted: [&str; N],
+) -> Result<(Option<String>, [Option<String>; N]), Usage> {
     let mut words = Vec::new();
-    let mut voice = None;
+    let mut values = [const { None }; N];
     let mut it = rest.iter();
     while let Some(&word) = it.next() {
-        match word {
-            "--" => {
-                words.extend(it.by_ref().copied());
-                break;
-            }
-            "--voice" => voice = Some(it.next().ok_or(Usage)?.to_string()),
-            _ if word.starts_with("--voice=") => voice = Some(word["--voice=".len()..].to_owned()),
-            _ if word.starts_with("--") => return Err(Usage),
-            _ => words.push(word),
+        if word == "--" {
+            words.extend(it.by_ref().copied());
+            break;
         }
+        if !word.starts_with("--") {
+            words.push(word);
+            continue;
+        }
+        let (name, inline) = match word.split_once('=') {
+            Some((name, value)) => (name, Some(value)),
+            None => (word, None),
+        };
+        let slot = accepted
+            .iter()
+            .position(|&flag| flag == name)
+            .ok_or(Usage)?;
+        let value = match inline {
+            Some(value) => value,
+            None => it.next().ok_or(Usage)?,
+        };
+        values[slot] = Some(value.to_owned());
     }
     let text = (!words.is_empty()).then(|| words.join(" "));
+    Ok((text, values))
+}
+
+fn parse_speak(rest: &[&str]) -> Result<Cli, Usage> {
+    let (text, [voice]) = parse_flags(rest, ["--voice"])?;
     Ok(Cli::Speak { text, voice })
+}
+
+fn parse_render(rest: &[&str]) -> Result<Cli, Usage> {
+    let (text, [out, voice, speed]) = parse_flags(rest, ["--out", "--voice", "--speed"])?;
+    Ok(Cli::Render {
+        out: out.ok_or(Usage)?,
+        text,
+        voice,
+        speed,
+    })
 }
 
 pub fn main() -> ExitCode {
@@ -127,6 +173,12 @@ pub fn run(cli: Cli, paths: &Paths) -> ExitCode {
             };
             send(paths, &Request::Speak(SpeakRequest { text, voice }))
         }
+        Cli::Render {
+            out,
+            text,
+            voice,
+            speed,
+        } => render(paths, &out, text, voice, speed),
         Cli::ConfigGet { json } => match Config::load(&paths.config) {
             Ok(c) if json => print_lines([c.to_json()]),
             Ok(c) => print_lines(c.to_lines()),
@@ -168,6 +220,99 @@ fn send(paths: &Paths, req: &Request) -> ExitCode {
             fail(DAEMON_DOWN)
         }
     }
+}
+
+/// Everything but the synthesis is checked first, so a typo costs no model
+/// load. Never talks to the Daemon.
+fn render(
+    paths: &Paths,
+    out: &str,
+    text: Option<String>,
+    voice: Option<String>,
+    speed: Option<String>,
+) -> ExitCode {
+    let (out, utterance) = match render_inputs(paths, out, text, voice, speed) {
+        Ok(inputs) => inputs,
+        Err(code) => return code,
+    };
+    let tty = std::io::stderr().is_terminal();
+    let progress = |batches: usize, audio: Duration| {
+        if tty {
+            eprint!("\rrendered {batches} batches, {:.1} s", audio.as_secs_f64());
+        }
+    };
+    let result = render::render(paths, &utterance, &out, progress);
+    if tty {
+        eprintln!();
+    }
+    match result {
+        Ok(audio) => print_lines([format!("{} {:.1} s", out.display(), audio.as_secs_f64())]),
+        Err(e) => fail(e),
+    }
+}
+
+/// The target and the Utterance, or the exit code of the first check that
+/// failed. Speed is 1.0, not the config's: that is a listening preference.
+fn render_inputs(
+    paths: &Paths,
+    out: &str,
+    text: Option<String>,
+    voice: Option<String>,
+    speed: Option<String>,
+) -> Result<(PathBuf, Utterance), ExitCode> {
+    let out = render::check_out(out).map_err(fail)?;
+    let speed = speed
+        .as_deref()
+        .map(Speed::parse)
+        .transpose()
+        .map_err(fail)?;
+    let voice = render_voice(paths, voice)?;
+    let text = render_text(text)?;
+    let utterance = Utterance {
+        text,
+        voice,
+        speed: speed.unwrap_or(Speed::NORMAL),
+        delivery: Delivery::Voiceover,
+    };
+    Ok((out, utterance))
+}
+
+/// `--voice`, else the configured one; either must be in the archive.
+fn render_voice(paths: &Paths, voice: Option<String>) -> Result<VoiceName, ExitCode> {
+    let Some(raw) = voice else {
+        let configured = Config::load(&paths.config).map_err(fail)?.voice;
+        voices::in_archive(&paths.models, &configured).map_err(fail)?;
+        return Ok(configured);
+    };
+    voices::known(&paths.models, &raw).map_err(fail)
+}
+
+/// The words, else stdin; blank is nothing to read, and a terminal is usage.
+fn render_text(words: Option<String>) -> Result<Text, ExitCode> {
+    let raw = match words {
+        Some(words) => words,
+        None => match read_stdin() {
+            Ok(Some(piped)) => piped,
+            Ok(None) => {
+                eprintln!("{Usage}");
+                return Err(ExitCode::from(2));
+            }
+            Err(e) => return Err(fail(format!("stdin: {e}"))),
+        },
+    };
+    Text::new(&raw).ok_or_else(|| fail("nothing to read"))
+}
+
+/// All of stdin, or `None` when it is a terminal: waiting on a person's
+/// keyboard is a usage mistake, not a script.
+fn read_stdin() -> std::io::Result<Option<String>> {
+    let stdin = std::io::stdin();
+    if stdin.is_terminal() {
+        return Ok(None);
+    }
+    let mut raw = String::new();
+    stdin.lock().read_to_string(&mut raw)?;
+    Ok(Some(raw))
 }
 
 /// `curl $SITE_BASE/install.sh?ts=<epoch>` (HTTPS only), then exec it with
@@ -272,6 +417,77 @@ mod tests {
         assert_eq!(p(&["speak", "--voice"]), Err(Usage));
         assert_eq!(p(&["speak", "--bogus"]), Err(Usage));
         assert_eq!(p(&["speak", "hi", "--bogus", "there"]), Err(Usage));
+    }
+
+    fn render(
+        out: &str,
+        text: Option<&str>,
+        voice: Option<&str>,
+        speed: Option<&str>,
+    ) -> Result<Cli, Usage> {
+        Ok(Cli::Render {
+            out: out.to_owned(),
+            text: text.map(str::to_owned),
+            voice: voice.map(str::to_owned),
+            speed: speed.map(str::to_owned),
+        })
+    }
+
+    #[test]
+    fn render_variants() {
+        assert_eq!(
+            p(&["render", "--out", "a.wav"]),
+            render("a.wav", None, None, None)
+        );
+        assert_eq!(
+            p(&["render", "--out=a.wav", "one", "two"]),
+            render("a.wav", Some("one two"), None, None)
+        );
+        assert_eq!(
+            p(&[
+                "render",
+                "hi",
+                "--speed",
+                "1.2",
+                "--voice=v",
+                "--out",
+                "a.wav"
+            ]),
+            render("a.wav", Some("hi"), Some("v"), Some("1.2"))
+        );
+        assert_eq!(
+            p(&[
+                "render",
+                "--speed=0.9",
+                "--out",
+                "a.wav",
+                "--",
+                "--out",
+                "x"
+            ]),
+            render("a.wav", Some("--out x"), None, Some("0.9"))
+        );
+        assert_eq!(
+            p(&["render", "--out", "a.wav", "line one\n\nline two"]),
+            render("a.wav", Some("line one\n\nline two"), None, None)
+        );
+        assert_eq!(
+            p(&["render", "--out", "a.wav", "-5", "degrees"]),
+            render("a.wav", Some("-5 degrees"), None, None)
+        );
+    }
+
+    #[test]
+    fn render_usage_errors() {
+        assert_eq!(p(&["render"]), Err(Usage));
+        assert_eq!(p(&["render", "hello"]), Err(Usage));
+        assert_eq!(p(&["render", "--", "--out", "a.wav"]), Err(Usage));
+        for flag in ["--out", "--voice", "--speed"] {
+            assert_eq!(p(&["render", "--out", "a.wav", flag]), Err(Usage), "{flag}");
+        }
+        assert_eq!(p(&["render", "--out", "a.wav", "--bogus"]), Err(Usage));
+        assert_eq!(p(&["render", "--out", "a.wav", "--loud=1"]), Err(Usage));
+        assert!(USAGE.contains("render --out PATH"));
     }
 
     #[test]

@@ -145,6 +145,7 @@ Asks before removing the Omatalk binding from `~/.config/hypr/bindings.lua`
 omatalk speak                       # capture and speak (what the hotkey runs)
 omatalk speak "text here"           # speak given text
 omatalk speak --voice af_bella "hi" # speak once in a voice, default unchanged
+omatalk render --out talk.wav "hi"  # render a script to a WAV file (see below)
 omatalk stop                        # cut off the current utterance
 omatalk status                      # idle | speaking | error
 omatalk version                     # print the installed release (--version works too)
@@ -158,6 +159,41 @@ omatalk daemon                      # run the Daemon (the unit's ExecStart)
 ```
 
 `systemctl --user start|stop|restart omatalk` controls the daemon.
+
+### Render a voiceover
+
+`omatalk render --out PATH [--voice NAME] [--speed N] [TEXT...]` writes a
+whole script to a WAV file. It takes the text from its arguments or, with
+none, from stdin:
+
+```sh
+omatalk render --out talk.wav < script.txt
+omatalk render --out talk.wav --voice af_bella --speed 0.95 "Welcome to the demo."
+```
+
+Render favors quality over latency. It never talks to the Daemon, so it works
+with the Daemon stopped, but it loads its own copy of the model. A blank line
+in the script is a beat: sentences get a short pause, and a paragraph gets a
+longer one. A single newline does not break a paragraph. Speed defaults to
+`1.0`, not your configured speed, because that is a listening preference. The
+voice defaults to your configured one.
+
+Render holds all audio in memory until it writes the file. Expect a peak of
+about 920 MiB plus 3 MiB per minute of audio (1.1 GiB for 60 minutes), on top
+of the Daemon, and about 10 seconds of render time per minute of audio.
+
+Render writes WAV only (16-bit mono, 24 kHz) and refuses any other
+extension. Convert with ffmpeg:
+
+```sh
+ffmpeg -i talk.wav talk.mp3
+```
+
+The file appears only when the whole render succeeds. A failed render leaves
+an existing file untouched. `--out` replaces its target (a symlink is replaced,
+not followed), and the new file gets default permissions. On success it prints
+the path and the audio's length. Run in a terminal, it also shows progress on
+stderr.
 
 When the daemon is down, `speak` and `stop` raise a desktop notification
 alongside the terminal error — they run from hotkeys, where there may be no
@@ -260,8 +296,8 @@ If the first word is clipped on Bluetooth or HDMI, see
 
 If the journal shows the Daemon exiting at startup with a library error,
 check that `onnxruntime-cpu` and `espeak-ng` are installed:
-`omarchy pkg present onnxruntime-cpu espeak-ng`. The Daemon loads
-`libonnxruntime.so.1` and `libespeak-ng.so.1` at startup. To use another
+`omarchy pkg present onnxruntime-cpu espeak-ng`. The Daemon and `omatalk render` load
+`libonnxruntime.so.1` and `libespeak-ng.so.1`. To use another
 onnxruntime build, set `ORT_DYLIB_PATH` to its library in the unit's
 environment.
 

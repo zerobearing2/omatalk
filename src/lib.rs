@@ -9,6 +9,7 @@ pub mod config;
 pub mod daemon;
 pub mod exec;
 pub mod protocol;
+pub mod render;
 pub mod sink;
 pub mod speech;
 pub mod stream;

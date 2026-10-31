@@ -64,7 +64,14 @@ Exit 0 means the recorded pid is alive, the socket is inside this run's instance
 .agents/skills/verify-omatalk/scripts/verify drive-stop "$RUN_ID"
 ```
 
-Both commands print the evidence directory they wrote under `evidence/drives/`.
+`drive-render` is the file proof. It runs `render --out` twice with the real model, requires an audible 24 kHz mono 16-bit WAV and byte-identical output, and requires that the Daemon stayed `idle` and the player received nothing. It keeps `out.wav`. With no arguments it renders a two-paragraph script.
+
+```sh
+.agents/skills/verify-omatalk/scripts/verify drive-render "$RUN_ID"
+.agents/skills/verify-omatalk/scripts/verify drive-render "$RUN_ID" -- --voice bm_george --speed 1.3 "Hello there, world."
+```
+
+All three commands print the evidence directory they wrote under `evidence/drives/`.
 
 Speak with no text reads the selection file, then the clipboard file. `doctor` prints both paths. The command does not call `wl-paste`. The player is the harness `record-pcm` command, not `pw-cat`, so the machine's speakers stay quiet. The Daemon appends `--rate 24000 --channels 1 -` and writes raw s16le mono on stdin. `record-notify` appends the notification text instead of calling `notify-send`.
 
@@ -105,6 +112,7 @@ verify doctor RUN
 verify run RUN -- ARG...
 verify drive-speak RUN [-- SPEAK-ARG...]
 verify drive-stop RUN [-- SPEAK-ARG...]
+verify drive-render RUN [-- RENDER-ARG...]
 verify await-status RUN WORD SECONDS
 verify pcm RUN
 verify cleanup RUN

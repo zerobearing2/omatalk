@@ -3,7 +3,7 @@ mod common;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use common::{FAKES, System, TempDir, omatalk, read, run, write};
+use common::{FAKES, System, TempDir, omatalk, read, run, write, write_voices_archive};
 
 const FAKE_VOICES: [&str; 4] = ["af_heart", "af_bella", "am_test", "bf_other"];
 
@@ -175,46 +175,6 @@ fn speak_failure_notifies() {
         result.stderr
     );
     assert!(read(&notify_log).contains("daemon not running"));
-}
-
-/// A stored zip holding one empty `<name>.npy` entry per voice: the voice
-/// list reads only the archive's central directory.
-fn write_voices_archive(path: &Path, names: &[&str]) {
-    let mut out = Vec::new();
-    let mut central = Vec::new();
-    for name in names {
-        let file = format!("{name}.npy");
-        let offset = out.len() as u32;
-        // Version 2.0, no flags, stored, 1980-01-01, CRC and sizes of empty data.
-        let common = |buf: &mut Vec<u8>| {
-            for half in [20u16, 0, 0, 0, 0x21] {
-                buf.extend(half.to_le_bytes());
-            }
-            buf.extend([0u8; 12]);
-            buf.extend((file.len() as u16).to_le_bytes());
-            buf.extend(0u16.to_le_bytes());
-        };
-        out.extend(0x0403_4b50u32.to_le_bytes());
-        common(&mut out);
-        out.extend(file.as_bytes());
-        central.extend(0x0201_4b50u32.to_le_bytes());
-        central.extend(20u16.to_le_bytes());
-        common(&mut central);
-        central.extend([0u8; 10]);
-        central.extend(offset.to_le_bytes());
-        central.extend(file.as_bytes());
-    }
-    let central_at = out.len() as u32;
-    let count = names.len() as u16;
-    out.extend(&central);
-    out.extend(0x0605_4b50u32.to_le_bytes());
-    out.extend([0u8; 4]);
-    out.extend(count.to_le_bytes());
-    out.extend(count.to_le_bytes());
-    out.extend((central.len() as u32).to_le_bytes());
-    out.extend(central_at.to_le_bytes());
-    out.extend(0u16.to_le_bytes());
-    write(path, out);
 }
 
 struct ConfigEnv {

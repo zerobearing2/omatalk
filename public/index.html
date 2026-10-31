@@ -738,6 +738,7 @@
     word-break: break-word;
     overflow-x: auto;
   }
+  .code-card.nowrap pre { white-space: pre; word-break: normal; }
   .code-card pre .k { color: var(--accent-2); }
   .code-card pre .v { color: var(--accent); }
 
@@ -830,6 +831,7 @@
         <a href="#what">What it does</a>
         <a href="#config">Config</a>
         <a href="#voices">Voices</a>
+        <a href="#render">Render</a>
         <a href="#bar">Bar states</a>
         <a href="#stack">How it's built</a>
         <a href="#architecture">Architecture</a>
@@ -1043,6 +1045,43 @@
           <button class="voice-btn" data-src="audio/voices/bm_lewis.mp3"><span class="voice-avatar" data-seed="bm_lewis"></span><span class="voice-name">bm_lewis</span></button>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section id="render">
+    <div class="eyebrow">render</div>
+    <h2>Turn a script into a voiceover</h2>
+    <p class="prose" style="margin-top:14px;">Need narration for a video, a screencast, or a podcast?
+      <code class="inline-code">omatalk render</code> turns a script into a WAV file on your own machine, with one command.
+      It reads the script from stdin, or from the arguments.</p>
+
+    <div class="code-card nowrap">
+      <div class="cc-title">
+        a script file
+        <button class="copy-btn" type="button">
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+              <span class="copy-label">copy</span>
+            </button>
+      </div>
+      <pre>omatalk render --out talk.wav &lt; script.txt</pre>
+    </div>
+    <div class="code-card nowrap" style="margin-top:16px;">
+      <div class="cc-title">
+        one line, with a voice and a speed
+        <button class="copy-btn" type="button">
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+              <span class="copy-label">copy</span>
+            </button>
+      </div>
+      <pre>omatalk render --out talk.wav --voice af_bella --speed 0.95 "Welcome to the demo."</pre>
+    </div>
+
+    <div class="manifest">
+      <div class="row"><div class="name">Pauses</div><div class="why">A blank line in the script adds a longer pause. A single newline does not.</div></div>
+      <div class="row"><div class="name">Voice, speed</div><div class="why"><code class="mono" style="background:none;border:none;padding:0;">--voice</code> takes any name from the list above and defaults to your configured voice. Speed defaults to 1.0, not your configured speed.</div></div>
+      <div class="row"><div class="name">Output</div><div class="why">WAV only: 16-bit mono, 24&nbsp;kHz. For MP3, run <code class="mono" style="background:none;border:none;padding:0;">ffmpeg -i talk.wav talk.mp3</code>.</div></div>
+      <div class="row"><div class="name">Daemon</div><div class="why">Render works with the Daemon stopped. It loads its own copy of the model, so a running Daemon holds its copy on top.</div></div>
+      <div class="row"><div class="name">Time, memory</div><div class="why">About 10 seconds of render time per minute of audio, measured on a Ryzen 7840HS. Peak memory is about 1&nbsp;GiB: 920&nbsp;MiB plus 3&nbsp;MiB per minute of audio. Nothing leaves the machine.</div></div>
     </div>
   </section>
 
