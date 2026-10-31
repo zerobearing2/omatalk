@@ -27,12 +27,14 @@ _Avoid_: request, job, playback
 
 **Voice**:
 Which voice pack an Utterance is spoken in. Bound when the Utterance starts,
-from the Daemon's default or a one-shot override.
+from the Daemon's default or a one-shot override. A Render takes the
+configured one or `--voice`.
 _Avoid_: speaker, persona
 
 **Speed**:
 How fast an Utterance is spoken. Bound when the Utterance starts, from the
-Daemon's default.
+Daemon's default. A Render ignores that default and uses 1.0 unless given
+`--speed`.
 _Avoid_: rate (that's the audio sample rate)
 
 **Interrupt**:
@@ -52,6 +54,12 @@ Speaking an Utterance batch by batch, starting playback before all audio is
 synthesized. The first batch is a few words, so first audio comes fast. Later
 batches grow up to Kokoro's 510-phoneme limit, and each one is synthesized
 while the previous one plays.
+
+**Render**:
+A whole script synthesized to a WAV file by the CLI, without the Daemon. It
+has no Stream and no Interrupt: it favors quality over latency, packs each
+paragraph on its own, and writes the file only when all of it succeeds.
+_Avoid_: export, record
 
 The Omarchy bar widget (megaphone, setup/config panel) lives in
 https://github.com/zerobearing2/omarchy-omatalk-plugin, released on its own.

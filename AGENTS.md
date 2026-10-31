@@ -33,8 +33,8 @@ never requires a plugin release, and the reverse.
 
 The release tarball `omatalk-x86_64.tar.gz` holds the `omatalk` binary,
 `omatalk.service`, and `LICENSE`. The binary dlopens `onnxruntime-cpu` and
-`espeak-ng` at Daemon startup only. `install.sh` installs both through
-`omarchy pkg add`.
+`espeak-ng` only in `omatalk daemon` and `omatalk render`. `install.sh`
+installs both through `omarchy pkg add`.
 
 `scripts/build.sh` runs from release. Do not add a Make target
 for it. `scripts/dev-install.sh` installs a local release
