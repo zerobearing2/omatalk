@@ -7,6 +7,7 @@ use std::fmt;
 use std::io::{IsTerminal, Read};
 use std::os::unix::ffi::OsStringExt;
 use std::os::unix::process::CommandExt;
+use std::path::PathBuf;
 use std::process::{Command, ExitCode, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -92,48 +93,51 @@ pub fn parse(args: &[String]) -> Result<Cli, Usage> {
     }
 }
 
-fn parse_speak(rest: &[&str]) -> Result<Cli, Usage> {
+/// The words and flag values of a `speak` or `render` argv. `accepted` names
+/// the `--flag`s the command takes; each is `--flag VALUE` or `--flag=VALUE`,
+/// and its value comes back in the same slot. After `--` everything is text,
+/// and any other `--` word is a usage error.
+fn parse_flags<const N: usize>(
+    rest: &[&str],
+    accepted: [&str; N],
+) -> Result<(Option<String>, [Option<String>; N]), Usage> {
     let mut words = Vec::new();
-    let mut voice = None;
+    let mut values = [const { None }; N];
     let mut it = rest.iter();
     while let Some(&word) = it.next() {
-        match word {
-            "--" => {
-                words.extend(it.by_ref().copied());
-                break;
-            }
-            "--voice" => voice = Some(it.next().ok_or(Usage)?.to_string()),
-            _ if word.starts_with("--voice=") => voice = Some(word["--voice=".len()..].to_owned()),
-            _ if word.starts_with("--") => return Err(Usage),
-            _ => words.push(word),
+        if word == "--" {
+            words.extend(it.by_ref().copied());
+            break;
         }
+        if !word.starts_with("--") {
+            words.push(word);
+            continue;
+        }
+        let (name, inline) = match word.split_once('=') {
+            Some((name, value)) => (name, Some(value)),
+            None => (word, None),
+        };
+        let slot = accepted
+            .iter()
+            .position(|&flag| flag == name)
+            .ok_or(Usage)?;
+        let value = match inline {
+            Some(value) => value,
+            None => it.next().ok_or(Usage)?,
+        };
+        values[slot] = Some(value.to_owned());
     }
     let text = (!words.is_empty()).then(|| words.join(" "));
+    Ok((text, values))
+}
+
+fn parse_speak(rest: &[&str]) -> Result<Cli, Usage> {
+    let (text, [voice]) = parse_flags(rest, ["--voice"])?;
     Ok(Cli::Speak { text, voice })
 }
 
 fn parse_render(rest: &[&str]) -> Result<Cli, Usage> {
-    let mut words = Vec::new();
-    let (mut out, mut voice, mut speed) = (None, None, None);
-    let mut it = rest.iter();
-    while let Some(&word) = it.next() {
-        let flag = |name: &str| word.strip_prefix(name).and_then(|v| v.strip_prefix('='));
-        match word {
-            "--" => {
-                words.extend(it.by_ref().copied());
-                break;
-            }
-            "--out" => out = Some(it.next().ok_or(Usage)?.to_string()),
-            "--voice" => voice = Some(it.next().ok_or(Usage)?.to_string()),
-            "--speed" => speed = Some(it.next().ok_or(Usage)?.to_string()),
-            _ if flag("--out").is_some() => out = flag("--out").map(str::to_owned),
-            _ if flag("--voice").is_some() => voice = flag("--voice").map(str::to_owned),
-            _ if flag("--speed").is_some() => speed = flag("--speed").map(str::to_owned),
-            _ if word.starts_with("--") => return Err(Usage),
-            _ => words.push(word),
-        }
-    }
-    let text = (!words.is_empty()).then(|| words.join(" "));
+    let (text, [out, voice, speed]) = parse_flags(rest, ["--out", "--voice", "--speed"])?;
     Ok(Cli::Render {
         out: out.ok_or(Usage)?,
         text,
@@ -219,8 +223,7 @@ fn send(paths: &Paths, req: &Request) -> ExitCode {
 }
 
 /// Everything but the synthesis is checked first, so a typo costs no model
-/// load. Never talks to the Daemon. Speed is 1.0, not the config's: that is a
-/// listening preference.
+/// load. Never talks to the Daemon.
 fn render(
     paths: &Paths,
     out: &str,
@@ -228,44 +231,9 @@ fn render(
     voice: Option<String>,
     speed: Option<String>,
 ) -> ExitCode {
-    let out = match render::check_out(out) {
-        Ok(out) => out,
-        Err(e) => return fail(e),
-    };
-    let speed = match speed.as_deref().map(Speed::parse).transpose() {
-        Ok(speed) => speed.unwrap_or(Speed::NORMAL),
-        Err(e) => return fail(e),
-    };
-    let voice = match voice {
-        Some(raw) => voices::known(&paths.models, &raw),
-        None => match Config::load(&paths.config) {
-            Ok(config) => voices::in_archive(&paths.models, &config.voice).map(|()| config.voice),
-            Err(e) => return fail(e),
-        },
-    };
-    let voice = match voice {
-        Ok(voice) => voice,
-        Err(unknown) => return fail(unknown),
-    };
-    let raw = match text {
-        Some(words) => words,
-        None => match read_stdin() {
-            Ok(Some(piped)) => piped,
-            Ok(None) => {
-                eprintln!("{Usage}");
-                return ExitCode::from(2);
-            }
-            Err(e) => return fail(format!("stdin: {e}")),
-        },
-    };
-    let Some(text) = Text::new(&raw) else {
-        return fail("nothing to read");
-    };
-    let utterance = Utterance {
-        text,
-        voice,
-        speed,
-        delivery: Delivery::Voiceover,
+    let (out, utterance) = match render_inputs(paths, out, text, voice, speed) {
+        Ok(inputs) => inputs,
+        Err(code) => return code,
     };
     let tty = std::io::stderr().is_terminal();
     let progress = |batches: usize, audio: Duration| {
@@ -281,6 +249,58 @@ fn render(
         Ok(audio) => print_lines([format!("{} {:.1} s", out.display(), audio.as_secs_f64())]),
         Err(e) => fail(e),
     }
+}
+
+/// The target and the Utterance, or the exit code of the first check that
+/// failed. Speed is 1.0, not the config's: that is a listening preference.
+fn render_inputs(
+    paths: &Paths,
+    out: &str,
+    text: Option<String>,
+    voice: Option<String>,
+    speed: Option<String>,
+) -> Result<(PathBuf, Utterance), ExitCode> {
+    let out = render::check_out(out).map_err(fail)?;
+    let speed = speed
+        .as_deref()
+        .map(Speed::parse)
+        .transpose()
+        .map_err(fail)?;
+    let voice = render_voice(paths, voice)?;
+    let text = render_text(text)?;
+    let utterance = Utterance {
+        text,
+        voice,
+        speed: speed.unwrap_or(Speed::NORMAL),
+        delivery: Delivery::Voiceover,
+    };
+    Ok((out, utterance))
+}
+
+/// `--voice`, else the configured one; either must be in the archive.
+fn render_voice(paths: &Paths, voice: Option<String>) -> Result<VoiceName, ExitCode> {
+    let Some(raw) = voice else {
+        let configured = Config::load(&paths.config).map_err(fail)?.voice;
+        voices::in_archive(&paths.models, &configured).map_err(fail)?;
+        return Ok(configured);
+    };
+    voices::known(&paths.models, &raw).map_err(fail)
+}
+
+/// The words, else stdin; blank is nothing to read, and a terminal is usage.
+fn render_text(words: Option<String>) -> Result<Text, ExitCode> {
+    let raw = match words {
+        Some(words) => words,
+        None => match read_stdin() {
+            Ok(Some(piped)) => piped,
+            Ok(None) => {
+                eprintln!("{Usage}");
+                return Err(ExitCode::from(2));
+            }
+            Err(e) => return Err(fail(format!("stdin: {e}"))),
+        },
+    };
+    Text::new(&raw).ok_or_else(|| fail("nothing to read"))
 }
 
 /// All of stdin, or `None` when it is a terminal: waiting on a person's
