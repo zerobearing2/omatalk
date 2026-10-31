@@ -31,9 +31,10 @@ branch is refused. The script builds in a temporary worktree: it sets the versio
 `make lint`, and `scripts/build.sh`, commits `Release vTAG`, tags it, and
 pushes only the tag. Then it runs `gh release create --verify-tag` and checks
 `releases/latest`: unchanged after an RC, the new tag after a stable release.
-A release never writes to master or any branch, so master's `Cargo.toml`
-version and `install.sh` pin do not track releases. Each tag's commit holds
-them. `make release` refuses unless the highest `v$VERSION-rc.*` tag was built
+A release never writes to master or any branch. Master's `Cargo.toml` version
+is always `0.0.0-dev`, so a local build never claims to be a release; do not
+change it. Master's `install.sh` pin does not track releases either. Each
+tag's commit holds the real values. `make release` refuses unless the highest `v$VERSION-rc.*` tag was built
 from the current HEAD (`tag^` equals HEAD), so the real release is the code
 last tested. If the branch moved, cut another RC.
 
