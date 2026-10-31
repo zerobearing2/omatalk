@@ -106,10 +106,15 @@ impl Fixture {
 
     /// A commit on master, pushed to origin.
     fn push_commit(&self, name: &str) {
+        self.push_commit_to("master", name);
+    }
+
+    /// A commit on the checked-out branch, pushed to origin's `branch`.
+    fn push_commit_to(&self, branch: &str, name: &str) {
         write(self.work.join(name), name);
         self.work_git(&["add", name]);
         self.work_git(&["commit", "--quiet", "-m", name]);
-        self.work_git(&["push", "--quiet", "origin", "master"]);
+        self.work_git(&["push", "--quiet", "origin", branch]);
     }
 
     /// A tag at the current HEAD, pushed to origin.
@@ -183,6 +188,33 @@ impl Fixture {
 
     fn latest(&self) -> String {
         read(self.sys.path("state/latest")).trim().to_owned()
+    }
+
+    fn set_latest(&self, tag: &str) {
+        write(self.sys.path("state/latest"), format!("{tag}\n"));
+    }
+
+    /// A branch at the current HEAD, pushed to origin and checked out.
+    fn release_branch(&self, name: &str) {
+        self.work_git(&["switch", "--quiet", "-c", name]);
+        self.work_git(&["push", "--quiet", "-u", "origin", name]);
+    }
+
+    fn switch(&self, name: &str) {
+        self.work_git(&["switch", "--quiet", name]);
+    }
+
+    fn origin_branch(&self, name: &str) -> String {
+        self.origin_git(&["rev-parse", &format!("refs/heads/{name}")])
+    }
+
+    /// The last `gh release create` of the run, as words.
+    fn last_create(&self) -> Vec<String> {
+        let creates = self.release_creates();
+        words(creates.last().expect("no gh release create"))
+            .into_iter()
+            .map(str::to_owned)
+            .collect()
     }
 
     fn show(&self, rev_path: &str) -> String {
@@ -423,7 +455,12 @@ fn refuses_off_master_a_dirty_tree_and_a_master_that_differs_from_origin() {
     let before = fx.observe();
     for mode in ["rc", "stable"] {
         let result = fx.release(mode, "0.10.0");
-        assert_refused(&fx, &before, &result, "need branch master, on topic");
+        assert_refused(
+            &fx,
+            &before,
+            &result,
+            "need branch master or release-X.Y.x, on topic",
+        );
     }
     fx.work_git(&["switch", "--quiet", "master"]);
 
@@ -548,4 +585,261 @@ fn a_rejected_tag_push_leaves_no_local_tag_and_no_release() {
     assert_eq!(fx.release_creates(), Vec::<String>::new());
     assert_eq!(fx.observe(), before);
     fx.assert_no_worktree_left();
+}
+
+#[test]
+fn refuses_a_branch_that_is_not_master_or_a_release_line() {
+    let fx = Fixture::new();
+
+    for name in [
+        "release-0.9",
+        "release-0.9.x-fix",
+        "release-0.9.y",
+        "release-0.9.1",
+        "release-v0.9.x",
+        "release-notes",
+        "release-",
+        "my-release-0.9.x",
+        "release-0.9.x/topic",
+    ] {
+        fx.release_branch(name);
+        let before = fx.observe();
+        for mode in ["rc", "stable"] {
+            let result = fx.release(mode, "0.9.1");
+            assert_refused(
+                &fx,
+                &before,
+                &result,
+                &format!("need branch master or release-X.Y.x, on {name}"),
+            );
+        }
+        fx.switch("master");
+    }
+
+    fx.work_git(&["switch", "--quiet", "--detach"]);
+    let before = fx.observe();
+    let result = fx.release("rc", "0.9.1");
+    assert_refused(&fx, &before, &result, "on HEAD");
+}
+
+#[test]
+fn refuses_a_version_outside_the_release_branch_line() {
+    let fx = Fixture::new();
+    fx.release_branch("release-0.9.x");
+    let before = fx.observe();
+
+    for version in ["0.10.0", "0.8.5", "1.9.1", "0.90.1"] {
+        for mode in ["rc", "stable"] {
+            let result = fx.release(mode, version);
+            assert_refused(
+                &fx,
+                &before,
+                &result,
+                &format!("release-0.9.x releases 0.9.z only, not {version}"),
+            );
+        }
+    }
+}
+
+#[test]
+fn a_release_branch_must_equal_its_own_origin_branch() {
+    let fx = Fixture::new();
+    fx.release_branch("release-0.9.x");
+
+    write(fx.work.join("unpushed.txt"), "unpushed");
+    fx.work_git(&["add", "unpushed.txt"]);
+    fx.work_git(&["commit", "--quiet", "-m", "unpushed"]);
+    let before = fx.observe();
+    for mode in ["rc", "stable"] {
+        let result = fx.release(mode, "0.9.1");
+        assert_refused(
+            &fx,
+            &before,
+            &result,
+            "release-0.9.x is not origin/release-0.9.x",
+        );
+    }
+
+    fx.work_git(&["switch", "--quiet", "-c", "release-0.8.x"]);
+    let before = fx.observe();
+    let result = fx.release("rc", "0.8.1");
+    assert_eq!(result.code, 1, "{}", result.stderr);
+    assert!(
+        result
+            .stderr
+            .contains("git fetch origin release-0.8.x --tags failed"),
+        "{}",
+        result.stderr
+    );
+    assert_eq!(fx.observe(), before);
+    assert_eq!(fx.calls("gh"), Vec::<String>::new());
+
+    fx.switch("release-0.9.x");
+    write(fx.work.join("Cargo.toml"), "edited");
+    let before = fx.observe();
+    let result = fx.release("rc", "0.9.1");
+    assert_refused(&fx, &before, &result, "not clean");
+}
+
+#[test]
+fn a_release_branch_publishes_rcs_and_stable_as_tags_only() {
+    let fx = Fixture::new();
+    fx.release_branch("release-0.9.x");
+    fx.switch("master");
+    fx.push_commit("unreleased-on-master.txt");
+    let master = fx.origin_master();
+    fx.switch("release-0.9.x");
+    fx.push_commit_to("release-0.9.x", "the-fix.txt");
+    let branch = fx.origin_branch("release-0.9.x");
+    let before = fx.observe();
+
+    for want in ["v0.9.1-rc.1", "v0.9.1-rc.2"] {
+        let result = fx.release("rc", "0.9.1");
+        assert_eq!(result.code, 0, "{}", result.stderr);
+        assert!(result.stdout.contains(&format!("Released {want}")));
+    }
+    assert_eq!(fx.origin_tags(), ["v0.9.1-rc.1", "v0.9.1-rc.2"]);
+    assert_eq!(fx.latest(), "v0.9.0");
+
+    let result = fx.release("stable", "0.9.1");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert_eq!(fx.origin_tags(), ["v0.9.1", "v0.9.1-rc.1", "v0.9.1-rc.2"]);
+    assert_eq!(fx.origin_master(), master);
+    assert_eq!(fx.origin_branch("release-0.9.x"), branch);
+    fx.assert_caller_unchanged(&before);
+    fx.assert_no_worktree_left();
+
+    let tag = "refs/tags/v0.9.1";
+    assert_eq!(fx.origin_git(&["rev-parse", &format!("{tag}^")]), branch);
+    let tree = fx.origin_git(&["ls-tree", "-r", "--name-only", tag]);
+    assert!(tree.lines().any(|l| l == "the-fix.txt"), "{tree}");
+    assert!(
+        !tree.lines().any(|l| l == "unreleased-on-master.txt"),
+        "{tree}"
+    );
+    assert!(
+        fx.show(&format!("{tag}:Cargo.toml"))
+            .contains("version = \"0.9.1\"")
+    );
+    assert!(fx.last_create().contains(&"--latest".to_owned()));
+    assert_eq!(fx.latest(), "v0.9.1");
+}
+
+#[test]
+fn stable_on_an_old_line_leaves_a_newer_latest_alone() {
+    let fx = Fixture::new();
+    fx.release_branch("release-0.9.x");
+    fx.set_latest("v0.10.0");
+    assert_eq!(fx.release("rc", "0.9.12").code, 0);
+
+    let result = fx.release("stable", "0.9.12");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(
+        result.stdout.contains(
+            "v0.9.12 is not higher than latest v0.10.0; it does not take releases/latest."
+        ),
+        "{}",
+        result.stdout
+    );
+    let create = fx.last_create();
+    assert_eq!(&create[3], "v0.9.12");
+    assert!(create.contains(&"--latest=false".to_owned()), "{create:?}");
+    assert!(!create.contains(&"--latest".to_owned()), "{create:?}");
+    assert!(!create.contains(&"--prerelease".to_owned()), "{create:?}");
+    assert_eq!(fx.latest(), "v0.10.0");
+    assert!(fx.origin_tags().contains(&"v0.9.12".to_owned()));
+}
+
+#[test]
+fn stable_takes_latest_only_when_numerically_higher() {
+    let fx = Fixture::new();
+    fx.set_latest("v0.9.2");
+    assert_eq!(fx.release("rc", "0.10.0").code, 0);
+    let result = fx.release("stable", "0.10.0");
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(fx.last_create().contains(&"--latest".to_owned()));
+    assert_eq!(fx.latest(), "v0.10.0");
+    assert!(
+        !result.stdout.contains("does not take"),
+        "{}",
+        result.stdout
+    );
+
+    for (latest, version) in [
+        ("v0.9.2", "0.9.3"),
+        ("v0.9.9", "1.0.0"),
+        ("v1.2.3", "1.2.10"),
+    ] {
+        let fx = Fixture::new();
+        fx.set_latest(latest);
+        assert_eq!(fx.release("rc", version).code, 0);
+        assert_eq!(fx.release("stable", version).code, 0);
+        assert!(fx.last_create().contains(&"--latest".to_owned()));
+        assert_eq!(fx.latest(), format!("v{version}"));
+    }
+
+    for (latest, version) in [
+        ("v0.10.0", "0.9.12"),
+        ("v1.0.0", "0.99.99"),
+        ("v1.2.10", "1.2.9"),
+    ] {
+        let fx = Fixture::new();
+        fx.set_latest(latest);
+        assert_eq!(fx.release("rc", version).code, 0);
+        let result = fx.release("stable", version);
+        assert_eq!(result.code, 0, "{} {}", latest, result.stderr);
+        assert!(fx.last_create().contains(&"--latest=false".to_owned()));
+        assert_eq!(fx.latest(), latest);
+    }
+}
+
+#[test]
+fn an_unreadable_latest_refuses_before_anything_is_pushed() {
+    let fx = Fixture::new();
+
+    for mode in ["rc", "stable"] {
+        if mode == "stable" {
+            assert_eq!(fx.release("rc", "0.10.0").code, 0);
+        }
+        let before = fx.observe();
+        let tags = fx.origin_tags();
+        let local_tags = fx.work_git(&["tag", "--list"]);
+        let creates = fx.release_creates();
+
+        let mut cmd = fx.script(mode, "0.10.0");
+        cmd.env("FAKE_GH_API_FAIL", "1");
+        let result = run(&mut cmd, "");
+
+        assert_eq!(result.code, 1, "{mode}: {}", result.stderr);
+        assert_eq!(result.stderr.lines().count(), 1, "{}", result.stderr);
+        assert!(
+            result.stderr.contains(
+                "could not read releases/latest (gh: Internal Server Error (HTTP 500)); nothing was pushed"
+            ),
+            "{}",
+            result.stderr
+        );
+        assert_eq!(fx.observe(), before);
+        assert_eq!(fx.origin_tags(), tags);
+        assert_eq!(fx.work_git(&["tag", "--list"]), local_tags);
+        assert_eq!(fx.release_creates(), creates);
+        fx.assert_no_worktree_left();
+    }
+}
+
+#[test]
+fn a_missing_latest_release_is_not_an_error() {
+    let fx = Fixture::new();
+    std::fs::remove_file(fx.sys.path("state/latest")).unwrap();
+
+    let rc = fx.release("rc", "0.10.0");
+    assert_eq!(rc.code, 0, "{}", rc.stderr);
+    assert!(!fx.sys.path("state/latest").exists());
+
+    let stable = fx.release("stable", "0.10.0");
+    assert_eq!(stable.code, 0, "{}", stable.stderr);
+    assert!(fx.last_create().contains(&"--latest".to_owned()));
+    assert_eq!(fx.latest(), "v0.10.0");
 }

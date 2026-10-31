@@ -2,10 +2,15 @@
 # A GitHub that holds one releases/latest tag in $FAKE_STATE/latest.
 # `gh release create` points it at the new tag unless the release is a
 # prerelease or has --latest=false. FAKE_GH_LATEST_AFTER overrides that.
+# FAKE_GH_API_FAIL=1 makes every `gh api` call fail with an HTTP 500.
 set -eu
 printf 'gh %s\n' "$*" >> "$FAKE_LOG"
 case "${1:-} ${2:-}" in
   "api repos/"*)
+    if [ "${FAKE_GH_API_FAIL:-}" = 1 ]; then
+      echo "gh: Internal Server Error (HTTP 500)" >&2
+      exit 1
+    fi
     if [ ! -f "$FAKE_STATE/latest" ]; then
       echo "gh: Not Found (HTTP 404)" >&2
       exit 1

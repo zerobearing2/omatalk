@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Publish a release from master: a tag plus its GitHub Release, never a push
-# to master or any branch.
+# Publish a release from master or a release-X.Y.x branch: a tag plus its
+# GitHub Release, never a push to any branch.
 #
 #   VERSION=x.y.z scripts/release.sh rc      publishes vX.Y.Z-rc.N as a prerelease
-#   VERSION=x.y.z scripts/release.sh stable  publishes vX.Y.Z as latest
+#   VERSION=x.y.z scripts/release.sh stable  publishes vX.Y.Z, as latest only
+#                                            when it is higher than the current latest
 #
-# The version change, the install.sh pin, and the release commit exist only in a
-# temporary worktree. The commit is tagged, and only the tag is pushed. A
-# stable release requires that the highest RC was built from this exact master.
+# On release-X.Y.x, VERSION must be X.Y.z. The version change, the install.sh
+# pin, and the release commit exist only in a temporary worktree. The commit is
+# tagged, and only the tag is pushed. A stable release requires that the
+# highest RC was built from this exact HEAD.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,6 +22,22 @@ source scripts/lib.sh
 die() {
   echo "$1" >&2
   exit 1
+}
+
+# True when x.y.z $1 is higher than x.y.z $2, compared number by number.
+version_gt() {
+  local a b i
+  IFS=. read -r -a a <<< "$1"
+  IFS=. read -r -a b <<< "$2"
+  for i in 0 1 2; do
+    if [ $((10#${a[$i]})) -gt $((10#${b[$i]})) ]; then
+      return 0
+    fi
+    if [ $((10#${a[$i]})) -lt $((10#${b[$i]})) ]; then
+      return 1
+    fi
+  done
+  return 1
 }
 
 mode="${1:-}"
@@ -39,22 +57,29 @@ if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 branch="$(git rev-parse --abbrev-ref HEAD)"
-if [ "$branch" != master ]; then
-  die "need branch master, on $branch; git switch master"
+if [[ "$branch" =~ ^release-([0-9]+)\.([0-9]+)\.x$ ]]; then
+  branch_line="$((10#${BASH_REMATCH[1]})).$((10#${BASH_REMATCH[2]}))"
+  IFS=. read -r -a version_parts <<< "$version"
+  version_line="$((10#${version_parts[0]})).$((10#${version_parts[1]}))"
+  if [ "$version_line" != "$branch_line" ]; then
+    die "$branch releases $branch_line.z only, not $version"
+  fi
+elif [ "$branch" != master ]; then
+  die "need branch master or release-X.Y.x, on $branch"
 fi
 
 if [ -n "$(git status --porcelain)" ]; then
   die "working tree is not clean; commit or stash first"
 fi
 
-if ! git fetch --quiet origin master --tags; then
-  die "git fetch origin master --tags failed"
+if ! git fetch --quiet origin "$branch" --tags; then
+  die "git fetch origin $branch --tags failed"
 fi
 
 head="$(git rev-parse HEAD)"
-origin_head="$(git rev-parse refs/remotes/origin/master)"
+origin_head="$(git rev-parse "refs/remotes/origin/$branch")"
 if [ "$head" != "$origin_head" ]; then
-  die "master is not origin/master; pull or push first"
+  die "$branch is not origin/$branch; pull or push first"
 fi
 
 base_tag="v$version"
@@ -93,7 +118,7 @@ else
   rc_tag="$base_tag-rc.$highest_rc"
   rc_parent="$(git rev-parse "refs/tags/$rc_tag^")"
   if [ "$rc_parent" != "$head" ]; then
-    die "master moved since $rc_tag; cut another RC: make rc VERSION=$version"
+    die "$branch moved since $rc_tag; cut another RC: make rc VERSION=$version"
   fi
 fi
 
@@ -120,6 +145,42 @@ cleanup() {
   rm -rf "$work_parent"
 }
 trap cleanup EXIT
+
+# Sets LATEST to the tag releases/latest names, or "" when no release exists
+# (HTTP 404). Any other gh failure returns 1 with its first line in LATEST_ERROR.
+read_latest() {
+  local errors="$work_parent/gh.err"
+  if LATEST="$(gh api "repos/$REPO/releases/latest" --jq .tag_name 2> "$errors")"; then
+    return 0
+  fi
+  LATEST_ERROR="$(head -n 1 "$errors")"
+  if grep -q 'HTTP 404' "$errors"; then
+    LATEST=""
+    return 0
+  fi
+  return 1
+}
+
+if ! read_latest; then
+  die "could not read releases/latest ($LATEST_ERROR); nothing was pushed"
+fi
+latest_before="$LATEST"
+if [ -n "$latest_before" ]; then
+  if [[ ! "$latest_before" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    die "releases/latest is '$latest_before', not a vX.Y.Z tag; nothing was pushed"
+  fi
+fi
+
+# Only a stable release higher than the current latest may take it. No
+# release at all counts as lower than any version.
+takes_latest=0
+if [ "$mode" = stable ]; then
+  if [ -z "$latest_before" ]; then
+    takes_latest=1
+  elif version_gt "$version" "${latest_before#v}"; then
+    takes_latest=1
+  fi
+fi
 
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 
@@ -153,16 +214,13 @@ if ! git push --quiet origin "refs/tags/$tag"; then
 fi
 tag_pushed=1
 
-if latest_before="$(gh api "repos/$REPO/releases/latest" --jq .tag_name)"; then
-  :
-else
-  latest_before=""
-fi
-
 if [ "$mode" = rc ]; then
   channel=(--prerelease --latest=false)
-else
+elif [ "$takes_latest" -eq 1 ]; then
   channel=(--latest)
+else
+  channel=(--latest=false)
+  echo "$tag is not higher than latest $latest_before; it does not take releases/latest."
 fi
 
 if ! gh release create "$tag" --repo "$REPO" --verify-tag --title "$tag" \
@@ -173,17 +231,18 @@ if ! gh release create "$tag" --repo "$REPO" --verify-tag --title "$tag" \
   exit 1
 fi
 
-if ! latest_after="$(gh api "repos/$REPO/releases/latest" --jq .tag_name)"; then
-  die "could not read releases/latest after publishing $tag"
+if ! read_latest; then
+  die "could not read releases/latest after publishing $tag ($LATEST_ERROR)"
 fi
+latest_after="$LATEST"
 
-if [ "$mode" = rc ]; then
-  if [ "$latest_after" != "$latest_before" ]; then
-    die "$tag is published, but releases/latest moved from '$latest_before' to '$latest_after'"
-  fi
-else
+if [ "$takes_latest" -eq 1 ]; then
   if [ "$latest_after" != "$tag" ]; then
     die "$tag is published, but releases/latest is '$latest_after', not $tag"
+  fi
+else
+  if [ "$latest_after" != "$latest_before" ]; then
+    die "$tag is published, but releases/latest moved from '$latest_before' to '$latest_after'"
   fi
 fi
 
