@@ -66,4 +66,20 @@ hours.
 
 ## Memory
 
-TODO(memory table)
+Peak RSS is a fixed cost plus the finished WAV, because render holds all
+audio in memory until the end. The fixed cost is the model and the ORT arena.
+One release render at each size, `af_heart`, speed 1.0, `/usr/bin/time`, on a
+Ryzen 7840HS:
+
+| Script | Audio | WAV | Peak RSS | Render time |
+| --- | --- | --- | --- | --- |
+| 1.3 KB | 1.3 min | 3.5 MiB | 923 MiB | 13 s |
+| 5.0 KB | 5.2 min | 14 MiB | 947 MiB | 53 s |
+| 15 KB | 15.5 min | 43 MiB | 974 MiB | 2.5 min |
+| 29 KB | 29.7 min | 82 MiB | 1014 MiB | 5.0 min |
+| 59 KB | 60.7 min | 167 MiB | 1100 MiB | 10.5 min |
+
+To estimate peak RSS, use 920 MiB + 3 MiB per 1,000 characters of script, or
+920 MiB + 3 MiB per minute of audio. The slope is about 51 KiB per second of
+audio. PCM alone is 47 KiB per second. A Daemon that is running holds its own
+model on top of this.
