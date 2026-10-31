@@ -95,12 +95,15 @@ and its systemd user unit. Then the script:
    and appends the line on yes. On no, or when F8 is already bound to
    something else, it leaves the file alone and prints a copy-paste command.
 
-Releases are cut with `make bump` then `make release` on `master`, so
-several PRs can land before anyone ships. Bump only edits the version
-file. Release builds the tarball, verifies it, commits, pushes, and
-publishes the GitHub release from those files. The bar plugin releases on
-its own, from its own repository. After the first run, `omatalk upgrade` fetches and runs the installer that
-shipped with the latest GitHub release.
+Releases are tags cut from `master`, so several PRs can land before anyone
+ships and pushing to `master` publishes nothing. `make rc VERSION=x.y.z`
+publishes a prerelease that `omatalk upgrade` and the site installer never
+serve. `make release VERSION=x.y.z` publishes the real release, and only for
+the exact master an RC was built from. Each one builds and tests in a
+temporary worktree, tags the commit, and pushes only the tag. The bar plugin
+releases on its own, from its own repository. After the first run,
+`omatalk upgrade` fetches and runs the installer that shipped with the latest
+GitHub release.
 
 The script at that URL is a small dispatcher: it fetches and runs the
 installer that shipped with the latest release, so the installer's own
