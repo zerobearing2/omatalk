@@ -1,4 +1,4 @@
-//! argv to a `Cli` value, then run it. Hand-rolled: the surface is ten
+//! argv to a `Cli` value, then run it. Hand-rolled: the surface is eleven
 //! commands, and the usage and error texts are contracts the panel shows
 //! verbatim. Every stderr text lives in a `Display` impl next to its type.
 

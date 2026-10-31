@@ -187,8 +187,10 @@ ffmpeg -i talk.wav talk.mp3
 ```
 
 The file appears only when the whole render succeeds. A failed render leaves
-an existing file untouched. On success it prints the path and the audio's
-length. Run in a terminal, it also shows progress on stderr.
+an existing file untouched. `--out` replaces its target (a symlink is replaced,
+not followed), and the new file gets default permissions. On success it prints
+the path and the audio's length. Run in a terminal, it also shows progress on
+stderr.
 
 When the daemon is down, `speak` and `stop` raise a desktop notification
 alongside the terminal error — they run from hotkeys, where there may be no
