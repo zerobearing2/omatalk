@@ -2,7 +2,7 @@
 
 This directory is the maintained source for verifying the user-facing behavior of Omatalk. Read the index before driving the app, then use the matching feature file as the recipe.
 
-The harness is `.agents/skills/verify-omatalk/scripts/verify`. The bar plugin and the site are not features of this map.
+The harness is `.agents/skills/verify-omatalk/scripts/verify`. The bar plugin, the site, and the install and release paths are not features of this map.
 
 ## Baseline preconditions
 
@@ -18,7 +18,7 @@ The harness is `.agents/skills/verify-omatalk/scripts/verify`. The bar plugin an
 - Start every recipe from `status: idle` unless its preconditions say otherwise.
 - Pass the run id from `launch` to every later command.
 - Treat every command as literal. Keep quoted text and flags unchanged.
-- Run CLI actions through `verify run` or the `drive-speak` and `drive-stop` commands named in the feature file.
+- Run CLI actions through `verify run` or the `drive-speak`, `drive-stop`, and `drive-render` commands named in the feature file.
 - After a recipe changes voice or speed, set them back to `af_heart` and `1.0` before the next recipe.
 - Do not delete `evidence/` during cleanup.
 
@@ -28,7 +28,7 @@ The harness is `.agents/skills/verify-omatalk/scripts/verify`. The bar plugin an
 - Speech proof includes stdout `ok`, a `speaking` sample, a later `idle` sample, and a PCM file larger than 2304 bytes that is not all zeros.
 - CLI proof includes the command, stdout, stderr, and exit code in `evidence/transcript.txt`.
 - A config change is proved by reading the config path `doctor` prints, not by the empty stdout of `config set`.
-- Record the feature file and the entry point with every artifact. `drive-speak` and `drive-stop` do this by writing `evidence/drives/<stamp>/`.
+- Record the feature file and the entry point with every artifact. The drive commands do this by writing `evidence/drives/<stamp>/`.
 - Report an unreachable path with the command that was run and the unmet precondition.
 - Do not report a skipped entry point as verified through a different path.
 
@@ -48,4 +48,5 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Speak](./speak.md) covers text, a one-shot voice, the selection, the clipboard fallback, and an empty source.
 - [Stop](./stop.md) covers cutting off an utterance that is already speaking.
 - [Status](./status.md) covers idle, speaking, and a Daemon that is not running.
+- [Render](./render.md) covers a script to a WAV file from arguments or stdin, its pauses, and its refusals.
 - [Config](./config.md) covers reading and writing voice and speed, and listing voices.

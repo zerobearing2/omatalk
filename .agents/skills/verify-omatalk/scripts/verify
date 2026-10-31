@@ -13,6 +13,7 @@ usage() {
     "       verify run RUN -- ARG..." \
     "       verify drive-speak RUN [-- SPEAK-ARG...]" \
     "       verify drive-stop RUN [-- SPEAK-ARG...]" \
+    "       verify drive-render RUN [-- RENDER-ARG...]" \
     "       verify await-status RUN WORD SECONDS" \
     "       verify pcm RUN" \
     "       verify cleanup RUN" \
@@ -519,6 +520,93 @@ cmd_drive_stop() {
   printf '%s\n' "$DRIVE_DIR"
 }
 
+# Field of a WAV header at byte OFFSET, as an unsigned integer of SIZE bytes.
+wav_field() {
+  local value
+  value=$(od -An -tu"$3" -j"$2" -N"$3" "$1")
+  printf '%s\n' "${value// /}"
+}
+
+# Requires a 24 kHz mono 16-bit WAV whose data is all of the file and not silent.
+check_wav() {
+  local file size pcm
+  file=$1
+  size=$(wc -c < "$file")
+  size=${size// /}
+  if [ "$size" -le 44 ]; then
+    return 1
+  fi
+  if [ "$(head -c 4 "$file")" != "RIFF" ]; then
+    return 1
+  fi
+  if [ "$(wav_field "$file" 22 2)" != "1" ] || [ "$(wav_field "$file" 34 2)" != "16" ]; then
+    return 1
+  fi
+  if [ "$(wav_field "$file" 24 4)" != "24000" ]; then
+    return 1
+  fi
+  if [ "$(wav_field "$file" 40 4)" != "$((size - 44))" ]; then
+    return 1
+  fi
+  pcm="$file.pcm"
+  tail -c +45 "$file" > "$pcm"
+  if ! pcm_is_audio "$pcm"; then
+    rm -f "$pcm"
+    return 1
+  fi
+  rm -f "$pcm"
+  printf 'bytes %s, seconds %s\n' "$size" "$(((size - 44) / 48000))"
+}
+
+cmd_drive_render() {
+  local run_id wav again
+  run_id=$1
+  shift
+  if [ "${1:-}" = "--" ]; then
+    shift
+  fi
+  if [ "$#" -eq 0 ]; then
+    set -- "The first paragraph of the verification script. It has two sentences.
+
+The second paragraph follows a blank line."
+  fi
+  begin_drive "$run_id"
+  wav="$DRIVE_DIR/out.wav"
+  again="$DRIVE_DIR/again.wav"
+  printf '%q ' omatalk render --out "$wav" "$@" > "$DRIVE_DIR/argv.txt"
+  printf '\n' >> "$DRIVE_DIR/argv.txt"
+  drive_cli "$DRIVE_DIR/stdout.txt" "$DRIVE_DIR/stderr.txt" render --out "$wav" "$@"
+  if [ "$CODE" -ne 0 ]; then
+    fail_drive "fail: render exit $CODE" "drive-render: render exited $CODE"
+  fi
+  if ! grep -qF "$wav " "$DRIVE_DIR/stdout.txt"; then
+    fail_drive "fail: stdout did not name the file" "drive-render: stdout did not name the file"
+  fi
+  if ! check_wav "$wav" > "$DRIVE_DIR/wav.txt"; then
+    fail_drive "fail: not an audible 24 kHz mono 16-bit WAV" "drive-render: bad WAV (see $DRIVE_DIR)"
+  fi
+  drive_cli "$DRIVE_DIR/stdout.again.txt" "$DRIVE_DIR/stderr.again.txt" render --out "$again" "$@"
+  if [ "$CODE" -ne 0 ] || ! cmp -s "$wav" "$again"; then
+    fail_drive "fail: a second render differed" "drive-render: a second render differed"
+  fi
+  rm -f "$again"
+  stop_status_recorder
+  if grep -q "speaking" "$STATUS_FILE"; then
+    fail_drive "fail: the Daemon spoke during a render" "drive-render: the Daemon spoke"
+  fi
+  if ! grep -q "idle" "$STATUS_FILE"; then
+    fail_drive "fail: the Daemon was not idle" "drive-render: no idle sample (see $DRIVE_DIR)"
+  fi
+  if [ -n "$(find "$PCM_DIR" -type f -print -quit 2>/dev/null)" ]; then
+    fail_drive "fail: the player received audio" "drive-render: the player received audio"
+  fi
+  if [ -n "$(find "$DRIVE_DIR" -name '*.tmp' -print -quit)" ]; then
+    fail_drive "fail: a temp file stayed" "drive-render: a temp file stayed"
+  fi
+  printf '%s\n' "ok" > "$DRIVE_DIR/result.txt"
+  printf '%s\n' "$DRIVE_DIR"
+}
+
 cmd_await_status() {
   local run_id want seconds i word
   run_id=$1
@@ -669,6 +757,11 @@ main() {
       need_args 2 "$@"
       shift
       cmd_drive_stop "$@"
+      ;;
+    drive-render)
+      need_args 2 "$@"
+      shift
+      cmd_drive_render "$@"
       ;;
     await-status)
       need_args 4 "$@"
