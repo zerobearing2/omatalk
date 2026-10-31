@@ -33,6 +33,16 @@ impl Text {
     }
 }
 
+/// How an Utterance trades latency for quality.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Delivery {
+    /// Played as it is synthesized: a short first batch, then the ramp.
+    Live,
+    /// Rendered to a file: batches never cross a paragraph, and pauses
+    /// follow the script's structure.
+    Voiceover,
+}
+
 /// One unit of speech with its bindings fixed at start. Immutable: a running
 /// Utterance cannot observe a later config edit because it owns its copy.
 #[derive(Clone, Debug)]
@@ -40,6 +50,15 @@ pub struct Utterance {
     pub text: Text,
     pub voice: VoiceName,
     pub speed: Speed,
+    pub delivery: Delivery,
+}
+
+/// f32 to s16le, clipped, truncated toward zero.
+pub fn s16le(samples: &[f32]) -> Vec<u8> {
+    samples
+        .iter()
+        .flat_map(|s| ((s.clamp(-1.0, 1.0) * 32767.0) as i16).to_le_bytes())
+        .collect()
 }
 
 /// Each batch's samples (trimmed, pause-padded), synthesized as pulled.

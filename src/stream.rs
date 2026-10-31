@@ -19,7 +19,9 @@ use std::time::{Duration, Instant};
 use crate::config::Config;
 use crate::exec::{self, Argv};
 use crate::sink::WakeLead;
-use crate::speech::{Engine, SAMPLE_RATE, SpeechError, StopToken, Text, Utterance};
+use crate::speech::{
+    Delivery, Engine, SAMPLE_RATE, SpeechError, StopToken, Text, Utterance, s16le,
+};
 
 /// How often the playback thread checks its token while waiting for PCM or
 /// for pipe space. Bounds Interrupt latency; only ticks while speaking.
@@ -187,7 +189,12 @@ impl Stream {
             })
             .expect("spawn playback thread");
         let job = Job {
-            utterance: Utterance { text, voice, speed },
+            utterance: Utterance {
+                text,
+                voice,
+                speed,
+                delivery: Delivery::Live,
+            },
             stop: stop.clone(),
             pcm: pcm_tx,
         };
@@ -259,14 +266,6 @@ fn feed(speech: &mut Player, pcm: &Receiver<Pcm>, stop: &StopToken) -> Result<()
             }
         }
     }
-}
-
-/// f32 to s16le, clipped, truncated toward zero.
-fn s16le(samples: &[f32]) -> Vec<u8> {
-    samples
-        .iter()
-        .flat_map(|s| ((s.clamp(-1.0, 1.0) * 32767.0) as i16).to_le_bytes())
-        .collect()
 }
 
 /// One pw-cat (or compatible) process fed raw s16le mono at 24 kHz.

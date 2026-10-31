@@ -329,6 +329,7 @@ pub fn trim(audio: &[f32]) -> &[f32] {
 mod tests {
     use super::*;
     use crate::config::Speed;
+    use crate::speech::Delivery;
     use std::time::{Duration, Instant};
 
     #[test]
@@ -377,6 +378,7 @@ mod tests {
             text: crate::speech::Text::new(text).unwrap(),
             voice: VoiceName::parse("af_heart").unwrap(),
             speed: Speed::parse("1.0").unwrap(),
+            delivery: Delivery::Live,
         }
     }
 

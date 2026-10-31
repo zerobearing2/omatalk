@@ -16,7 +16,7 @@ use omatalk::config::Speed;
 use omatalk::speech::batch::{Batch, Batches};
 use omatalk::speech::g2p::G2p;
 use omatalk::speech::kokoro::Kokoro;
-use omatalk::speech::{Engine, SAMPLE_RATE, StopToken, Text, Utterance};
+use omatalk::speech::{Delivery, Engine, SAMPLE_RATE, StopToken, Text, Utterance};
 use omatalk::voices::VoiceName;
 
 fn ms(d: Duration) -> f64 {
@@ -66,6 +66,7 @@ fn main() {
         text: Text::new(text).expect("non-empty text"),
         voice: VoiceName::parse(&voice).expect("voice name"),
         speed: Speed::parse(&speed).expect("speed"),
+        delivery: Delivery::Live,
     };
     if rate {
         fit_rate(&mut kokoro, &text, &utterance);
