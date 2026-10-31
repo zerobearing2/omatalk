@@ -208,6 +208,7 @@ pub struct Speed(f32);
 impl Speed {
     pub const MIN: f32 = 0.5;
     pub const MAX: f32 = 2.0;
+    pub const NORMAL: Speed = Speed(1.0);
     /// `MIN` and `MAX` as the error texts spell them.
     const RANGE: &str = "between 0.5 and 2.0";
 
