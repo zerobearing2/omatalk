@@ -83,6 +83,22 @@ fn renders_words_to_a_wav_without_a_daemon() {
 }
 
 #[test]
+fn a_render_asks_the_engine_for_a_voiceover() {
+    let env = env();
+    let out = env.out("delivery.wav");
+
+    let result = env.render(&["--out", out.to_str().unwrap(), "Hi."], "");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    let wav = bytes(&out);
+    assert_eq!(
+        pcm(&wav),
+        8191i16.to_le_bytes().repeat(2400),
+        "the fake engine is silent unless the Delivery is a Voiceover"
+    );
+}
+
+#[test]
 fn reads_the_script_from_stdin_when_no_words_are_given() {
     let env = env();
     let out = env.out("piped.wav");
