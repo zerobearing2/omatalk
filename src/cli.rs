@@ -237,13 +237,13 @@ fn render(
         Err(e) => return fail(e),
     };
     let voice = match voice {
-        Some(raw) => raw,
+        Some(raw) => voices::known(&paths.models, &raw),
         None => match Config::load(&paths.config) {
-            Ok(config) => config.voice.to_string(),
+            Ok(config) => voices::in_archive(&paths.models, &config.voice).map(|()| config.voice),
             Err(e) => return fail(e),
         },
     };
-    let voice = match voices::known(&paths.models, &voice) {
+    let voice = match voice {
         Ok(voice) => voice,
         Err(unknown) => return fail(unknown),
     };
