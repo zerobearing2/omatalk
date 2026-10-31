@@ -68,7 +68,7 @@ enum Decision {
     Keep,
 }
 
-/// The Source and Interrupt rules from CONTEXT.md, as one pure function.
+/// The Source and Interrupt rules from GLOSSARY.md, as one pure function.
 ///
 /// - Inline text, else the Selection, resolves the text.
 /// - Resolved text equal to what is playing: stop.

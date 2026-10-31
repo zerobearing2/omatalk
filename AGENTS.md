@@ -1,7 +1,7 @@
 # Omatalk
 
 Local text-to-speech for Omarchy: hotkey → the machine speaks your selected text.
-See `CONTEXT.md` for domain language.
+See `GLOSSARY.md` for domain language.
 
 This repository is the Daemon, CLI, and site. They are one Rust crate
 (`src/`) and one binary: `omatalk daemon` is the Daemon, and every other
@@ -11,7 +11,7 @@ its own release. Work on it in a plain clone of that repo
 (`~/Work/omarchy-omatalk-plugin`). The installed plugin at
 `~/.config/omarchy/plugins/zerobearing.omatalk` is a git clone too. Its
 agent docs stay here, because the listed tree must not track `AGENTS.md`,
-`CONTEXT.md`, or `docs/agents/`.
+`GLOSSARY.md`, or `docs/agents/`.
 
 ## Release
 
@@ -116,7 +116,7 @@ Default five canonical triage role strings. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` at root + `docs/adr/`. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` at root + `docs/adr/`. See `docs/agents/domain.md`.
 
 ### Bar plugin tests
 

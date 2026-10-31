@@ -445,7 +445,7 @@ once first. To go back to the latest release, run `omatalk upgrade`.
 
 ## Design docs
 
-- [Domain language](CONTEXT.md)
+- [Domain language](GLOSSARY.md)
 - [ADRs](docs/adr/)
 
 ## Credits
