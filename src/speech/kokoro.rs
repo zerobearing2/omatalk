@@ -342,6 +342,7 @@ pub fn trim(audio: &[f32]) -> &[f32] {
 mod tests {
     use super::*;
     use crate::config::Speed;
+    use crate::speech::batch::PARAGRAPH_MS;
     use std::time::{Duration, Instant};
 
     #[test]
@@ -415,7 +416,7 @@ mod tests {
         let first = render(&mut kokoro, two);
         assert_eq!(first, render(&mut kokoro, two));
         assert_eq!(first.len(), 2, "one batch per paragraph");
-        let beat = (900 * SAMPLE_RATE / 1000) as usize;
+        let beat = (PARAGRAPH_MS * SAMPLE_RATE / 1000) as usize;
         assert!(first[0].iter().rev().take(beat).all(|&s| s == 0.0));
 
         let one = render(

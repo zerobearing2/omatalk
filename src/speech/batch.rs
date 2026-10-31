@@ -23,14 +23,37 @@ pub const SYNTH_MS_PER_PHONEME: f32 = 11.0;
 /// (measured 58-61).
 pub const AUDIO_MS_PER_PHONEME: f32 = 58.0;
 
-/// Voiceover pauses, appended to a trimmed batch. Kokoro's own gaps between
-/// sentences inside one batch measure 480-670 ms, and the trimmed joint between
-/// two batches already adds 110-150 ms, so a sentence joint of 420 ms lands at
-/// 530-570 ms, where the model would have put it. A clause joint tops the same
-/// trimmed joint up to a short breath; a word joint needs nothing on top of it.
-pub const SENTENCE_JOINT_MS: u32 = 420;
-pub const CLAUSE_JOINT_MS: u32 = 170;
-pub const WORD_JOINT_MS: u32 = 0;
+/// The silence appended to a trimmed batch, by how the batch ends. A word
+/// bound needs none.
+struct Pauses {
+    sentence: u32,
+    clause: u32,
+}
+
+impl Pauses {
+    fn after(&self, batch: &str) -> u32 {
+        match bound(batch.trim_end().chars().last()) {
+            Bound::Sentence => self.sentence,
+            Bound::Clause => self.clause,
+            Bound::Word => 0,
+        }
+    }
+}
+
+const LIVE: Pauses = Pauses {
+    sentence: 250,
+    clause: 100,
+};
+
+/// Kokoro's own gaps between sentences inside one batch measure 480-670 ms,
+/// and the trimmed joint between two batches already adds 110-150 ms, so a
+/// sentence pause of 420 ms lands at 530-570 ms, where the model would have
+/// put it. A clause pause tops the same trimmed joint up to a short breath.
+const VOICEOVER: Pauses = Pauses {
+    sentence: 420,
+    clause: 170,
+};
+
 /// A blank line in the script is a beat, longer than any sentence gap.
 pub const PARAGRAPH_MS: u32 = 900;
 
@@ -39,8 +62,8 @@ pub const PARAGRAPH_MS: u32 = 900;
 pub struct Batch {
     pub phonemes: String,
     /// Live: 250 ms after `.!?…`, 100 ms after `,;:`, 0 otherwise. Voiceover:
-    /// the joint constants above, or `PARAGRAPH_MS` at a paragraph's end.
-    /// Always 0 on the last batch of the Utterance.
+    /// `VOICEOVER`'s pauses, or `PARAGRAPH_MS` at a paragraph's end. Always 0
+    /// on the last batch of the Utterance.
     pub pause_ms: u32,
 }
 
@@ -158,7 +181,7 @@ impl<I: Iterator<Item = String>> Iterator for Batches<I> {
         };
         let last = self.exhausted && self.pending.is_empty() && self.packed.is_empty();
         self.ramp = self.ramp.after(len(&phonemes));
-        let pause_ms = if last { 0 } else { pause_after(&phonemes) };
+        let pause_ms = if last { 0 } else { LIVE.after(&phonemes) };
         Some(Batch { phonemes, pause_ms })
     }
 }
@@ -182,24 +205,6 @@ fn bound(c: Option<char>) -> Bound {
         Some('.' | '!' | '?' | '…') => Bound::Sentence,
         Some(',' | ';' | ':') => Bound::Clause,
         _ => Bound::Word,
-    }
-}
-
-fn pause_after(batch: &str) -> u32 {
-    match bound(batch.trim_end().chars().last()) {
-        Bound::Sentence => 250,
-        Bound::Clause => 100,
-        Bound::Word => 0,
-    }
-}
-
-/// The pause a Voiceover leaves after a batch that has a successor in its
-/// paragraph, from how the batch ends.
-fn joint_ms(batch: &str) -> u32 {
-    match bound(batch.trim_end().chars().last()) {
-        Bound::Sentence => SENTENCE_JOINT_MS,
-        Bound::Clause => CLAUSE_JOINT_MS,
-        Bound::Word => WORD_JOINT_MS,
     }
 }
 
@@ -230,7 +235,7 @@ pub fn script(paragraphs: impl IntoIterator<Item = impl AsRef<str>>) -> Vec<Batc
         let mut packed = split_phonemes(paragraph.as_ref()).into_iter().peekable();
         while let Some(phonemes) = packed.next() {
             let pause_ms = if packed.peek().is_some() {
-                joint_ms(&phonemes)
+                VOICEOVER.after(&phonemes)
             } else {
                 PARAGRAPH_MS
             };
@@ -528,10 +533,13 @@ mod tests {
 
     #[test]
     fn pauses_follow_the_last_mark() {
-        assert_eq!(pause_after("a."), 250);
-        assert_eq!(pause_after("a…"), 250);
-        assert_eq!(pause_after("a;"), 100);
-        assert_eq!(pause_after("a"), 0);
+        assert_eq!(LIVE.after("a."), 250);
+        assert_eq!(LIVE.after("a…"), 250);
+        assert_eq!(LIVE.after("a;"), 100);
+        assert_eq!(LIVE.after("a"), 0);
+        assert_eq!(VOICEOVER.after("a?"), 420);
+        assert_eq!(VOICEOVER.after("a:"), 170);
+        assert_eq!(VOICEOVER.after("a"), 0);
     }
 
     fn texts(batches: &[Batch]) -> Vec<&str> {
@@ -583,15 +591,7 @@ mod tests {
                 },
             ]
         );
-        assert_eq!(
-            (
-                SENTENCE_JOINT_MS,
-                CLAUSE_JOINT_MS,
-                WORD_JOINT_MS,
-                PARAGRAPH_MS
-            ),
-            (420, 170, 0, 900)
-        );
+        assert_eq!(PARAGRAPH_MS, 900);
     }
 
     #[test]
@@ -606,13 +606,9 @@ mod tests {
         let out = script([sentence.as_str(), "tail."]);
         assert!(out.len() >= 3);
         let pauses: Vec<u32> = out.iter().map(|b| b.pause_ms).collect();
-        assert!(pauses.contains(&CLAUSE_JOINT_MS), "{pauses:?}");
+        assert!(pauses.contains(&VOICEOVER.clause), "{pauses:?}");
         let joints = &pauses[..pauses.len() - 2];
-        assert!(
-            joints
-                .iter()
-                .all(|&p| p == CLAUSE_JOINT_MS || p == WORD_JOINT_MS)
-        );
+        assert!(joints.iter().all(|&p| p == VOICEOVER.clause || p == 0));
         assert_eq!(pauses[pauses.len() - 2], PARAGRAPH_MS);
         assert_eq!(pauses[pauses.len() - 1], 0);
     }
@@ -622,11 +618,11 @@ mod tests {
         let sentences: Vec<String> = (0..4).map(|_| prose(1, 200, 1)).collect();
         let out = script([sentences.join(" ")]);
         assert_eq!(out.len(), 2);
-        assert_eq!(out[0].pause_ms, SENTENCE_JOINT_MS);
+        assert_eq!(out[0].pause_ms, VOICEOVER.sentence);
         assert_eq!(out[1].pause_ms, 0);
 
         let out = script([format!("{} {},", prose(1, 400, 1), "b".repeat(300))]);
-        assert_eq!(out[0].pause_ms, SENTENCE_JOINT_MS);
+        assert_eq!(out[0].pause_ms, VOICEOVER.sentence);
     }
 
     #[test]
