@@ -12,7 +12,7 @@ DONE WHEN: `test -x "${HOME}/.local/bin/omatalk" && test -f "${HOME}/.local/shar
 - [ ] Run the release installer
 - [ ] Confirm the binary, the models, and the Daemon
 
-Run these steps on the machine that should speak. Omatalk is local text to speech for Omarchy. Use https://omatalk.zerobearing.com/install.sh. That URL downloads the install.sh shipped with the latest GitHub release and runs it, so the script and the binary match. Do not run the install.sh in this git checkout. That copy gets a real release tag and checksum only when a release is published.
+Run these steps on the machine that should speak. Omatalk is local text to speech for Omarchy. Use https://omatalk.zerobearing.com/install.sh. That URL downloads the install.sh shipped with the latest GitHub release and runs it, so the script and the binary match. Do not run the install.sh in this git checkout. Its release pin is stale by design.
 
 ## Step 0: Check Omarchy and the user session
 
@@ -22,7 +22,6 @@ The Daemon is a systemd user service. The installer exits when the omarchy comma
 command -v omarchy
 command -v systemctl
 systemctl --user show-environment >/dev/null
-test -n "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 ```
 
 **Verify:**
@@ -33,7 +32,7 @@ Expected: `ok`. Packages the installer may add are curl, pipewire, wl-clipboard,
 
 ## Step 1: Confirm the CPU is x86_64
 
-The published artifact is omatalk-x86_64.tar.gz. The release script checks its SHA-256. No other architecture is published.
+The published artifact is omatalk-x86_64.tar.gz. The installer checks its SHA-256. No other architecture is published.
 
 ```bash
 uname -m
