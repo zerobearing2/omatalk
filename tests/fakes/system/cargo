@@ -1,0 +1,13 @@
+#!/bin/sh
+# Logs every call. `cargo build` leaves a binary in $CARGO_TARGET_DIR/release.
+# FAKE_CARGO_FAIL=<subcommand> makes that subcommand exit 101.
+set -eu
+printf 'cargo %s\n' "$*" >> "$FAKE_LOG"
+if [ "${FAKE_CARGO_FAIL:-}" = "${1:-}" ]; then
+  exit 101
+fi
+if [ "${1:-}" = build ]; then
+  mkdir -p "$CARGO_TARGET_DIR/release"
+  printf 'fake omatalk binary\n' > "$CARGO_TARGET_DIR/release/omatalk"
+  chmod 755 "$CARGO_TARGET_DIR/release/omatalk"
+fi

@@ -1,0 +1,47 @@
+#!/bin/sh
+# A GitHub that holds one releases/latest tag in $FAKE_STATE/latest.
+# `gh release create` points it at the new tag unless the release is a
+# prerelease or has --latest=false. FAKE_GH_LATEST_AFTER overrides that.
+set -eu
+printf 'gh %s\n' "$*" >> "$FAKE_LOG"
+case "${1:-} ${2:-}" in
+  "api repos/"*)
+    if [ ! -f "$FAKE_STATE/latest" ]; then
+      echo "gh: Not Found (HTTP 404)" >&2
+      exit 1
+    fi
+    cat "$FAKE_STATE/latest"
+    ;;
+  "release create")
+    tag="$3"
+    moves_latest=1
+    for arg in "$@"; do
+      case "$arg" in
+        --verify-tag)
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "gh: tag $tag not found on the remote" >&2
+            exit 1
+          fi
+          ;;
+        --prerelease | --latest=false)
+          moves_latest=0
+          ;;
+        *.tar.gz | *.sha256 | install.sh | uninstall.sh)
+          if [ ! -f "$arg" ]; then
+            echo "gh: missing asset $arg" >&2
+            exit 1
+          fi
+          ;;
+      esac
+    done
+    if [ -n "${FAKE_GH_LATEST_AFTER:-}" ]; then
+      printf '%s\n' "$FAKE_GH_LATEST_AFTER" > "$FAKE_STATE/latest"
+    elif [ "$moves_latest" -eq 1 ]; then
+      printf '%s\n' "$tag" > "$FAKE_STATE/latest"
+    fi
+    ;;
+  *)
+    echo "gh: unexpected call: $*" >&2
+    exit 1
+    ;;
+esac
