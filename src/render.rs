@@ -93,28 +93,22 @@ fn duration(pcm: &[u8]) -> Duration {
 
 /// The 44-byte header for 16-bit mono PCM at `SAMPLE_RATE`; `None` when the
 /// data does not fit RIFF's u32 sizes.
-fn header(data_len: usize) -> Option<[u8; HEADER_LEN]> {
+fn header(data_len: usize) -> Option<Vec<u8>> {
     let data_len = u32::try_from(data_len).ok()?;
     let riff_len = data_len.checked_add(RIFF_OVERHEAD)?;
-    let mut h = [0u8; HEADER_LEN];
-    let fields: [(usize, &[u8]); 12] = [
-        (0, b"RIFF"),
-        (4, &riff_len.to_le_bytes()),
-        (8, b"WAVE"),
-        (12, b"fmt "),
-        (16, &16u32.to_le_bytes()),
-        (20, &1u16.to_le_bytes()),
-        (22, &1u16.to_le_bytes()),
-        (24, &SAMPLE_RATE.to_le_bytes()),
-        (28, &(SAMPLE_RATE * 2).to_le_bytes()),
-        (32, &2u16.to_le_bytes()),
-        (34, &16u16.to_le_bytes()),
-        (36, b"data"),
-    ];
-    for (at, bytes) in fields {
-        h[at..at + bytes.len()].copy_from_slice(bytes);
-    }
-    h[40..].copy_from_slice(&data_len.to_le_bytes());
+    let mut h = Vec::with_capacity(HEADER_LEN);
+    h.extend(b"RIFF");
+    h.extend(riff_len.to_le_bytes());
+    h.extend(b"WAVEfmt ");
+    h.extend(16u32.to_le_bytes());
+    h.extend(1u16.to_le_bytes()); // PCM
+    h.extend(1u16.to_le_bytes()); // mono
+    h.extend(SAMPLE_RATE.to_le_bytes());
+    h.extend((SAMPLE_RATE * 2).to_le_bytes()); // bytes per second
+    h.extend(2u16.to_le_bytes()); // bytes per frame
+    h.extend(16u16.to_le_bytes()); // bits per sample
+    h.extend(b"data");
+    h.extend(data_len.to_le_bytes());
     Some(h)
 }
 
