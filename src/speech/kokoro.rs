@@ -9,7 +9,7 @@ use std::thread;
 use ort::session::{RunOptions, Session};
 use ort::value::Tensor;
 
-use super::batch::{Batch, Batches, paragraphs, script};
+use super::batch::{Batch, Batches, script};
 use super::g2p::G2p;
 use super::{Audio, Delivery, Engine, LoadError, SAMPLE_RATE, SpeechError, StopToken, Utterance};
 use crate::voices::{VOICES_FILE, VoiceName};
@@ -107,30 +107,13 @@ impl Engine for Kokoro {
         } = self;
         let vocab = &*vocab;
         let speed = u.speed.get();
-        let mut known_line = move |line: &str| known(vocab, &g2p.line(line));
-        // The model's own gaps shrink with speed, so a Voiceover's pauses do
-        // too. Live keeps its fixed 250/100 ms.
-        let (batches, pause_scale): (Box<dyn Iterator<Item = Batch> + 'a>, f32) = match u.delivery {
-            Delivery::Live => {
-                let lines = phonemize(u.text.as_str(), stop, known_line);
-                (Box::new(Batches::new(lines, speed)), 1.0)
-            }
-            Delivery::Voiceover => {
-                let paragraphs = paragraphs(u.text.as_str())
-                    .into_iter()
-                    .map_while(|lines| {
-                        (!stop.is_fired()).then(|| {
-                            let lines: Vec<String> = lines
-                                .into_iter()
-                                .map(&mut known_line)
-                                .filter(|line| !line.is_empty())
-                                .collect();
-                            lines.join(" ")
-                        })
-                    })
-                    .collect::<Vec<_>>();
-                (Box::new(script(paragraphs).into_iter()), 1.0 / speed)
-            }
+        let known_line = move |line: &str| known(vocab, &g2p.line(line));
+        let batches: Box<dyn Iterator<Item = Batch> + 'a> = match u.delivery {
+            Delivery::Live => Box::new(Batches::new(
+                phonemize(u.text.as_str(), stop, known_line),
+                speed,
+            )),
+            Delivery::Voiceover => Box::new(script(u.text.as_str(), speed, known_line).into_iter()),
         };
         Box::new(batches.map_while(move |batch| {
             let tokens = tokens(vocab, &batch.phonemes);
@@ -139,10 +122,12 @@ impl Engine for Kokoro {
                 Err(e) => return Some(Err(e)),
             };
             let audio = infer(session, input, &tokens, style, speed, stop, Arena::Keep)?;
-            let pause_ms = (batch.pause_ms as f32 * pause_scale).round() as u32;
             Some(audio.map(|audio| {
                 let mut audio = trim(&audio).to_vec();
-                audio.resize(audio.len() + (pause_ms * SAMPLE_RATE / 1000) as usize, 0.0);
+                audio.resize(
+                    audio.len() + (batch.pause_ms * SAMPLE_RATE / 1000) as usize,
+                    0.0,
+                );
                 audio
             }))
         }))
