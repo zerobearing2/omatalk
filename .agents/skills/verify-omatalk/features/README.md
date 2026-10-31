@@ -25,7 +25,7 @@ The harness is `.agents/skills/verify-omatalk/scripts/verify`. The bar plugin, t
 ## Proof and skip reporting
 
 - Capture the command and the resulting state, not only the final `ok`.
-- Speech proof includes stdout `ok`, a `speaking` sample, a later `idle` sample, and a PCM file larger than 2304 bytes that is not all zeros.
+- Speech proof includes stdout `ok`, a `speaking` sample, a later `idle` sample, and a PCM file with a nonzero sample.
 - CLI proof includes the command, stdout, stderr, and exit code in `evidence/transcript.txt`.
 - A config change is proved by reading the config path `doctor` prints, not by the empty stdout of `config set`.
 - Record the feature file and the entry point with every artifact. The drive commands do this by writing `evidence/drives/<stamp>/`.

@@ -2,16 +2,16 @@
 name: verify-omatalk
 description: >
   Drive the Omatalk CLI against an isolated Daemon and prove speak, stop,
-  status, and config from the audio and replies a user would see. Use when
-  validating a change to this repo, when the user says verify omatalk, or
-  before claiming speak, stop, status, or config works.
+  status, render, and config from the audio, files, and replies a user would
+  see. Use when validating a change to this repo, when the user says verify
+  omatalk, or before claiming any of those commands works.
 ---
 
 # Verify Omatalk
 
 Omatalk is a local CLI plus a Daemon on a Unix socket. The bar plugin is a separate repo and this skill does not drive it. The static site under `public/` is not part of a speech proof.
 
-The harness is `.agents/skills/verify-omatalk/scripts/verify`. It builds `target/release/omatalk` when that binary is missing or older than `src/`, then starts a Daemon whose socket, config, and player are private to the run. It never uses the user socket at `${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk/omatalk.sock`, and it never runs `upgrade` or `uninstall`.
+The harness is `.agents/skills/verify-omatalk/scripts/verify`. It builds `target/release/omatalk` when that binary is missing or older than `src/`, `data/`, `Cargo.toml`, or `Cargo.lock`, then starts a Daemon whose socket, config, and player are private to the run. It never uses the user socket at `${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk/omatalk.sock`, and it never runs `upgrade` or `uninstall`.
 
 Each run id names one directory, `/tmp/omatalk-verify/<run-id>/`. Instance state is `<run-id>/instance/`. Proof is `<run-id>/evidence/` and is not deleted by cleanup. Two runs need two ids. Do not share a directory.
 
@@ -24,13 +24,12 @@ The script unsets `OMATALK_TEST_FAKE_ENGINE`. That flag synthesizes silence and 
 From the repo root:
 
 ```sh
-chmod +x .agents/skills/verify-omatalk/scripts/verify
 RUN_ID=$(.agents/skills/verify-omatalk/scripts/verify launch)
 ```
 
-`launch` prints one line, the run id. The Daemon is ready when `doctor` prints `status: idle`. Readiness is that reply, plus a `model warm` line in the daemon log. The Daemon writes that line to unbuffered stderr, so it lands in the log file as soon as the model loads. Startup waits up to 90 seconds for the model load.
+`launch` prints one line, the run id. It waits up to 90 seconds for a `model warm` line in the daemon log and `status` of `idle`.
 
-`launch` exits non-zero if the binary, models, or libraries are missing, or if the Daemon does not reach `idle`. On that failure it still runs cleanup for the run it started.
+`launch` exits non-zero if the binary, models, or libraries are missing, or if the Daemon does not reach `idle`. If the Daemon started and failed, `launch` runs cleanup itself.
 
 ## Doctor
 
@@ -98,7 +97,7 @@ Do not treat `OMATALK_TEST_FAKE_ENGINE` as a successful speech proof. The PCM ch
 .agents/skills/verify-omatalk/scripts/verify cleanup "$RUN_ID"
 ```
 
-Cleanup sends `SIGTERM` to the Daemon pid `launch` recorded, then `SIGKILL` if that pid is still alive after five seconds. It does not search by process name. It copies the daemon log and any leftover PCM into `evidence/`, then deletes `instance/`. The evidence directory stays. Confirm the drive directory is still there after cleanup before calling the proof done.
+Cleanup sends `SIGTERM` to the Daemon pid `launch` recorded, then `SIGKILL` if that pid is still alive after five seconds. It does not search by process name. It copies the daemon log, the notify log, and any leftover PCM into `evidence/`, then deletes `instance/`. The evidence directory stays. Confirm the drive directory is still there after cleanup before calling the proof done.
 
 A failed launch or a failed drive should be cleaned the same way before the next attempt.
 
