@@ -24,7 +24,7 @@ Config shows the saved voice and speed, changes them, and lists the voices the m
 Preconditions:
 
 - `verify doctor "$RUN_ID"` prints `status: idle`.
-- The config file still has `voice = af_heart` and `speed = 1.0`. No Daemon is required for these commands, but use the run's config and models so the user file is not modified.
+- `config get` prints `voice = af_heart` and `speed = 1.0`. These commands need no Daemon, but use the run's config and models so the user file is not modified.
 
 - **Read settings.** Run `verify run "$RUN_ID" -- config get`. Exit code is 0 and stdout contains `voice = af_heart` and `speed = 1.0`.
 - **Read settings as JSON.** Run `verify run "$RUN_ID" -- config get --json`. Exit code is 0 and the single stdout line is a JSON object whose `voice` is `af_heart` and whose `speed` is `1.0`.
