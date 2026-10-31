@@ -1,106 +1,99 @@
 # Marketplace listing
 
-Plugin ID `zerobearing.omatalk` is permanent. Repo:
-https://github.com/zerobearing2/omarchy-omatalk-plugin (a separate repo;
-run the commands below in a clone of it).
-
-Listings live in `omacom/omarchy-plugin-marketplace`. Validation and the
-Automated Security Baseline scan an exact 40-character commit. They do not
-execute plugin code. Approval is maintainer-only.
-
-Read [SUBMISSION.md](https://github.com/omacom/omarchy-plugin-marketplace/blob/main/SUBMISSION.md),
-[SECURITY.md](https://github.com/omacom/omarchy-plugin-marketplace/blob/main/SECURITY.md),
-and [VERIFICATION.md](https://github.com/omacom/omarchy-plugin-marketplace/blob/main/VERIFICATION.md)
-when the recipe below is not enough.
-
-## Listing
+Use this after every bar plugin release. Run the commands in a clone of
+https://github.com/zerobearing2/omarchy-omatalk-plugin. Plugin ID
+`zerobearing.omatalk` is permanent.
 
 Listed at https://omarchyplugins.com/plugin.html?id=zerobearing.omatalk,
-approved on #8407 at plugin v1.2.2 (`c0d145f`). The first submission,
-#4712, was closed after review objected to an installer in the plugin.
-#8407's review objected to the panel displaying and copying the site
-`curl | bash`; the fix was a link to https://omatalk.zerobearing.com/#install
-with no command shown. Keep it that way: the plugin downloads, executes,
-displays, and copies no install command. It calls the `omatalk` CLI once
-`~/.local/bin/omatalk` exists. `manual-setup` stays.
+approved on `omacom/omarchy-plugin-marketplace#8407` at plugin v1.2.2
+(`c0d145f`). Validation and the Automated Security Baseline scan an exact
+40-character commit and do not run plugin code. Only a marketplace maintainer
+can approve.
 
-The baseline scanner also flags `curl | bash` in the plugin README and
-`git fetch` followed by running scripts, including maintainer-only release
-scripts.
+If this recipe is not enough, read
+[SUBMISSION.md](https://github.com/omacom/omarchy-plugin-marketplace/blob/main/SUBMISSION.md),
+[SECURITY.md](https://github.com/omacom/omarchy-plugin-marketplace/blob/main/SECURITY.md),
+and [VERIFICATION.md](https://github.com/omacom/omarchy-plugin-marketplace/blob/main/VERIFICATION.md).
 
-## After listing, each plugin release
+## Rules for the plugin tree
 
-In the plugin clone, `make bump` then `make release`. Then file a **new**
-Verify issue.
+- The panel links to https://omatalk.zerobearing.com/#install with no command.
+  The plugin downloads, runs, displays, and copies no install command. Review
+  closed #4712 over an installer in the plugin, and #8407's review objected to
+  a `curl | bash` in the panel.
+- The plugin calls the `omatalk` CLI once `~/.local/bin/omatalk` exists.
+- The baseline scanner flags `curl | bash` in the plugin README, and `git fetch`
+  followed by running scripts, including maintainer-only release scripts.
+- The plugin never ships or runs an installer. Its `tests/run.sh` fails if
+  `install.sh` or `uninstall.sh` is in the tree.
+- The `manual-setup` label stays.
+- Agent docs stay in this repository, because the plugin's git tree is the
+  listed snapshot.
 
-```sh
-SHA=$(git rev-parse HEAD)
-VERSION=$(jq -r .version manifest.json)
-```
+## Publish a plugin release
 
-`$SHA` must be 40 hex characters of the commit that was pushed.
+1. In the plugin clone, run `make bump`, then `make release`.
+2. Read the commit and the version:
 
-Form: https://github.com/omacom/omarchy-plugin-marketplace/issues/new?template=verify-plugin.yml
+   ```sh
+   SHA=$(git rev-parse HEAD)
+   VERSION=$(jq -r .version manifest.json)
+   ```
 
-Select **Verify and publish a newer upstream commit**. Leave the standard
-installation box unchecked.
+   `$SHA` must be the 40 hex characters of the pushed commit.
 
-```md
-### Verification action
+3. Write `/tmp/omarchy-plugin-verify.md` with `$SHA` filled in. It matches the
+   [verify form](https://github.com/omacom/omarchy-plugin-marketplace/issues/new?template=verify-plugin.yml)
+   with **Verify and publish a newer upstream commit** selected and the standard
+   installation box unchecked.
 
-Verify and publish a newer upstream commit
+   ```md
+   ### Verification action
 
-### Plugin ID
+   Verify and publish a newer upstream commit
 
-zerobearing.omatalk
+   ### Plugin ID
 
-### Repository URL
+   zerobearing.omatalk
 
-https://github.com/zerobearing2/omarchy-omatalk-plugin
+   ### Repository URL
 
-### Target commit
+   https://github.com/zerobearing2/omarchy-omatalk-plugin
 
-$SHA
+   ### Target commit
 
-### Verification acknowledgment
+   $SHA
 
-- [x] I understand that only the exact target commit can become a verified marketplace snapshot and that verification is not a security audit.
+   ### Verification acknowledgment
 
-### Standard installation acknowledgment
+   - [x] I understand that only the exact target commit can become a verified marketplace snapshot and that verification is not a security audit.
 
-- [ ] I confirm that this listed root plugin supports the standard Omarchy installation path and does not require manual setup.
-```
+   ### Standard installation acknowledgment
 
-Title: `[Verify]: Omatalk $VERSION`. Create only after the owner confirms.
+   - [ ] I confirm that this listed root plugin supports the standard Omarchy installation path and does not require manual setup.
+   ```
 
-CLI:
+4. After the owner confirms, file a **new** Verify issue:
 
-```sh
-gh issue create \
-  --repo omacom/omarchy-plugin-marketplace \
-  --title "[Verify]: Omatalk $VERSION" \
-  --body-file /tmp/omarchy-plugin-verify.md
-```
+   ```sh
+   gh issue create \
+     --repo omacom/omarchy-plugin-marketplace \
+     --title "[Verify]: Omatalk $VERSION" \
+     --body-file /tmp/omarchy-plugin-verify.md
+   ```
 
-If the bot fails, edit that Verify issue. A later plugin `master` push
-without a new Verify issue leaves the catalog `Update unverified`.
+   If the bot fails, edit that issue.
 
 Done when the bot validation comment names `$SHA`. Then stop. A maintainer
-applies `approved-and-verified` last. `manual-setup` stays.
+applies `approved-and-verified` last.
 
-## Snapshot re-check
+A plugin `master` push without a new Verify issue leaves the catalog at
+`Update unverified`, because `omarchy plugin add` and `update` clone mutable
+HEAD, not the verified SHA.
 
-Use the same form, **Verify the currently listed snapshot**, only when the
-target is the listing's recorded `listingValidatedCommit` (from the plugin
-detail page), not current HEAD. A `review-required` result needs
-`maintainer-verified` on that issue, not `approved-and-verified`.
+## Re-check the listed snapshot
 
-## Guardrails
-
-- Keep `zerobearing.omatalk`. Update README and commands in the same change
-  if it ever must move, and only before the first listing.
-- The plugin must never ship or run an installer. Its `tests/run.sh`
-  fails if `install.sh` or `uninstall.sh` is in the tree.
-- `omarchy plugin add` / `update` clone mutable HEAD, not the verified SHA.
-- Agent docs stay in this repository. The plugin repo's git tree is the
-  listed snapshot.
+Use the same form with **Verify the currently listed snapshot**, only when the
+target is the listing's `listingValidatedCommit` from the plugin detail page,
+not current HEAD. A `review-required` result needs `maintainer-verified` on that
+issue, not `approved-and-verified`.
