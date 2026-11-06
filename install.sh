@@ -236,4 +236,4 @@ if ! "$LAUNCHER" speak "Welcome to omatalk!" >/dev/null 2>&1; then
   warn "Welcome speech failed; check: journalctl --user -u omatalk"
 fi
 
-msg "Done. Select text and press F8, or run: omatalk speak|stop|status|upgrade|uninstall"
+msg "Done. Select text and press F8, or run: omatalk --help"
