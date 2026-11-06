@@ -71,7 +71,7 @@ ASK_FROM="${HOME}/.local/share/omatalk-install-answer" bash -c "$(curl -fsSL htt
 ```bash
 test -x "${HOME}/.local/bin/omatalk" && echo binary
 ```
-Expected: the log ends with `Done. Select text and press F8, or run: omatalk speak|stop|status|upgrade|uninstall`, and this check prints `binary`. Allow several minutes when the models are not already on disk.
+Expected: the log ends with `Done. Select text and press F8, or run: omatalk --help`, and this check prints `binary`. Allow several minutes when the models are not already on disk.
 
 ## Step 4: Confirm the binary, the models, and the Daemon
 
