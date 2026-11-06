@@ -1,6 +1,6 @@
 [package]
 name = "omatalk"
-version = "0.0.0-dev"
+version = "0.10.0"
 edition = "2024"
 license = "MIT"
 description = "Local text-to-speech for Omarchy: hotkey, and the machine speaks your selected text."
