@@ -20,6 +20,7 @@ libloading = "0.8"
 fancy-regex = "0.19"
 unicode-normalization = "0.1"
 npyz = { version = "0.9", features = ["npz"] }
+clap = { version = "4", default-features = false, features = ["std", "derive", "help", "usage", "error-context", "suggestions", "color", "wrap_help"] }
 
 [build-dependencies]
 serde_json = "1"

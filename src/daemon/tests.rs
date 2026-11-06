@@ -203,12 +203,15 @@ fn voice_override_binds_override_and_configured_speed() {
 #[test]
 fn cli_voice_travels_the_wire_and_binds_without_writing_config() {
     let h = Harness::new(RecordingEngine::default());
-    let argv = ["speak", "--voice", "af_bella", "Hi,", "I'm", "bella."].map(String::from);
-    let crate::cli::Cli::Speak { text, voice } = crate::cli::parse(&argv).unwrap() else {
+    let argv = [
+        "omatalk", "speak", "--voice", "af_bella", "Hi,", "I'm", "bella.",
+    ];
+    let args = <crate::cli::Args as clap::Parser>::parse_from(argv);
+    let crate::cli::Cli::Speak { text, voice } = args.command else {
         unreachable!()
     };
     let line = Request::Speak(SpeakRequest {
-        text,
+        text: (!text.is_empty()).then(|| text.join(" ")),
         voice: voice.as_deref().and_then(VoiceName::parse),
     })
     .encode();
