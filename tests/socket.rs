@@ -219,7 +219,7 @@ fn cli_rejects_follow() {
     let result = run(omatalk(["status", "--follow"]).envs(daemon.env.clone()), "");
     assert_eq!(result.code, 2);
     assert!(
-        result.stderr.starts_with("usage: omatalk"),
+        result.stderr.starts_with("error: ") && result.stderr.contains("Usage: omatalk "),
         "{}",
         result.stderr
     );

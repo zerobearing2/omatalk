@@ -1,6 +1,6 @@
-//! argv to a `Cli` value, then run it. Hand-rolled: the surface is eleven
-//! commands, and the usage and error texts are contracts the panel shows
-//! verbatim. Every stderr text lives in a `Display` impl next to its type.
+//! argv to a `Cli` value, then run it. clap owns help, usage, and argv
+//! errors (exit 2). Every other stderr text lives in a `Display` impl next to
+//! its type.
 
 use std::ffi::{OsStr, OsString};
 use std::fmt;
@@ -11,150 +11,110 @@ use std::path::PathBuf;
 use std::process::{Command, ExitCode, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use clap::{CommandFactory, Parser, Subcommand};
+
 use crate::config::{Config, Paths, Setting, Speed};
 use crate::protocol::{self, Request, SpeakRequest};
 use crate::render;
 use crate::speech::{Delivery, Text, Utterance};
 use crate::voices::{self, VoiceName};
 
-pub const USAGE: &str = "usage: omatalk {speak [--voice NAME] [TEXT...] | render --out PATH [--voice NAME] [--speed N] [TEXT...] | stop | status | version | \
-config get [--json] | config set voice|speed VALUE | config voices [--json] | upgrade | uninstall}";
-
 /// The Hyprland binding has no terminal, so a failed speak/stop also notifies.
 pub const DAEMON_DOWN: &str = "daemon not running";
 pub const DAEMON_DOWN_NOTIFY: &str = "daemon not running — systemctl --user start omatalk";
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Parser)]
+#[command(
+    name = "omatalk",
+    version,
+    about = "Local text-to-speech for Omarchy",
+    arg_required_else_help = true
+)]
+pub struct Args {
+    #[command(subcommand)]
+    pub command: Cli,
+}
+
+#[derive(Debug, PartialEq, Subcommand)]
 pub enum Cli {
-    Version,
-    /// `text` is argv joined by single spaces; `None` when no words were given.
-    /// `--voice` may appear anywhere before `--`; after `--` everything is text.
+    /// Speak TEXT, or the selected text when none is given
+    #[command(allow_negative_numbers = true)]
     Speak {
-        text: Option<String>,
+        /// Voice for this request only (see `omatalk config voices`)
+        #[arg(long, value_name = "NAME")]
         voice: Option<String>,
+        /// Words to speak; use `--` before text that starts with `-`
+        #[arg(value_name = "TEXT")]
+        text: Vec<String>,
     },
-    /// Same word rules as `Speak`. `speed` stays raw so a bad one is a
-    /// reported failure, not a usage error. `None` text reads stdin.
+    /// Render TEXT, or stdin, to a WAV file
+    #[command(
+        allow_negative_numbers = true,
+        after_help = "Examples:\n  omatalk render --out hello.wav \"Hello there.\"\n  omatalk render --out script.wav < script.txt"
+    )]
     Render {
+        /// WAV file to write
+        #[arg(long, value_name = "PATH")]
         out: String,
-        text: Option<String>,
+        /// Voice [default: the configured voice]
+        #[arg(long, value_name = "NAME")]
         voice: Option<String>,
+        /// Speed, 0.5 to 2.0 [default: 1.0]
+        #[arg(long, value_name = "N")]
         speed: Option<String>,
+        /// Words to render; read from stdin when omitted
+        #[arg(value_name = "TEXT")]
+        text: Vec<String>,
     },
+    /// Stop speaking
     Stop,
+    /// Print the Daemon's state
     Status,
-    ConfigGet {
-        json: bool,
-    },
-    ConfigSet {
-        key: String,
-        value: String,
-    },
-    ConfigVoices {
-        json: bool,
-    },
+    /// Print the version
+    Version,
+    /// Read or change settings
+    #[command(subcommand, arg_required_else_help = true)]
+    Config(ConfigCommand),
+    /// Install the latest release
     Upgrade,
+    /// Remove Omatalk from this machine
     Uninstall,
-    /// The unit's ExecStart. Not in USAGE.
+    /// Run the Daemon (started by omatalk.service)
+    #[command(hide = true)]
     Daemon,
 }
 
-/// Any argv `parse` rejects. Printed as USAGE; exit 2.
-#[derive(Debug, PartialEq)]
-pub struct Usage;
-
-impl fmt::Display for Usage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(USAGE)
-    }
-}
-
-/// `args` excludes argv[0].
-pub fn parse(args: &[String]) -> Result<Cli, Usage> {
-    let words: Vec<&str> = args.iter().map(String::as_str).collect();
-    match words.as_slice() {
-        ["version"] | ["--version"] => Ok(Cli::Version),
-        ["stop"] => Ok(Cli::Stop),
-        ["status"] => Ok(Cli::Status),
-        ["upgrade"] => Ok(Cli::Upgrade),
-        ["uninstall"] => Ok(Cli::Uninstall),
-        ["daemon"] => Ok(Cli::Daemon),
-        ["config", "get"] => Ok(Cli::ConfigGet { json: false }),
-        ["config", "get", "--json"] => Ok(Cli::ConfigGet { json: true }),
-        ["config", "voices"] => Ok(Cli::ConfigVoices { json: false }),
-        ["config", "voices", "--json"] => Ok(Cli::ConfigVoices { json: true }),
-        ["config", "set", key, value] => Ok(Cli::ConfigSet {
-            key: key.to_string(),
-            value: value.to_string(),
-        }),
-        ["speak", rest @ ..] => parse_speak(rest),
-        ["render", rest @ ..] => parse_render(rest),
-        _ => Err(Usage),
-    }
-}
-
-/// The words and flag values of a `speak` or `render` argv. `accepted` names
-/// the `--flag`s the command takes; each is `--flag VALUE` or `--flag=VALUE`,
-/// and its value comes back in the same slot. After `--` everything is text,
-/// and any other `--` word is a usage error.
-fn parse_flags<const N: usize>(
-    rest: &[&str],
-    accepted: [&str; N],
-) -> Result<(Option<String>, [Option<String>; N]), Usage> {
-    let mut words = Vec::new();
-    let mut values = [const { None }; N];
-    let mut it = rest.iter();
-    while let Some(&word) = it.next() {
-        if word == "--" {
-            words.extend(it.by_ref().copied());
-            break;
-        }
-        if !word.starts_with("--") {
-            words.push(word);
-            continue;
-        }
-        let (name, inline) = match word.split_once('=') {
-            Some((name, value)) => (name, Some(value)),
-            None => (word, None),
-        };
-        let slot = accepted
-            .iter()
-            .position(|&flag| flag == name)
-            .ok_or(Usage)?;
-        let value = match inline {
-            Some(value) => value,
-            None => it.next().ok_or(Usage)?,
-        };
-        values[slot] = Some(value.to_owned());
-    }
-    let text = (!words.is_empty()).then(|| words.join(" "));
-    Ok((text, values))
-}
-
-fn parse_speak(rest: &[&str]) -> Result<Cli, Usage> {
-    let (text, [voice]) = parse_flags(rest, ["--voice"])?;
-    Ok(Cli::Speak { text, voice })
-}
-
-fn parse_render(rest: &[&str]) -> Result<Cli, Usage> {
-    let (text, [out, voice, speed]) = parse_flags(rest, ["--out", "--voice", "--speed"])?;
-    Ok(Cli::Render {
-        out: out.ok_or(Usage)?,
-        text,
-        voice,
-        speed,
-    })
+#[derive(Debug, PartialEq, Subcommand)]
+pub enum ConfigCommand {
+    /// Print the settings
+    Get {
+        /// Print one JSON object
+        #[arg(long)]
+        json: bool,
+    },
+    /// Change one setting
+    Set {
+        /// Setting to change
+        #[arg(value_parser = ["voice", "speed"])]
+        key: String,
+        /// A voice name, or a speed from 0.5 to 2.0
+        value: String,
+    },
+    /// List the installed voices
+    Voices {
+        /// Print one JSON array
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 pub fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    match parse(&args) {
-        Ok(cli) => run(cli, &Paths::from_env()),
-        Err(usage) => {
-            eprintln!("{usage}");
-            ExitCode::from(2)
-        }
-    }
+    run(Args::parse().command, &Paths::from_env())
+}
+
+/// Words joined by single spaces; `None` when no words were given.
+fn joined(words: Vec<String>) -> Option<String> {
+    (!words.is_empty()).then(|| words.join(" "))
 }
 
 /// Exit codes: 0 success, 1 a reported failure (one stderr line), 2 usage.
@@ -167,6 +127,7 @@ pub fn run(cli: Cli, paths: &Paths) -> ExitCode {
         Cli::Status => send(paths, &Request::Status),
         Cli::Stop => send(paths, &Request::Stop),
         Cli::Speak { text, voice } => {
+            let text = joined(text);
             let voice = match voice.map(|v| voices::known(&paths.models, &v)).transpose() {
                 Ok(v) => v,
                 Err(unknown) => return fail(unknown),
@@ -178,24 +139,26 @@ pub fn run(cli: Cli, paths: &Paths) -> ExitCode {
             text,
             voice,
             speed,
-        } => render(paths, &out, text, voice, speed),
-        Cli::ConfigGet { json } => match Config::load(&paths.config) {
+        } => render(paths, &out, joined(text), voice, speed),
+        Cli::Config(ConfigCommand::Get { json }) => match Config::load(&paths.config) {
             Ok(c) if json => print_lines([c.to_json()]),
             Ok(c) => print_lines(c.to_lines()),
             Err(e) => fail(e),
         },
-        Cli::ConfigVoices { json } => match voices::list(&paths.models) {
+        Cli::Config(ConfigCommand::Voices { json }) => match voices::list(&paths.models) {
             Ok(names) if json => print_lines([voices_json(&names)]),
             Ok(names) => print_lines(names.iter().map(VoiceName::to_string)),
             Err(e) => fail(voices::VoiceError::Archive(e)),
         },
-        Cli::ConfigSet { key, value } => match Setting::parse(&paths.models, &key, &value) {
-            Ok(setting) => match setting.write(&paths.config) {
-                Ok(()) => ExitCode::SUCCESS,
-                Err(e) => fail(format!("{}: {e}", paths.config.display())),
-            },
-            Err(e) => fail(e),
-        },
+        Cli::Config(ConfigCommand::Set { key, value }) => {
+            match Setting::parse(&paths.models, &key, &value) {
+                Ok(setting) => match setting.write(&paths.config) {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(e) => fail(format!("{}: {e}", paths.config.display())),
+                },
+                Err(e) => fail(e),
+            }
+        }
         Cli::Upgrade => upgrade(paths),
         Cli::Uninstall => uninstall(),
         Cli::Daemon => match crate::daemon::serve(paths) {
@@ -287,16 +250,21 @@ fn render_voice(paths: &Paths, voice: Option<String>) -> Result<VoiceName, ExitC
     voices::known(&paths.models, &raw).map_err(fail)
 }
 
-/// The words, else stdin; blank is nothing to read, and a terminal is usage.
+/// The words, else stdin; blank is nothing to read, and a terminal is a
+/// usage error.
 fn render_text(words: Option<String>) -> Result<Text, ExitCode> {
     let raw = match words {
         Some(words) => words,
         None => match read_stdin() {
             Ok(Some(piped)) => piped,
-            Ok(None) => {
-                eprintln!("{Usage}");
-                return Err(ExitCode::from(2));
-            }
+            Ok(None) => Args::command()
+                .bin_name("omatalk render")
+                .override_usage("omatalk render --out <PATH> [TEXT]...")
+                .error(
+                    clap::error::ErrorKind::MissingRequiredArgument,
+                    "no TEXT given and stdin is a terminal",
+                )
+                .exit(),
             Err(e) => return Err(fail(format!("stdin: {e}"))),
         },
     };
@@ -369,65 +337,76 @@ fn fail(msg: impl fmt::Display) -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::error::ErrorKind;
 
-    fn p(words: &[&str]) -> Result<Cli, Usage> {
-        parse(&words.iter().map(|w| w.to_string()).collect::<Vec<_>>())
+    fn p(words: &[&str]) -> Result<Cli, ErrorKind> {
+        Args::try_parse_from(std::iter::once("omatalk").chain(words.iter().copied()))
+            .map(|args| args.command)
+            .map_err(|e| e.kind())
     }
 
-    fn speak(text: Option<&str>, voice: Option<&str>) -> Result<Cli, Usage> {
+    fn words(text: &str) -> Vec<String> {
+        text.split(' ').map(str::to_owned).collect()
+    }
+
+    fn speak(text: &str, voice: Option<&str>) -> Result<Cli, ErrorKind> {
         Ok(Cli::Speak {
-            text: text.map(str::to_owned),
+            text: if text.is_empty() { vec![] } else { words(text) },
             voice: voice.map(str::to_owned),
         })
     }
 
     #[test]
+    fn definition_is_valid() {
+        Args::command().debug_assert();
+    }
+
+    #[test]
     fn speak_variants() {
-        assert_eq!(p(&["speak"]), speak(None, None));
-        assert_eq!(p(&["speak", "a", "b"]), speak(Some("a b"), None));
-        assert_eq!(
-            p(&["speak", "--voice", "v", "a"]),
-            speak(Some("a"), Some("v"))
-        );
-        assert_eq!(
-            p(&["speak", "a", "--voice", "v"]),
-            speak(Some("a"), Some("v"))
-        );
-        assert_eq!(p(&["speak", "--voice=v", "a"]), speak(Some("a"), Some("v")));
+        assert_eq!(p(&["speak"]), speak("", None));
+        assert_eq!(p(&["speak", "a", "b"]), speak("a b", None));
+        assert_eq!(p(&["speak", "--voice", "v", "a"]), speak("a", Some("v")));
+        assert_eq!(p(&["speak", "a", "--voice", "v"]), speak("a", Some("v")));
+        assert_eq!(p(&["speak", "--voice=v", "a"]), speak("a", Some("v")));
         assert_eq!(
             p(&["speak", "--", "--voice", "x"]),
-            speak(Some("--voice x"), None)
+            speak("--voice x", None)
         );
         assert_eq!(
             p(&["speak", "--voice", "v", "--", "--bogus"]),
-            speak(Some("--bogus"), Some("v"))
+            speak("--bogus", Some("v"))
         );
-        assert_eq!(
-            p(&["speak", "-5", "degrees"]),
-            speak(Some("-5 degrees"), None)
-        );
+        assert_eq!(p(&["speak", "-5", "degrees"]), speak("-5 degrees", None));
         assert_eq!(
             p(&["speak", "line one\nline two"]),
-            speak(Some("line one\nline two"), None)
+            Ok(Cli::Speak {
+                text: vec!["line one\nline two".into()],
+                voice: None
+            })
         );
+        assert_eq!(joined(words("a b")), Some("a b".into()));
+        assert_eq!(joined(vec![]), None);
     }
 
     #[test]
     fn speak_usage_errors() {
-        assert_eq!(p(&["speak", "--voice"]), Err(Usage));
-        assert_eq!(p(&["speak", "--bogus"]), Err(Usage));
-        assert_eq!(p(&["speak", "hi", "--bogus", "there"]), Err(Usage));
+        assert_eq!(p(&["speak", "--voice"]), Err(ErrorKind::InvalidValue));
+        assert_eq!(p(&["speak", "--bogus"]), Err(ErrorKind::UnknownArgument));
+        assert_eq!(
+            p(&["speak", "hi", "--bogus", "there"]),
+            Err(ErrorKind::UnknownArgument)
+        );
     }
 
     fn render(
         out: &str,
-        text: Option<&str>,
+        text: &[&str],
         voice: Option<&str>,
         speed: Option<&str>,
-    ) -> Result<Cli, Usage> {
+    ) -> Result<Cli, ErrorKind> {
         Ok(Cli::Render {
             out: out.to_owned(),
-            text: text.map(str::to_owned),
+            text: text.iter().map(|w| w.to_string()).collect(),
             voice: voice.map(str::to_owned),
             speed: speed.map(str::to_owned),
         })
@@ -437,11 +416,11 @@ mod tests {
     fn render_variants() {
         assert_eq!(
             p(&["render", "--out", "a.wav"]),
-            render("a.wav", None, None, None)
+            render("a.wav", &[], None, None)
         );
         assert_eq!(
             p(&["render", "--out=a.wav", "one", "two"]),
-            render("a.wav", Some("one two"), None, None)
+            render("a.wav", &["one", "two"], None, None)
         );
         assert_eq!(
             p(&[
@@ -453,7 +432,7 @@ mod tests {
                 "--out",
                 "a.wav"
             ]),
-            render("a.wav", Some("hi"), Some("v"), Some("1.2"))
+            render("a.wav", &["hi"], Some("v"), Some("1.2"))
         );
         assert_eq!(
             p(&[
@@ -465,71 +444,101 @@ mod tests {
                 "--out",
                 "x"
             ]),
-            render("a.wav", Some("--out x"), None, Some("0.9"))
-        );
-        assert_eq!(
-            p(&["render", "--out", "a.wav", "line one\n\nline two"]),
-            render("a.wav", Some("line one\n\nline two"), None, None)
+            render("a.wav", &["--out", "x"], None, Some("0.9"))
         );
         assert_eq!(
             p(&["render", "--out", "a.wav", "-5", "degrees"]),
-            render("a.wav", Some("-5 degrees"), None, None)
+            render("a.wav", &["-5", "degrees"], None, None)
+        );
+        assert_eq!(
+            p(&["render", "--out", "a.wav", "--speed", "-1"]),
+            render("a.wav", &[], None, Some("-1"))
         );
     }
 
     #[test]
     fn render_usage_errors() {
-        assert_eq!(p(&["render"]), Err(Usage));
-        assert_eq!(p(&["render", "hello"]), Err(Usage));
-        assert_eq!(p(&["render", "--", "--out", "a.wav"]), Err(Usage));
+        use ErrorKind::*;
+        assert_eq!(p(&["render"]), Err(MissingRequiredArgument));
+        assert_eq!(p(&["render", "hello"]), Err(MissingRequiredArgument));
+        assert_eq!(
+            p(&["render", "--", "--out", "a.wav"]),
+            Err(MissingRequiredArgument)
+        );
         for flag in ["--out", "--voice", "--speed"] {
-            assert_eq!(p(&["render", "--out", "a.wav", flag]), Err(Usage), "{flag}");
+            assert_eq!(
+                p(&["render", "--out", "a.wav", flag]),
+                Err(InvalidValue),
+                "{flag}"
+            );
         }
-        assert_eq!(p(&["render", "--out", "a.wav", "--bogus"]), Err(Usage));
-        assert_eq!(p(&["render", "--out", "a.wav", "--loud=1"]), Err(Usage));
-        assert!(USAGE.contains("render --out PATH"));
+        assert_eq!(
+            p(&["render", "--out", "a.wav", "--bogus"]),
+            Err(UnknownArgument)
+        );
+        assert_eq!(
+            p(&["render", "--out", "a.wav", "--loud=1"]),
+            Err(UnknownArgument)
+        );
     }
 
     #[test]
     fn fixed_commands() {
         assert_eq!(p(&["version"]), Ok(Cli::Version));
-        assert_eq!(p(&["--version"]), Ok(Cli::Version));
         assert_eq!(p(&["stop"]), Ok(Cli::Stop));
         assert_eq!(p(&["status"]), Ok(Cli::Status));
         assert_eq!(p(&["daemon"]), Ok(Cli::Daemon));
         assert_eq!(
             p(&["config", "get", "--json"]),
-            Ok(Cli::ConfigGet { json: true })
+            Ok(Cli::Config(ConfigCommand::Get { json: true }))
         );
         assert_eq!(
             p(&["config", "voices"]),
-            Ok(Cli::ConfigVoices { json: false })
+            Ok(Cli::Config(ConfigCommand::Voices { json: false }))
         );
         assert_eq!(
             p(&["config", "set", "speed", "1"]),
-            Ok(Cli::ConfigSet {
+            Ok(Cli::Config(ConfigCommand::Set {
                 key: "speed".into(),
                 value: "1".into()
-            })
+            }))
+        );
+    }
+
+    #[test]
+    fn help_and_version_are_not_errors_of_use() {
+        for words in [
+            &["--help"][..],
+            &["-h"],
+            &["help"],
+            &["help", "render"],
+            &["render", "--help"],
+        ] {
+            assert_eq!(p(words), Err(ErrorKind::DisplayHelp), "{words:?}");
+        }
+        for words in [&["--version"][..], &["-V"]] {
+            assert_eq!(p(words), Err(ErrorKind::DisplayVersion), "{words:?}");
+        }
+        assert_eq!(
+            p(&[]),
+            Err(ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand)
         );
     }
 
     #[test]
     fn extra_or_missing_words_are_usage() {
         for words in [
-            &[][..],
-            &["frob"],
+            &["frob"][..],
             &["upgrade", "now"],
             &["uninstall", "now"],
             &["status", "--follow"],
             &["version", "x"],
-            &["config"],
             &["config", "set", "speed"],
+            &["config", "set", "pitch", "1"],
             &["config", "get", "--yaml"],
             &["daemon", "--foreground"],
         ] {
-            assert_eq!(p(words), Err(Usage), "{words:?}");
+            assert!(p(words).is_err(), "{words:?}");
         }
-        assert!(Usage.to_string().starts_with("usage: omatalk "));
     }
 }

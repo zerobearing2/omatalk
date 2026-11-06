@@ -252,11 +252,15 @@ fn a_missing_out_or_an_unknown_flag_is_usage() {
     for result in [no_out, unknown] {
         assert_eq!(result.code, 2);
         assert!(
-            result.stderr.starts_with("usage: omatalk "),
+            result.stderr.starts_with("error: ") && result.stderr.contains("Usage: omatalk "),
             "{}",
             result.stderr
         );
-        assert!(result.stderr.contains("render --out PATH"));
+        assert!(
+            result.stderr.contains("omatalk render"),
+            "{}",
+            result.stderr
+        );
     }
     assert!(!out.exists());
 }

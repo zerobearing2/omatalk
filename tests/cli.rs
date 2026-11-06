@@ -54,7 +54,7 @@ fn upgrade_rejects_extra_arguments() {
 
     assert_eq!(result.code, 2);
     assert!(
-        result.stderr.starts_with("usage: omatalk"),
+        result.stderr.starts_with("error: ") && result.stderr.contains("Usage: omatalk "),
         "{}",
         result.stderr
     );
@@ -95,7 +95,7 @@ fn uninstall_rejects_extra_arguments() {
 
     assert_eq!(result.code, 2);
     assert!(
-        result.stderr.starts_with("usage: omatalk"),
+        result.stderr.starts_with("error: ") && result.stderr.contains("Usage: omatalk "),
         "{}",
         result.stderr
     );
@@ -118,7 +118,13 @@ fn notify_environment(tmp: &Path) -> (Vec<(&'static str, PathBuf)>, PathBuf) {
 
 #[test]
 fn version_prints_the_cargo_version_without_a_daemon() {
-    for flag in ["version", "--version"] {
+    for (flag, expected) in [
+        ("version", env!("CARGO_PKG_VERSION").to_owned()),
+        (
+            "--version",
+            format!("omatalk {}", env!("CARGO_PKG_VERSION")),
+        ),
+    ] {
         let tmp = TempDir::new("cli");
 
         let result = run(
@@ -127,7 +133,7 @@ fn version_prints_the_cargo_version_without_a_daemon() {
         );
 
         assert_eq!(result.code, 0, "{flag}: {}", result.stderr);
-        assert_eq!(result.stdout.trim(), env!("CARGO_PKG_VERSION"), "{flag}");
+        assert_eq!(result.stdout.trim(), expected, "{flag}");
         assert_eq!(result.stderr, "", "{flag}");
     }
 }
@@ -401,9 +407,9 @@ fn config_set_rejects_unsettable_key() {
 
         let result = env.config(&["set", key, "whatever"]);
 
-        assert_eq!(result.code, 1, "{key}");
+        assert_eq!(result.code, 2, "{key}");
         assert!(
-            result.stderr.contains("not settable via config set"),
+            result.stderr.contains("[possible values: voice, speed]"),
             "{key}: {}",
             result.stderr
         );
@@ -530,4 +536,32 @@ fn config_set_writes_through_a_dotfiles_symlink() {
             "live={live}"
         );
     }
+}
+
+#[test]
+fn help_prints_to_stdout_and_exits_zero() {
+    for args in [
+        &["--help"][..],
+        &["-h"],
+        &["help", "render"],
+        &["render", "--help"],
+    ] {
+        let result = run(&mut omatalk(args), "");
+
+        assert_eq!(result.code, 0, "{args:?}: {}", result.stderr);
+        assert!(
+            result.stdout.contains("Usage: omatalk "),
+            "{args:?}: {}",
+            result.stdout
+        );
+        assert_eq!(result.stderr, "", "{args:?}");
+    }
+}
+
+#[test]
+fn no_arguments_prints_help_and_exits_two() {
+    let result = run(&mut omatalk(Vec::<&str>::new()), "");
+
+    assert_eq!(result.code, 2);
+    assert!(result.stderr.contains("Commands:"), "{}", result.stderr);
 }

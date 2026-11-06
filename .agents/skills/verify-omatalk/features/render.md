@@ -26,7 +26,7 @@ Preconditions:
 - **Options.** Run `verify drive-render "$RUN_ID" -- --voice bm_george --speed 1.3 "Hello there, world."` `result.txt` is `ok`.
 - **Stdin.** Take `binary`, `models`, `config`, and `evidence` from `doctor`. Run `printf 'One. Two.\n\nThree.\n' | OMATALK_MODELS="$MODELS" OMATALK_CONFIG="$CONFIG" "$BINARY" render --out "$EVIDENCE/stdin.wav"`. Exit code is 0, stdout names the path and a duration, and the audio is longer than the same text with no blank line.
 - **Daemon down.** Run the same command with `OMATALK_SOCKET` set to `$INSTANCE/missing.sock`. Take `INSTANCE` from the socket path by removing `/omatalk.sock`. Exit code is 0 and the WAV is written.
-- **Refusals.** Run `verify run "$RUN_ID" -- render --out x.mp3 hi`. Exit code is 1, stderr names ffmpeg, and no file appears. Run `verify run "$RUN_ID" -- render --out x.wav "   "`. Exit code is 1, stderr is `nothing to read`, and no file appears. Run `verify run "$RUN_ID" -- render hi`. Exit code is 2 and stderr is the usage line.
+- **Refusals.** Run `verify run "$RUN_ID" -- render --out x.mp3 hi`. Exit code is 1, stderr names ffmpeg, and no file appears. Run `verify run "$RUN_ID" -- render --out x.wav "   "`. Exit code is 1, stderr is `nothing to read`, and no file appears. Run `verify run "$RUN_ID" -- render hi`. Exit code is 2 and stderr starts with `error:` and names `--out <PATH>`.
 
 ## Gotchas
 
