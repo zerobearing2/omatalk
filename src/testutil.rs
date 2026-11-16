@@ -77,7 +77,7 @@ pub fn log_lines(path: &Path, prefix: &str) -> Vec<String> {
 pub const FAKES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fakes");
 
 /// The env vars the fakes read, each naming a file in `dir`.
-pub fn fake_env(dir: &Path) -> [(&'static str, PathBuf); 6] {
+pub fn fake_env(dir: &Path) -> [(&'static str, PathBuf); 8] {
     [
         ("OMATALK_TEST_LOG", dir.join("play.log")),
         ("OMATALK_TEST_NOTIFY_LOG", dir.join("notify.log")),
@@ -85,12 +85,14 @@ pub fn fake_env(dir: &Path) -> [(&'static str, PathBuf); 6] {
         ("OMATALK_TEST_CAPTURE_FILE", dir.join("capture.txt")),
         ("OMATALK_TEST_CLIPBOARD_FILE", dir.join("clipboard.txt")),
         ("OMATALK_TEST_PCM", dir.join("pcm.raw")),
+        ("OMATALK_TEST_MEDIA_FILE", dir.join("media.txt")),
+        ("OMATALK_TEST_MEDIA_LOG", dir.join("media.log")),
     ]
 }
 
 /// Config keys that route every external command to a fake. `argv` turns a
 /// fake's path into its TOML value.
-pub fn fake_commands(argv: impl Fn(&str) -> String) -> [(&'static str, String); 5] {
+pub fn fake_commands(argv: impl Fn(&str) -> String) -> [(&'static str, String); 6] {
     [
         ("capture_primary", argv(&format!("{FAKES}/capture-primary"))),
         (
@@ -100,5 +102,6 @@ pub fn fake_commands(argv: impl Fn(&str) -> String) -> [(&'static str, String); 
         ("player", argv(&format!("{FAKES}/player"))),
         ("notify", argv(&format!("{FAKES}/notify"))),
         ("sink_probe", "[\"false\"]".to_owned()),
+        ("media_bus", argv(&format!("{FAKES}/busctl"))),
     ]
 }

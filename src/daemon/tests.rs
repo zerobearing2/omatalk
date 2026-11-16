@@ -33,7 +33,14 @@ impl Harness {
     /// For an engine that watches files in the harness dir.
     fn with(make: impl FnOnce(&Path) -> RecordingEngine) -> Harness {
         let dir = TempDir::new("actor");
-        for file in ["play.log", "notify.log", "capture.txt", "clipboard.txt"] {
+        for file in [
+            "play.log",
+            "notify.log",
+            "capture.txt",
+            "clipboard.txt",
+            "media.txt",
+            "media.log",
+        ] {
             std::fs::write(dir.path().join(file), "").unwrap();
         }
         std::fs::write(dir.path().join("ticks.txt"), "10").unwrap();
@@ -119,6 +126,16 @@ impl Harness {
         wait_for(&format!("{count} {prefix:?} lines"), WAIT, || {
             (log_lines(&log, prefix).len() >= count).then_some(())
         });
+    }
+
+    /// Waits for `count` Pause or Play calls, then for any stray extra to land.
+    fn media_calls(&self, count: usize) -> Vec<String> {
+        let log = self.path("media.log");
+        wait_for(&format!("{count} media calls"), WAIT, || {
+            (log_lines(&log, "").len() >= count).then_some(())
+        });
+        std::thread::sleep(Duration::from_millis(200));
+        log_lines(&log, "")
     }
 
     fn calls(&self) -> Vec<Call> {
@@ -594,4 +611,74 @@ fn bind_refuses_while_a_live_daemon_answers_and_replaces_a_stale_socket() {
         "stale socket left behind"
     );
     bind(&paths).unwrap();
+}
+
+const MUSIC: &str = "org.mpris.MediaPlayer2.music";
+
+fn players() -> String {
+    format!("{MUSIC} Playing\norg.mpris.MediaPlayer2.video Paused\norg.example.notmpris Playing\n")
+}
+
+#[test]
+fn speech_pauses_only_playing_players_and_resumes_them_after() {
+    let h = Harness::new(RecordingEngine::default());
+    h.set("media.txt", &players());
+    h.speak(Some("One sentence."), None);
+    h.wait_state(State::Idle);
+    assert_eq!(
+        h.media_calls(2),
+        [format!("Pause {MUSIC}"), format!("Play {MUSIC}")]
+    );
+    assert!(
+        std::fs::read_to_string(h.path("media.txt"))
+            .unwrap()
+            .contains("video Paused"),
+        "a player paused before speech stays paused"
+    );
+}
+
+#[test]
+fn interrupt_keeps_media_paused_until_stop() {
+    let (engine, gate) = gate(1);
+    let h = Harness::new(engine);
+    h.set("media.txt", &players());
+    let (first, second) = two_pieces();
+    h.speak(Some(&format!("{first} {second}")), None);
+    gate.reached.recv_timeout(WAIT).unwrap();
+    assert_eq!(h.media_calls(1), [format!("Pause {MUSIC}")]);
+
+    h.speak(Some("Quick replacement."), None);
+    assert_eq!(h.state(), State::Speaking);
+    assert_eq!(h.media_calls(1), [format!("Pause {MUSIC}")]);
+
+    h.stop();
+    drop(gate.release);
+    assert_eq!(
+        h.media_calls(2),
+        [format!("Pause {MUSIC}"), format!("Play {MUSIC}")]
+    );
+}
+
+#[test]
+fn error_resumes_paused_media() {
+    let h = Harness::new(RecordingEngine::default());
+    h.set("media.txt", &players());
+    h.write_config(&[("player", "[\"false\"]".to_owned())]);
+    h.speak(Some("One sentence."), None);
+    h.wait_state(State::Error);
+    assert_eq!(
+        h.media_calls(2),
+        [format!("Pause {MUSIC}"), format!("Play {MUSIC}")]
+    );
+}
+
+#[test]
+fn pause_media_off_leaves_players_alone() {
+    let h = Harness::new(RecordingEngine::default());
+    h.set("media.txt", &players());
+    h.write_config(&[("pause_media", "false".to_owned())]);
+    h.speak(Some("One sentence."), None);
+    h.wait_state(State::Idle);
+    std::thread::sleep(Duration::from_millis(200));
+    assert_eq!(log_lines(&h.path("media.log"), ""), Vec::<String>::new());
 }

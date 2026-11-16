@@ -8,6 +8,7 @@ pub mod cli;
 pub mod config;
 pub mod daemon;
 pub mod exec;
+pub mod media;
 pub mod protocol;
 pub mod render;
 pub mod sink;

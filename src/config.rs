@@ -74,6 +74,11 @@ pub struct Config {
     /// Silence played before speech when the default sink is a suspended
     /// Bluetooth or HDMI sink. Zero disables it.
     pub wake_lead: Duration,
+    /// Pause MPRIS players that are playing when speech starts, and resume
+    /// them when it ends.
+    pub pause_media: bool,
+    /// busctl-compatible, already on the session bus.
+    pub media_bus: Argv,
 }
 
 impl Config {
@@ -92,6 +97,8 @@ impl Config {
             notify: argv(&["notify-send", "Omatalk"]),
             sink_probe: argv(&["pactl"]),
             wake_lead: Duration::from_millis(650),
+            pause_media: true,
+            media_bus: argv(&["busctl", "--user"]),
         }
     }
 
@@ -134,7 +141,11 @@ impl Config {
                             bad(&format!("an integer between 0 and {WAKE_LEAD_MAX_MS}"))
                         })?;
                 }
-                "capture_primary" | "capture_clipboard" | "player" | "notify" | "sink_probe" => {
+                "pause_media" => {
+                    config.pause_media = item.as_bool().ok_or_else(|| bad("true or false"))?;
+                }
+                "capture_primary" | "capture_clipboard" | "player" | "notify" | "sink_probe"
+                | "media_bus" => {
                     let argv = item
                         .as_array()
                         .and_then(|a| {
@@ -149,6 +160,7 @@ impl Config {
                         "capture_clipboard" => config.capture_clipboard = argv,
                         "player" => config.player = argv,
                         "notify" => config.notify = argv,
+                        "media_bus" => config.media_bus = argv,
                         _ => config.sink_probe = argv,
                     }
                 }
@@ -193,6 +205,8 @@ impl Config {
             ("notify", argv(&self.notify)),
             ("sink_probe", argv(&self.sink_probe)),
             ("wake_lead_ms", (self.wake_lead.as_millis() as u64).into()),
+            ("pause_media", self.pause_media.into()),
+            ("media_bus", argv(&self.media_bus)),
         ]
     }
 }
@@ -498,6 +512,10 @@ mod tests {
                 "config.toml: wake_lead_ms must be an integer between 0 and 2000",
             ),
             (
+                "pause_media = \"yes\"\n",
+                "config.toml: pause_media must be true or false",
+            ),
+            (
                 "wake_lead_ms = 600.0\n",
                 "config.toml: wake_lead_ms must be an integer between 0 and 2000",
             ),
@@ -515,7 +533,7 @@ mod tests {
     fn json_is_one_sorted_line_with_numeric_speed() {
         assert_eq!(
             Config::defaults().to_json(),
-            r#"{"capture_clipboard":["wl-paste"],"capture_primary":["wl-paste","--primary"],"lang":"en-us","notify":["notify-send","Omatalk"],"player":["pw-cat","-p","--raw","--format","s16"],"sink_probe":["pactl"],"speed":1.0,"voice":"af_heart","wake_lead_ms":650}"#
+            r#"{"capture_clipboard":["wl-paste"],"capture_primary":["wl-paste","--primary"],"lang":"en-us","media_bus":["busctl","--user"],"notify":["notify-send","Omatalk"],"pause_media":true,"player":["pw-cat","-p","--raw","--format","s16"],"sink_probe":["pactl"],"speed":1.0,"voice":"af_heart","wake_lead_ms":650}"#
         );
     }
 }
