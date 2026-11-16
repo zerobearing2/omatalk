@@ -303,7 +303,8 @@ fn cli_waits_out_the_daemons_slowest_speak_reply() {
         daemon.path("config.toml"),
         "capture_primary = [\"sleep\", \"10\"]\n\
          capture_clipboard = [\"sleep\", \"10\"]\n\
-         notify = [\"sh\", \"-c\", \"sleep 10\"]\n",
+         notify = [\"sh\", \"-c\", \"sleep 10\"]\n\
+         media_bus = [\"false\"]\n",
     );
 
     let result = run(omatalk(["speak"]).envs(daemon.env.clone()), "");
