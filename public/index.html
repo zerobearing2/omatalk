@@ -933,7 +933,7 @@
     <ol class="loop">
       <li><div class="step-body"><b>Highlight text</b> anywhere in Hyprland: a browser tab, a terminal, a GTK app, an editor buffer.</div></li>
       <li><div class="step-body"><b>Press the Speak Key.</b> Omatalk resolves the <b>Source</b>: the Wayland primary selection first (<code>wl-paste --primary</code>), the clipboard if nothing's selected.</div></li>
-      <li><div class="step-body"><b>The daemon streams it.</b> Text becomes phonemes, packed into batches that start with a few words, and is synthesized through Kokoro-82M. First audio lands before the rest has finished rendering.</div></li>
+      <li><div class="step-body"><b>The daemon streams it.</b> Text becomes phonemes, packed into batches that start with a few words, and is synthesized through Kokoro-82M. First audio lands before the rest has finished rendering. Music or a video that's playing pauses while it speaks, then picks back up.</div></li>
       <li><div class="step-body"><b>Press it again to interrupt.</b> The playing <b>Utterance</b> cuts off immediately. Unchanged or empty Selection just stops; a new Selection starts speaking. No queue.</div></li>
     </ol>
   </section>
@@ -954,7 +954,8 @@
       <div>
         <p class="prose" style="margin-top:0; font-size:0.98rem;"><code class="inline-code">~/.config/omatalk/config.toml</code> is
           entirely optional. Missing the file, Omatalk just runs on defaults. Point <code class="inline-code">voice</code> at any
-          name from the list above, tune <code class="inline-code">speed</code>, save.</p>
+          name from the list above, tune <code class="inline-code">speed</code>, save. <code class="inline-code">pause_media</code> pauses
+          music and video while Omatalk speaks; set it to <code class="inline-code">false</code> to let them keep playing.</p>
         <div class="code-card">
           <div class="cc-title">
             ~/.config/omatalk/config.toml
@@ -964,7 +965,8 @@
             </button>
           </div>
           <pre><span class="k">voice</span> = <span class="v">"af_heart"</span>
-<span class="k">speed</span> = <span class="v">1.0</span></pre>
+<span class="k">speed</span> = <span class="v">1.0</span>
+<span class="k">pause_media</span> = <span class="v">true</span></pre>
         </div>
       </div>
 
@@ -1154,14 +1156,14 @@
   <section id="roadmap">
     <div class="eyebrow">roadmap</div>
     <h2>Shipped and next</h2>
-    <p class="prose">The MVP scope stayed narrow on purpose. Four pieces have shipped; the remaining work is next, in roughly the order it will land.</p>
+    <p class="prose">The MVP scope stayed narrow on purpose. Five pieces have shipped; the remaining work is next, in roughly the order it will land.</p>
     <div class="manifest">
       <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Quickshell widget <span class="roadmap-status">shipped</span></div><div class="why">A megaphone status indicator in Omarchy's own shell. It follows the daemon over a Unix socket, uses the theme accent while speaking, and shows the shell urgent color after a 3-second disconnect grace period.</div></div>
       <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Voice + speed panel <span class="roadmap-status">shipped</span></div><div class="why">Click the bar icon for a voice picker and speed slider, both auto-saving to <code class="mono" style="background:none;border:none;padding:0;">config.toml</code> — the next utterance binds the change, no restart. The same surface is scriptable: <code class="mono" style="background:none;border:none;padding:0;">omatalk config get/set/voices</code>.</div></div>
       <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Rust port <span class="roadmap-status">shipped</span></div><div class="why">Omatalk 0.9 is one Rust binary. <code class="mono" style="background:none;border:none;padding:0;">omatalk daemon</code> is the Daemon, and every other command is the CLI. The install no longer needs a Python environment. The socket, <code class="mono" style="background:none;border:none;padding:0;">config.toml</code>, and the bar plugin stay the same.</div></div>
       <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Performance fixes <span class="roadmap-status">shipped</span></div><div class="why">Speech starts about a third of a second after the press. The first batch is a few words, against more than a second when a whole paragraph was synthesized first. The fp32 model is faster on CPU than the half-size fp16 export. A low-resource engine (Piper, int8) for potato-class machines remains open.</div></div>
-      <div class="row"><div class="name">AUR package</div><div class="why">Publish <code class="mono" style="background:none;border:none;padding:0;">omatalk-bin</code> so Omarchy can install Omatalk from the AUR. The curl installer stays until that package ships.</div></div>
-      <div class="row"><div class="name">Media ducking</div><div class="why">Automatically lower other audio while Omatalk is speaking, opt-in via config.</div></div>
+      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Media pause <span class="roadmap-status">shipped</span></div><div class="why">Music and video that are playing pause while Omatalk speaks and resume when it stops, the way voxtype pauses them while you dictate. Anything you had already paused stays paused. It works with any player that supports MPRIS, such as browsers, Spotify, and mpv. Set <code class="mono" style="background:none;border:none;padding:0;">pause_media = false</code> to turn it off.</div></div>
+      <div class="row"><div class="name">Omarchy package</div><div class="why">Publish Omatalk as an Omarchy package, so it installs with Omarchy's own tooling. The curl installer stays until that package ships.</div></div>
       <div class="row"><div class="name">More languages</div><div class="why">Kokoro-82M ships packs for nine languages. Omatalk speaks English only for now.</div></div>
     </div>
   </section>
