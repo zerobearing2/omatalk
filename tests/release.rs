@@ -843,3 +843,39 @@ fn a_missing_latest_release_is_not_an_error() {
     assert!(fx.last_create().contains(&"--latest".to_owned()));
     assert_eq!(fx.latest(), "v0.10.0");
 }
+
+/// Release commits never land on a branch, so the last release is not an
+/// ancestor of the next one. GitHub would otherwise start the notes at the
+/// last tag still reachable from HEAD.
+#[test]
+fn notes_start_at_the_highest_lower_stable_release() {
+    let fx = Fixture::new();
+    assert_eq!(fx.release("rc", "0.10.0").code, 0);
+    assert!(!fx.last_create().contains(&"--notes-start-tag".to_owned()));
+    assert_eq!(fx.release("stable", "0.10.0").code, 0);
+    assert!(
+        !fx.last_create().contains(&"--notes-start-tag".to_owned()),
+        "an RC is never a notes start"
+    );
+
+    fx.push_commit("after-0.10.0.txt");
+    assert_eq!(fx.release("rc", "0.11.0").code, 0);
+    let create = fx.last_create();
+    let at = create.iter().position(|w| w == "--notes-start-tag");
+    assert_eq!(
+        at.map(|i| create[i + 1].as_str()),
+        Some("v0.10.0"),
+        "{create:?}"
+    );
+
+    fx.push_tag("v0.9.0");
+    fx.release_branch("release-0.9.x");
+    assert_eq!(fx.release("rc", "0.9.1").code, 0);
+    let create = fx.last_create();
+    let at = create.iter().position(|w| w == "--notes-start-tag");
+    assert_eq!(
+        at.map(|i| create[i + 1].as_str()),
+        Some("v0.9.0"),
+        "an old line ignores newer releases: {create:?}"
+    );
+}
