@@ -1,0 +1,21 @@
+#!/bin/sh
+# Players are "name status" lines in $OMATALK_TEST_MEDIA_FILE.
+# Pause and Play calls are logged and update the file.
+players="$OMATALK_TEST_MEDIA_FILE"
+case "$1" in --timeout=*) shift ;; esac
+status() { awk -v n="$1" '$1 == n {print $2}' "$players"; }
+case "$*" in
+  "--acquired --no-legend list")
+    cut -d' ' -f1 "$players" 2>/dev/null ;;
+  "get-property "*" PlaybackStatus")
+    now=$(status "$2")
+    [ -n "$now" ] || exit 1
+    echo "s \"$now\"" ;;
+  "call "*" Pause"|"call "*" Play")
+    [ -n "$(status "$2")" ] || exit 1
+    echo "$5 $2" >> "$OMATALK_TEST_MEDIA_LOG"
+    case "$5" in Pause) to=Paused ;; *) to=Playing ;; esac
+    awk -v n="$2" -v to="$to" '$1 == n {$2 = to} {print}' "$players" > "$players.new"
+    mv "$players.new" "$players" ;;
+  *) exit 1 ;;
+esac

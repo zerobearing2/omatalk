@@ -103,6 +103,8 @@ file again, so changes apply to the next press with no restart.
 | `player` | `["pw-cat", "-p", "--raw", "--format", "s16"]` | Command that plays raw s16le mono from stdin. Omatalk appends `--rate 24000 --channels 1 -`. |
 | `notify` | `["notify-send", "Omatalk"]` | Command for desktop notifications. The message is appended as the last argument. |
 | `sink_probe` | `["pactl"]` | pactl-compatible command for the sink check. Omatalk appends `get-default-sink`, then `list sinks short`. |
+| `pause_media` | `true` | Pause media players (MPRIS) that are playing when speech starts, and resume them when it ends. |
+| `media_bus` | `["busctl", "--user"]` | busctl-compatible command on the session bus, used by `pause_media`. |
 | `lang` | `"en-us"` | Accepted for compatibility. Every value reads as `en-us`, the only language. |
 
 Commands are lists of strings, not shell lines. A bad value makes the press

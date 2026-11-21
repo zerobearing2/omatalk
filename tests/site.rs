@@ -147,9 +147,10 @@ fn config_snippet_matches_daemon_defaults() {
     let defaults = defaults();
     // serde_json prints the speed like Python's repr: 1.0, not 1.
     let expected = format!(
-        "voice = \"{}\"\nspeed = {}",
+        "voice = \"{}\"\nspeed = {}\npause_media = {}",
         defaults["voice"].as_str().unwrap(),
-        defaults["speed"]
+        defaults["speed"],
+        defaults["pause_media"]
     );
     let card = copy_cards(&page())
         .into_iter()

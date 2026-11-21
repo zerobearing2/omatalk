@@ -2,11 +2,12 @@
 //! Utterance state.
 //!
 //! Threads: main (accept), one short-lived thread per request connection,
-//! the actor, the synth thread (`stream::Synth`), and one playback thread per
-//! Stream. Only the actor mutates `Phase` or the follower list; everyone else
-//! sends it a `Command`. The actor never spawns a process and never does a
-//! blocking write, so `status` and `follow` stay instant while a capture,
-//! notify, or ORT run is slow.
+//! the actor, the synth thread (`stream::Synth`), the media thread
+//! (`media::Media`), and one playback thread per Stream. Only the actor
+//! mutates `Phase` or the follower list; everyone else sends it a `Command`.
+//! The actor never spawns a process and never does a blocking write, so
+//! `status` and `follow` stay instant while a capture, notify, or ORT run is
+//! slow.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};

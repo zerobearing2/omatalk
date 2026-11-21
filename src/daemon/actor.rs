@@ -5,6 +5,7 @@ use std::os::unix::net::UnixStream;
 use std::sync::mpsc::{Receiver, Sender};
 
 use crate::config::Config;
+use crate::media::Media;
 use crate::protocol::State;
 use crate::speech::Text;
 use crate::stream::{Outcome, Stream, Synth};
@@ -126,6 +127,7 @@ pub(super) struct Actor {
     synth: Synth,
     /// For playback threads to report `StreamEnded`.
     commands: Sender<Command>,
+    media: Media,
 }
 
 impl Actor {
@@ -136,17 +138,22 @@ impl Actor {
             followers: Followers::default(),
             synth,
             commands,
+            media: Media::spawn(),
         }
     }
 
     /// The only place state lines are emitted: once per change, after the
-    /// command that caused it. Interrupt is Speaking -> Speaking: no line.
+    /// command that caused it. Interrupt is Speaking -> Speaking: no line, and
+    /// paused media stays paused.
     pub(super) fn run(mut self, inbox: Receiver<Command>) {
         for cmd in inbox {
             let before = self.phase.state();
             self.handle(cmd);
             let after = self.phase.state();
             if after != before {
+                if before == State::Speaking {
+                    self.media.resume();
+                }
                 self.followers.broadcast(after);
             }
         }
@@ -195,6 +202,9 @@ impl Actor {
             Decision::Start(text) => {
                 self.last_gen += 1;
                 let generation = Gen(self.last_gen);
+                if config.pause_media && self.phase.playing().is_none() {
+                    self.media.pause(config.media_bus.clone());
+                }
                 let commands = self.commands.clone();
                 let stream = Stream::start(text.clone(), config, &self.synth, move |outcome| {
                     let _ = commands.send(Command::StreamEnded {
