@@ -108,6 +108,32 @@ done <<EOF
 $rc_refs
 EOF
 
+# Release commits never land on a branch, so GitHub cannot find the last
+# release by walking back from the new tag. Name it: the highest stable tag
+# below this version, which on a release line skips newer lines.
+notes_start=""
+stable_refs="$(git ls-remote --tags --refs origin 'refs/tags/v*')"
+while read -r _ ref; do
+  candidate="${ref#refs/tags/v}"
+  if [[ ! "$candidate" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    continue
+  fi
+  if ! version_gt "$version" "$candidate"; then
+    continue
+  fi
+  if [ -z "$notes_start" ]; then
+    notes_start="v$candidate"
+  elif version_gt "$candidate" "${notes_start#v}"; then
+    notes_start="v$candidate"
+  fi
+done <<EOF
+$stable_refs
+EOF
+notes_args=()
+if [ -n "$notes_start" ]; then
+  notes_args=(--notes-start-tag "$notes_start")
+fi
+
 if [ "$mode" = rc ]; then
   release_version="$version-rc.$((highest_rc + 1))"
 else
@@ -224,7 +250,7 @@ else
 fi
 
 if ! gh release create "$tag" --repo "$REPO" --verify-tag --title "$tag" \
-  --generate-notes "${channel[@]}" \
+  --generate-notes "${notes_args[@]}" "${channel[@]}" \
   "$TARBALL" "$TARBALL.sha256" install.sh uninstall.sh; then
   echo "$tag is pushed but its GitHub Release was not created." >&2
   echo "Retry the gh release create, or delete the tag: git push origin :refs/tags/$tag" >&2
