@@ -172,6 +172,7 @@ fn unit_runs_the_packaged_binary_as_the_daemon() {
         "Environment=OMATALK_MODELS=%h/.local/share/omatalk/models",
         "Restart=always",
         "RestartSec=500ms",
+        "RuntimeDirectory=omatalk",
         "WantedBy=graphical-session.target",
     ] {
         assert!(lines.contains(&want), "missing {want:?}");

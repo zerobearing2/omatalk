@@ -6,6 +6,8 @@ PartOf=graphical-session.target
 [Service]
 ExecStart=/usr/bin/omatalk daemon
 Environment=OMATALK_MODELS=%h/.local/share/omatalk/models
+# systemd removes $XDG_RUNTIME_DIR/omatalk, socket and all, when the Daemon stops.
+RuntimeDirectory=omatalk
 Restart=always
 RestartSec=500ms
 

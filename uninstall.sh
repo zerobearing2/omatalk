@@ -78,7 +78,6 @@ if [ -e "$PLUGIN_DIR" ]; then
     warn "Kept $PLUGIN_DIR; it is not the packaged plugin. Remove it with: rm -rf $PLUGIN_DIR"
   fi
 fi
-msg "Curl-era files removed"
 
 if [ -d "$OMATALK_HOME" ]; then
   if ! read -r -p "Remove $OMATALK_HOME (models, ~355MB)? [y/N] " answer < "$ASK_FROM"; then
