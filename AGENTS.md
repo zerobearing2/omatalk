@@ -34,7 +34,9 @@ selected text. Use the terms in `GLOSSARY.md`. The Omarchy package
 - `scripts/dev-install.sh` dogfoods this checkout: it builds `packaging/dev` as
   `omatalk-bin` at `<newest tag>.r<commits>.g<sha>` and runs
   `sudo pacman -U` on it. It needs models from an earlier `omatalk setup`.
-  `omarchy pkg drop omatalk-bin && omarchy pkg add omatalk-bin` goes back.
+  `omarchy pkg drop omatalk-bin && omarchy pkg add omatalk-bin && omatalk setup`
+  goes back. The drop disables the unit and removes the plugin link, so setup
+  must run again.
 - `scripts/build.sh` runs from `scripts/release.sh`. Keep both build scripts
   out of the Makefile.
 
