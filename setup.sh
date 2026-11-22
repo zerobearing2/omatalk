@@ -248,8 +248,8 @@ if [ ! -x "$OMATALK_BIN" ]; then
   exit 1
 fi
 
-step_curl_era
 step_models
+step_curl_era
 step_enable
 step_restart_daemon
 step_binding

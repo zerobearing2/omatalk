@@ -150,3 +150,18 @@ fn installer_requires_omarchy() {
     assert!(fake.launcher().is_file());
     assert_eq!(setup_calls(&fake), 0);
 }
+
+#[test]
+fn a_failed_model_download_leaves_a_curl_era_install_running() {
+    let fake = Fake::new();
+    fake.seed_curl_install();
+    std::fs::remove_file(fake.site("models").join(VOICES)).unwrap();
+
+    let result = fake.setup("");
+
+    assert_ne!(result.code, 0);
+    assert_eq!(read(fake.launcher()), launcher_script("curl-era"));
+    assert!(fake.installed_unit().is_file());
+    assert!(!fake.logged("systemctl --user disable"));
+    assert!(!fake.logged("systemctl --user stop"));
+}
