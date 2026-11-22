@@ -31,12 +31,8 @@ Panel {
   property var voiceOptions: []
   property string voice: ""
   property real speed: 1.0
-  property string voiceError: ""
-  property string speedError: ""
   property bool pauseMedia: true
   property int wakeLeadMs: 650
-  property string pauseMediaError: ""
-  property string wakeLeadError: ""
   property string daemonVersion: "unknown"
 
   readonly property string statusLine: {
@@ -79,14 +75,7 @@ Panel {
 
   onOpenedChanged: if (opened) refresh()
 
-  function setVoice(value) {
-    root.voice = value
-    setVoiceProc.command = [root.launcherPath, "config", "set", "voice", value]
-    setVoiceProc.running = true
-    root.previewVoice(value)
-  }
-
-  // Not sequenced after setVoiceProc: the preview never touches
+  // Not sequenced after the voice save: the preview never touches
   // config.toml or waits on the Daemon's reload, so there is nothing to
   // wait for — it fires in parallel with the save.
   function previewVoice(name) {
@@ -94,23 +83,37 @@ Panel {
     previewProc.running = true
   }
 
-  function setSpeed(value) {
-    root.speed = value
-    setSpeedProc.command = [root.launcherPath, "config", "set", "speed", String(value)]
-    setSpeedProc.running = true
+  // `config set <key>`. Its stderr line is the error shown under the
+  // control until a later save of the same key succeeds.
+  component ConfigSetter: Process {
+    id: setter
+    property string key
+    property string error: ""
+    function save(value) {
+      setter.command = [root.launcherPath, "config", "set", setter.key, String(value)]
+      setter.running = true
+    }
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: setter.error = text.trim()
+    }
+    onExited: function(exitCode) { if (exitCode === 0) setter.error = "" }
   }
 
-  function setPauseMedia(value) {
-    root.pauseMedia = value
-    setPauseMediaProc.command = [root.launcherPath, "config", "set", "pause_media", String(value)]
-    setPauseMediaProc.running = true
+  component ErrorLine: Text {
+    visible: text !== ""
+    width: parent.width
+    wrapMode: Text.WordWrap
+    color: Color.urgent
+    font.family: Style.font.family
+    font.pixelSize: Style.font.bodySmall
   }
 
-  function setWakeLead(value) {
-    root.wakeLeadMs = value
-    setWakeLeadProc.command = [root.launcherPath, "config", "set", "wake_lead_ms", String(value)]
-    setWakeLeadProc.running = true
-  }
+  ConfigSetter { id: voiceSetter; key: "voice" }
+  ConfigSetter { id: speedSetter; key: "speed" }
+  ConfigSetter { id: pauseMediaSetter; key: "pause_media" }
+  ConfigSetter { id: wakeLeadSetter; key: "wake_lead_ms" }
 
   Process {
     id: voicesProc
@@ -152,49 +155,9 @@ Panel {
   }
 
   Process {
-    id: setVoiceProc
-    stdout: StdioCollector { waitForEnd: true }
-    stderr: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.voiceError = text.trim()
-    }
-    onExited: function(exitCode) { if (exitCode === 0) root.voiceError = "" }
-  }
-
-  Process {
     id: previewProc
     stdout: StdioCollector { waitForEnd: true }
     stderr: StdioCollector { waitForEnd: true }
-  }
-
-  Process {
-    id: setSpeedProc
-    stdout: StdioCollector { waitForEnd: true }
-    stderr: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.speedError = text.trim()
-    }
-    onExited: function(exitCode) { if (exitCode === 0) root.speedError = "" }
-  }
-
-  Process {
-    id: setPauseMediaProc
-    stdout: StdioCollector { waitForEnd: true }
-    stderr: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.pauseMediaError = text.trim()
-    }
-    onExited: function(exitCode) { if (exitCode === 0) root.pauseMediaError = "" }
-  }
-
-  Process {
-    id: setWakeLeadProc
-    stdout: StdioCollector { waitForEnd: true }
-    stderr: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.wakeLeadError = text.trim()
-    }
-    onExited: function(exitCode) { if (exitCode === 0) root.wakeLeadError = "" }
   }
 
   Process {
@@ -271,7 +234,11 @@ Panel {
               width: parent.width - previewButton.width - parent.spacing
               options: root.voiceOptions
               placeholderText: "Search voices…"
-              onChanged: function(v) { root.setVoice(v) }
+              onChanged: function(v) {
+                root.voice = v
+                voiceSetter.save(v)
+                root.previewVoice(v)
+              }
 
               Binding on value { value: root.voice }
             }
@@ -290,15 +257,7 @@ Panel {
             }
           }
 
-          Text {
-            visible: root.voiceError !== ""
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: root.voiceError
-            color: Color.urgent
-            font.family: Style.font.family
-            font.pixelSize: Style.font.bodySmall
-          }
+          ErrorLine { objectName: "omatalkVoiceError"; text: voiceSetter.error }
 
           PanelSectionHeader { text: "SPEED" }
 
@@ -317,7 +276,10 @@ Panel {
               value: root.speed
               tickCount: 16
               tickColor: Color.popups.background
-              onReleased: function(v) { root.setSpeed(root.snapSpeed(v)) }
+              onReleased: function(v) {
+                root.speed = root.snapSpeed(v)
+                speedSetter.save(root.speed)
+              }
             }
 
             Text {
@@ -330,15 +292,7 @@ Panel {
             }
           }
 
-          Text {
-            visible: root.speedError !== ""
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: root.speedError
-            color: Color.urgent
-            font.family: Style.font.family
-            font.pixelSize: Style.font.bodySmall
-          }
+          ErrorLine { objectName: "omatalkSpeedError"; text: speedSetter.error }
 
           PanelSeparator {}
 
@@ -352,18 +306,13 @@ Panel {
             foreground: Color.popups.text
             fontFamily: Style.font.family
             checked: root.pauseMedia
-            onClicked: root.setPauseMedia(!root.pauseMedia)
+            onClicked: {
+              root.pauseMedia = !root.pauseMedia
+              pauseMediaSetter.save(root.pauseMedia)
+            }
           }
 
-          Text {
-            visible: root.pauseMediaError !== ""
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: root.pauseMediaError
-            color: Color.urgent
-            font.family: Style.font.family
-            font.pixelSize: Style.font.bodySmall
-          }
+          ErrorLine { objectName: "omatalkPauseMediaError"; text: pauseMediaSetter.error }
 
           Column {
             width: parent.width
@@ -404,7 +353,10 @@ Panel {
               value: root.wakeLeadMs
               tickCount: 5
               tickColor: Color.popups.background
-              onReleased: function(v) { root.setWakeLead(root.snapWakeLead(v)) }
+              onReleased: function(v) {
+                root.wakeLeadMs = root.snapWakeLead(v)
+                wakeLeadSetter.save(root.wakeLeadMs)
+              }
             }
 
             Text {
@@ -418,16 +370,7 @@ Panel {
             }
           }
 
-
-          Text {
-            visible: root.wakeLeadError !== ""
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: root.wakeLeadError
-            color: Color.urgent
-            font.family: Style.font.family
-            font.pixelSize: Style.font.bodySmall
-          }
+          ErrorLine { objectName: "omatalkWakeLeadError"; text: wakeLeadSetter.error }
 
           Text {
             visible: root.daemonUnavailable

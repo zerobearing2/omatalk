@@ -89,8 +89,9 @@ TestCase {
     compare(hero().detail, "unknown")
   }
 
-  function test_set_voice_saves_and_previews() {
-    panel.setVoice("bf_emma")
+  function test_choosing_a_voice_saves_and_previews_it() {
+    findChild(panel, "omatalkVoiceDropdown").changed("bf_emma")
+    compare(panel.voice, "bf_emma")
     compare(commandLine(findProc("config set voice")), launcherBin + " config set voice bf_emma")
     compare(
       commandLine(findProc("speak --voice")),
@@ -98,40 +99,31 @@ TestCase {
     )
   }
 
-  function test_set_speed_saves_snapped_value() {
-    panel.setSpeed(panel.snapSpeed(1.73))
+  function test_the_speed_slider_saves_the_snapped_value() {
+    findChild(panel, "omatalkSpeedSlider").released(1.73)
+    compare(panel.speed, 1.7)
     compare(commandLine(findProc("config set speed")), launcherBin + " config set speed 1.7")
   }
 
-  function test_set_pause_media_saves_the_flipped_value() {
-    panel.setPauseMedia(false)
-    compare(panel.pauseMedia, false)
-    compare(commandLine(findProc("config set pause_media")), launcherBin + " config set pause_media false")
-    panel.setPauseMedia(true)
-    compare(commandLine(findProc("config set pause_media")), launcherBin + " config set pause_media true")
-  }
-
-  function test_set_wake_lead_saves_snapped_value() {
-    panel.setWakeLead(panel.snapWakeLead(1230))
-    compare(commandLine(findProc("config set wake_lead_ms")), launcherBin + " config set wake_lead_ms 1250")
-    panel.setWakeLead(panel.snapWakeLead(0))
-    compare(commandLine(findProc("config set wake_lead_ms")), launcherBin + " config set wake_lead_ms 0")
-  }
-
-  function test_set_errors_show_and_clear() {
-    panel.setPauseMedia(false)
+  function test_a_failed_save_shows_its_error_until_a_save_succeeds() {
+    var toggle = findChild(panel, "omatalkPauseMediaToggle")
+    var error = findChild(panel, "omatalkPauseMediaError")
+    toggle.clicked()
     findProc("config set pause_media").complete(1, "", "false: nope\n")
-    compare(panel.pauseMediaError, "false: nope")
-    panel.setPauseMedia(true)
+    compare(error.text, "false: nope")
+    toggle.clicked()
     findProc("config set pause_media").complete(0, "", "")
-    compare(panel.pauseMediaError, "")
+    compare(error.text, "")
 
-    panel.setWakeLead(650)
+    var slider = findChild(panel, "omatalkWakeLeadSlider")
+    error = findChild(panel, "omatalkWakeLeadError")
+    slider.released(650)
     findProc("config set wake_lead_ms").complete(1, "", "bad\n")
-    compare(panel.wakeLeadError, "bad")
-    panel.setWakeLead(700)
+    compare(error.text, "bad")
+    compare(findChild(panel, "omatalkPauseMediaError").text, "")
+    slider.released(700)
     findProc("config set wake_lead_ms").complete(0, "", "")
-    compare(panel.wakeLeadError, "")
+    compare(error.text, "")
   }
 
   function test_controls_drive_the_setters() {
@@ -144,6 +136,8 @@ TestCase {
     toggle.clicked()
     compare(commandLine(findProc("config set pause_media")), launcherBin + " config set pause_media false")
     compare(toggle.checked, false)
+    toggle.clicked()
+    compare(commandLine(findProc("config set pause_media")), launcherBin + " config set pause_media true")
 
     slider.released(1233)
     compare(commandLine(findProc("config set wake_lead_ms")), launcherBin + " config set wake_lead_ms 1250")
