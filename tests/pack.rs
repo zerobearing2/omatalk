@@ -35,10 +35,6 @@ fn checkout(tmp: &Path) -> PathBuf {
             .unwrap();
     }
     write(tree.join("Cargo.toml"), MANIFEST);
-    write(
-        tree.join("install.sh"),
-        "RELEASE_TAG=\"v0\"\nTARBALL_SHA256=\"0\"\n",
-    );
     let binary = tmp.join("target/release/omatalk");
     write(&binary, FAKE_BINARY);
     chmod(&binary, 0o700);
@@ -65,10 +61,9 @@ fn pack(tree: &Path) -> String {
 }
 
 #[test]
-fn pack_is_byte_identical_across_runs_and_leaves_install_sh() {
+fn pack_is_byte_identical_across_runs() {
     let tmp = TempDir::new("pack");
     let tree = checkout(tmp.path());
-    let before = read(tree.join("install.sh"));
 
     let first = pack(&tree);
     std::fs::File::options()
@@ -80,7 +75,6 @@ fn pack_is_byte_identical_across_runs_and_leaves_install_sh() {
     let second = pack(&tree);
 
     assert_eq!(first, second);
-    assert_eq!(read(tree.join("install.sh")), before);
 }
 
 #[test]

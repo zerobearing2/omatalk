@@ -144,17 +144,11 @@ monitor.bluez.rules = [
 
 ## Upgrade and uninstall
 
-`omatalk upgrade` installs the latest release. Upgrades never touch
-`config.toml`. `omarchy plugin update zerobearing.omatalk` updates the bar
-plugin, which releases on its own.
+`omarchy plugin update zerobearing.omatalk` updates the bar plugin, which
+releases on its own.
 
 `omatalk uninstall` removes the Daemon, its systemd unit, and the bar plugin.
-It asks before it deletes the models, your config, and the F8 binding. If the
-`omatalk` command is already gone, run:
-
-```sh
-curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
-```
+It asks before it deletes the models, your config, and the F8 binding.
 
 `omarchy plugin remove zerobearing.omatalk` removes only the megaphone. The
 Daemon, models, and config stay, and F8 still speaks.

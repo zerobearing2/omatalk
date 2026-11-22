@@ -11,8 +11,6 @@ use toml_edit::{DocumentMut, Item, Value};
 use crate::exec::Argv;
 use crate::voices::VoiceName;
 
-pub const SITE_BASE: &str = "https://omatalk.zerobearing.com";
-
 /// Resolved once per process. Every Omatalk env var is read here; the only
 /// other env read is ort's own `ORT_DYLIB_PATH`, in `speech::kokoro`.
 pub struct Paths {
@@ -23,8 +21,6 @@ pub struct Paths {
     pub config: PathBuf,
     /// `$OMATALK_MODELS`, else `~/.local/share/omatalk/models`.
     pub models: PathBuf,
-    /// `$SITE_BASE` (trailing `/` stripped), else `SITE_BASE`.
-    pub site: String,
     /// `OMATALK_TEST_FAKE_ENGINE` set: the Daemon skips model, lexicon, and
     /// dlopen, and synthesizes silence. The black-box tests' seam.
     pub fake_engine: bool,
@@ -47,9 +43,6 @@ impl Paths {
                 .unwrap_or_else(|| home.join(".config/omatalk/config.toml")),
             models: var("OMATALK_MODELS")
                 .unwrap_or_else(|| home.join(".local/share/omatalk/models")),
-            site: var("SITE_BASE")
-                .map(|v| v.to_string_lossy().trim_end_matches('/').to_owned())
-                .unwrap_or_else(|| SITE_BASE.to_owned()),
             fake_engine: var("OMATALK_TEST_FAKE_ENGINE").is_some(),
         }
     }

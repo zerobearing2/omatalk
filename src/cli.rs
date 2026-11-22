@@ -2,14 +2,12 @@
 //! errors (exit 2). Every other stderr text lives in a `Display` impl next to
 //! its type.
 
-use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::io::{IsTerminal, Read};
-use std::os::unix::ffi::OsStringExt;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
-use std::process::{Command, ExitCode, Stdio};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::process::{Command, ExitCode};
+use std::time::Duration;
 
 use clap::{CommandFactory, Parser, Subcommand};
 
@@ -75,8 +73,6 @@ pub enum Cli {
     /// Read or change settings
     #[command(subcommand, arg_required_else_help = true)]
     Config(ConfigCommand),
-    /// Install the latest release
-    Upgrade,
     /// Remove Omatalk from this machine
     Uninstall,
     /// Run the Daemon (started by omatalk.service)
@@ -159,7 +155,6 @@ pub fn run(cli: Cli, paths: &Paths) -> ExitCode {
                 Err(e) => fail(e),
             }
         }
-        Cli::Upgrade => upgrade(paths),
         Cli::Uninstall => uninstall(),
         Cli::Daemon => match crate::daemon::serve(paths) {
             Ok(never) => match never {},
@@ -283,27 +278,6 @@ fn read_stdin() -> std::io::Result<Option<String>> {
     Ok(Some(raw))
 }
 
-/// `curl $SITE_BASE/install.sh?ts=<epoch>` (HTTPS only), then exec it with
-/// the environment inherited.
-fn upgrade(paths: &Paths) -> ExitCode {
-    let epoch = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs());
-    let fetched = Command::new("curl")
-        .args(["-L", "--fail", "--silent", "--show-error"])
-        .args(["--proto", "=https", "--proto-redir", "=https", "--tlsv1.2"])
-        .arg(format!("{}/install.sh?ts={epoch}", paths.site))
-        .stderr(Stdio::inherit())
-        .output();
-    match fetched {
-        Ok(out) if out.status.success() => {
-            exec_script(OsString::from_vec(out.stdout), "omatalk upgrade")
-        }
-        Ok(out) => fail(format!("upgrade failed: curl {}", out.status)),
-        Err(e) => fail(format!("upgrade failed: curl: {e}")),
-    }
-}
-
 /// The embedded `uninstall.sh`: no dependency on files under OMATALK_HOME,
 /// which it deletes.
 fn uninstall() -> ExitCode {
@@ -313,7 +287,7 @@ fn uninstall() -> ExitCode {
 /// Replaces this process with `bash -c script`, like the site's
 /// `bash -c "$(curl ...)"`: stdin stays free for the script's prompts.
 /// Returns only if exec failed.
-fn exec_script(script: impl AsRef<OsStr>, label: &str) -> ExitCode {
+fn exec_script(script: &str, label: &str) -> ExitCode {
     let err = Command::new("bash").arg("-c").arg(script).arg(label).exec();
     fail(format!("{label} failed: bash: {err}"))
 }
@@ -529,7 +503,6 @@ mod tests {
     fn extra_or_missing_words_are_usage() {
         for words in [
             &["frob"][..],
-            &["upgrade", "now"],
             &["uninstall", "now"],
             &["status", "--follow"],
             &["version", "x"],

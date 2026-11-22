@@ -7,50 +7,11 @@ use common::{FAKES, System, TempDir, omatalk, read, run, write, write_voices_arc
 
 const FAKE_VOICES: [&str; 4] = ["af_heart", "af_bella", "am_test", "bf_other"];
 
-const SITE_BASE: &str = "https://omatalk.test";
-
-/// A fake machine whose site serves an install.sh that records
-/// `$UPGRADE_VALUE` into `$UPGRADE_MARKER`.
-fn upgrade_site() -> System {
-    let mut sys = System::new();
-    write(
-        sys.site("install.sh"),
-        "#!/bin/sh\nprintf '%s' \"$UPGRADE_VALUE\" > \"$UPGRADE_MARKER\"\n",
-    );
-    sys.set("SITE_BASE", SITE_BASE);
-    sys.set("UPGRADE_MARKER", sys.path("upgrade-marker"));
-    sys
-}
-
 #[test]
-fn upgrade_fetches_installer_over_https_without_connecting_to_daemon() {
-    let mut sys = upgrade_site();
-    sys.set("UPGRADE_VALUE", "inherited");
+fn upgrade_is_not_a_command() {
+    let sys = System::new();
 
     let result = run(omatalk(["upgrade"]).envs(sys.env()), "");
-
-    assert_eq!(result.code, 0, "{}", result.stderr);
-    assert_eq!(read(sys.path("upgrade-marker")), "inherited");
-    let downloads = sys.downloads();
-    assert_eq!(downloads.len(), 1, "{downloads:?}");
-    for flag in ["--proto =https", "--proto-redir =https", "--tlsv1.2"] {
-        assert!(
-            downloads[0].contains(flag),
-            "{flag:?} missing: {downloads:?}"
-        );
-    }
-    let url = downloads[0].rsplit_once(' ').unwrap().1;
-    assert!(
-        url.starts_with(&format!("{SITE_BASE}/install.sh?ts=")),
-        "{downloads:?}"
-    );
-}
-
-#[test]
-fn upgrade_rejects_extra_arguments() {
-    let sys = upgrade_site();
-
-    let result = run(omatalk(["upgrade", "now"]).envs(sys.env()), "");
 
     assert_eq!(result.code, 2);
     assert!(
