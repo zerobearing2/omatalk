@@ -29,8 +29,10 @@ Now `omarchy pkg add omatalk-bin && omatalk setup` is the one install, and
   checkout at that path is deleted first, and the shell restarts.
 - `omatalk setup` also migrates a curl install: it disables and deletes the
   curl-era unit, binary, and v0.5 leftovers, and keeps models, config, and
-  the F8 line. So `omarchy pkg add omatalk-bin && omatalk setup` migrates as
-  well as the shim does. The plugin ID stays
+  the F8 line. Curl users should still run the shim: it calls
+  `/usr/bin/omatalk setup` by path, while a bare `omatalk setup` can reach the
+  old `~/.local/bin/omatalk` when that comes first on PATH or is hashed, and
+  that binary has no `setup`. The plugin ID stays
   `zerobearing.omatalk`, so a saved bar placement keeps working. The plugin
   calls `/usr/bin/omatalk` only, and `scripts/build.sh` stamps the release
   version into its manifest. This supersedes ADR 0004.

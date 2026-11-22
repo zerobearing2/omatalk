@@ -17,9 +17,10 @@ and `omatalk setup` links it into `~/.config/omarchy/plugins/`, replacing a
 copy you added from the Omarchy Marketplace. If F8 is taken, it prints a
 command to paste instead. `omatalk setup` is safe to run again.
 
-Installed with the old curl command? Run it once more. It installs the package,
-removes the files the curl installer left, and keeps your models, config, and F8
-binding.
+Installed with the old curl command? Run
+`curl -fsSL https://omatalk.zerobearing.com/install.sh | bash` once more, or
+`omatalk upgrade`. Either installs the package, removes the files the curl
+installer left, and keeps your models, config, and F8 binding.
 
 ```sh
 curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
