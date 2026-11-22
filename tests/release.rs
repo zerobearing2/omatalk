@@ -153,6 +153,7 @@ impl Fixture {
             .arg(mode)
             .current_dir(&self.work)
             .env("VERSION", version)
+            .env("OMATALK_HOLD_LATEST", "0")
             .env_remove("CARGO_TARGET_DIR");
         cmd
     }
@@ -166,6 +167,7 @@ impl Fixture {
         cmd.arg(target)
             .arg(format!("VERSION={version}"))
             .current_dir(&self.work)
+            .env("OMATALK_HOLD_LATEST", "0")
             .env_remove("CARGO_TARGET_DIR");
         run(&mut cmd, "")
     }
@@ -394,6 +396,26 @@ fn stable_publishes_latest_from_the_master_the_last_rc_tested() {
 }
 
 #[test]
+fn a_held_stable_release_leaves_latest_alone() {
+    let fx = Fixture::new();
+    assert_eq!(fx.release("rc", "0.10.0").code, 0);
+
+    let mut stable = fx.script("stable", "0.10.0");
+    stable.env_remove("OMATALK_HOLD_LATEST");
+    let result = run(&mut stable, "");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert_eq!(fx.origin_tags(), ["v0.10.0", "v0.10.0-rc.1"]);
+    let creates = fx.release_creates();
+    let create = words(creates.last().unwrap());
+    assert_eq!(&create[..4], ["gh", "release", "create", "v0.10.0"]);
+    assert!(create.contains(&"--latest=false"), "{create:?}");
+    assert!(!create.contains(&"--prerelease"), "{create:?}");
+    assert_eq!(fx.latest(), "v0.9.0");
+    assert!(result.stdout.contains("held"), "{}", result.stdout);
+}
+
+#[test]
 fn a_moved_latest_fails_the_run() {
     let fx = Fixture::new();
 
@@ -516,29 +538,29 @@ fn refuses_a_version_whose_tag_exists() {
 }
 
 #[test]
-fn refuses_stable_without_an_rc() {
+fn stable_needs_no_rc() {
     let fx = Fixture::new();
-    fx.push_tag("v0.11.0-rc.1");
-    let before = fx.observe();
+    let master = fx.origin_master();
 
     let result = fx.release("stable", "0.10.0");
 
-    assert_refused(&fx, &before, &result, "no v0.10.0-rc.N tag");
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert_eq!(fx.origin_tags(), ["v0.10.0"]);
+    assert_eq!(fx.origin_git(&["rev-parse", "refs/tags/v0.10.0^"]), master);
+    assert_eq!(fx.latest(), "v0.10.0");
 }
 
 #[test]
-fn refuses_stable_when_master_moved_past_the_last_rc() {
+fn stable_releases_the_current_master_after_an_older_rc() {
     let fx = Fixture::new();
     assert_eq!(fx.release("rc", "0.10.0").code, 0);
     fx.push_commit("landed-after-rc.txt");
-    std::fs::remove_file(fx.sys.path("commands.log")).unwrap();
-    let before = fx.observe();
+    let master = fx.origin_master();
 
     let result = fx.release("stable", "0.10.0");
 
-    assert_refused(&fx, &before, &result, "cut another RC");
-    assert_eq!(fx.release("rc", "0.10.0").code, 0);
-    assert_eq!(fx.release("stable", "0.10.0").code, 0);
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert_eq!(fx.origin_git(&["rev-parse", "refs/tags/v0.10.0^"]), master);
     assert_eq!(fx.latest(), "v0.10.0");
 }
 

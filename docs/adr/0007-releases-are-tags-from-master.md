@@ -82,3 +82,10 @@ released from an old line is not offered to users on the newer one by
 it at build time and a local build must not claim to be a release. Master's
 `install.sh` pin is stale by design, and `dev-install.sh` reads the pin only
 for model file names.
+
+## Addendum: RCs are optional
+
+The RC gate is gone. `make release` tags HEAD whether or not an RC of it
+exists, because the gate forced a throwaway RC before every release, even when
+the code had already been tested another way, such as a dev package or a held
+release. Cut an RC when a change needs testing by people outside this machine.

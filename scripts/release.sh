@@ -8,13 +8,18 @@
 #
 # On release-X.Y.x, VERSION must be X.Y.z. The version change and the release
 # commit exist only in a temporary worktree. The commit is tagged, and only the
-# tag is pushed. A stable release requires that the highest RC was built from
-# this exact HEAD. install.sh is a tracked file uploaded beside the tarball.
+# tag is pushed. An RC is optional before a stable release. install.sh is a
+# tracked file uploaded beside the tarball.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO="zerobearing2/omatalk"
 TARBALL="omatalk-x86_64.tar.gz"
+# Until omatalk-bin is in OPR, no release takes releases/latest: taking it
+# deploys the site and sends every curl user's `omatalk upgrade` to the shim,
+# which needs the package. Delete this once OPR publishes, then promote with
+# `gh release edit vX.Y.Z --latest && gh workflow run pages.yml`.
+HOLD_LATEST="${OMATALK_HOLD_LATEST:-1}"
 
 cd "$ROOT"
 source scripts/lib.sh
@@ -138,14 +143,6 @@ if [ "$mode" = rc ]; then
   release_version="$version-rc.$((highest_rc + 1))"
 else
   release_version="$version"
-  if [ "$highest_rc" -eq 0 ]; then
-    die "no $base_tag-rc.N tag on origin; make rc VERSION=$version first"
-  fi
-  rc_tag="$base_tag-rc.$highest_rc"
-  rc_parent="$(git rev-parse "refs/tags/$rc_tag^")"
-  if [ "$rc_parent" != "$head" ]; then
-    die "$branch moved since $rc_tag; cut another RC: make rc VERSION=$version"
-  fi
 fi
 
 tag="v$release_version"
@@ -201,7 +198,9 @@ fi
 # release at all counts as lower than any version.
 takes_latest=0
 if [ "$mode" = stable ]; then
-  if [ -z "$latest_before" ]; then
+  if [ "$HOLD_LATEST" = 1 ]; then
+    takes_latest=0
+  elif [ -z "$latest_before" ]; then
     takes_latest=1
   elif version_gt "$version" "${latest_before#v}"; then
     takes_latest=1
@@ -246,7 +245,11 @@ elif [ "$takes_latest" -eq 1 ]; then
   channel=(--latest)
 else
   channel=(--latest=false)
-  echo "$tag is not higher than latest $latest_before; it does not take releases/latest."
+  if [ "$HOLD_LATEST" = 1 ]; then
+    echo "Releases are held until omatalk-bin is in OPR; $tag does not take releases/latest."
+  else
+    echo "$tag is not higher than latest $latest_before; it does not take releases/latest."
+  fi
 fi
 
 if ! gh release create "$tag" --repo "$REPO" --verify-tag --title "$tag" \

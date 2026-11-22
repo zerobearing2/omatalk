@@ -67,14 +67,13 @@ tag plus its GitHub Release (`docs/adr/0007-releases-are-tags-from-master.md`).
 
 ```sh
 make rc VERSION=0.10.0        # v0.10.0-rc.N, a GitHub prerelease
-make release VERSION=0.10.0   # v0.10.0; needs an RC of this exact HEAD
+make release VERSION=0.10.0   # v0.10.0; an RC first is optional
 ```
 
 Both run `scripts/release.sh`. It requires branch `master` or `release-X.Y.x`,
 `VERSION` as `x.y.z` (`X.Y.z` on a release branch), a clean tree, and HEAD equal
-to `origin/<branch>`. `make release` also requires that the highest
-`v$VERSION-rc.*` tag was built from HEAD (`tag^` equals HEAD). If the branch
-moved, cut another RC.
+to `origin/<branch>`. An RC is optional: `make release` tags HEAD whether or
+not an RC came first.
 
 The script builds in a temporary worktree. It sets the version, runs
 `cargo test --locked`, `make lint`, and `scripts/build.sh`, commits
@@ -96,6 +95,12 @@ the result. RCs never take it. A
 stable release takes it only when its version is numerically higher than the
 current latest. If the script cannot read it (anything but a 404), it refuses
 before it pushes.
+
+Until omatalk-bin is in OPR, `HOLD_LATEST` in `scripts/release.sh` holds every
+release: a stable release publishes with `--latest=false`, so the site and curl
+users' upgrades stay on v0.11.0. Once OPR publishes, promote the release with
+`gh release edit vX.Y.Z --latest && gh workflow run pages.yml`, and delete the
+switch, its test, and the `OMATALK_HOLD_LATEST=0` lines in `tests/release.rs`.
 
 The release assets are the tarball `omatalk-x86_64.tar.gz` with its `.sha256`,
 and the shim `install.sh`. The tarball holds the `omatalk` binary,
