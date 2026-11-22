@@ -246,6 +246,8 @@ impl Fake {
             "#!/venv/bin/python\n",
         );
         write(install_home.join("src/daemon/omatalkd.py"), "old daemon\n");
+        write(install_home.join("omatalk-src.tar.gz"), "old source\n");
+        write(install_home.join("omatalk-src.tar.gz.sha256"), "old sum\n");
         write(self.model(FP16), "fp16 model");
         write(self.model(VOICES), "fake voices");
         write(self.launcher(), "#!/venv/bin/python\n");

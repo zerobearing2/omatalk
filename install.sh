@@ -30,7 +30,8 @@ remove_curl_era_files() {
 
   rm -f "$HOME/.local/bin/omatalk" "$HOME/.local/bin/omatalkd"
   rm -rf "$OMATALK_HOME/venv" "$OMATALK_HOME/src"
-  rm -f "$OMATALK_HOME/models/kokoro-v1.0.fp16.onnx" "$OMATALK_HOME/omatalk-src.tar.gz"
+  rm -f "$OMATALK_HOME/models/kokoro-v1.0.fp16.onnx" "$OMATALK_HOME/omatalk-src.tar.gz" \
+    "$OMATALK_HOME/omatalk-src.tar.gz.sha256"
 }
 
 if ! command -v omarchy >/dev/null 2>&1; then
