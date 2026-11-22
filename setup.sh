@@ -287,8 +287,10 @@ step_curl_era
 step_enable
 step_start_daemon
 step_binding
-step_wait
+# The plugin goes before the wait, so a Daemon that fails to start never leaves
+# the old curl-era checkout probing a deleted binary. The widget redials.
 step_plugin
+step_wait
 step_welcome
 
 msg "Done. Select text and press F8, or run: omatalk --help"

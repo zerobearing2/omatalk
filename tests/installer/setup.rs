@@ -105,8 +105,9 @@ fn bad_model_download_fails_before_the_unit_is_touched() {
 }
 
 #[test]
-fn setup_fails_if_daemon_never_becomes_ready() {
+fn setup_fails_if_daemon_never_becomes_ready_but_still_links_the_plugin() {
     let mut fake = Fake::new();
+    fake.seed_checkout_plugin();
     fake.set("FAKE_DAEMON_DOWN", "1");
 
     let result = fake.setup("");
@@ -117,8 +118,10 @@ fn setup_fails_if_daemon_never_becomes_ready() {
         "{}",
         result.stdout
     );
-    assert!(!fake.logged("omarchy plugin"));
-    assert!(!fake.plugin_dir().exists());
+    assert_eq!(
+        std::fs::read_link(fake.plugin_dir()).unwrap(),
+        fake.plugin_source()
+    );
 }
 
 #[test]
