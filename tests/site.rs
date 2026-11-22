@@ -216,20 +216,43 @@ fn install_commands_match_readme_and_cname() {
     assert!(public("install.sh").is_file());
 }
 
-/// Old docs said `curl -fsSL https://<host>/uninstall.sh | bash`; without this
-/// stub that pipe would fetch a 404 page and fail silently.
+/// Old docs said `curl -fsSL https://<host>/uninstall.sh | bash`. On a
+/// package install that pipe names the package drop and removes nothing.
 #[test]
-fn site_uninstall_script_points_at_the_package_drop_and_fails() {
-    let script = read(public("uninstall.sh"));
+fn site_uninstall_script_sends_a_package_install_to_the_drop() {
+    let sys = System::new();
 
-    let result = run(
-        std::process::Command::new("bash").arg("-c").arg(&script),
-        "",
-    );
+    let result = run(sys.command("bash").arg(public("uninstall.sh")), "");
 
     assert_eq!(result.code, 1);
     assert_eq!(result.stdout, "");
     assert_eq!(result.stderr, "Run: omarchy pkg drop omatalk-bin\n");
+    assert_eq!(sys.downloads(), Vec::<String>::new());
+}
+
+/// A curl install has no package to drop, so the pipe runs the last curl-era
+/// uninstaller. `releases/latest` no longer carries one.
+#[test]
+fn site_uninstall_script_runs_the_curl_era_uninstaller_without_the_package() {
+    let sys = System::new();
+    let pinned = "zerobearing2/omatalk/releases/download/v0.11.0/uninstall.sh";
+    write(sys.site(pinned), "echo ran v0.11.0 uninstall.sh\n");
+
+    let result = run(
+        sys.command("bash")
+            .arg(public("uninstall.sh"))
+            .env("FAKE_PKG_ABSENT", "omatalk-bin"),
+        "",
+    );
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert_eq!(result.stdout, "ran v0.11.0 uninstall.sh\n");
+    let downloads = sys.downloads();
+    assert_eq!(downloads.len(), 1, "{downloads:?}");
+    assert!(
+        downloads[0].ends_with(&format!(" https://github.com/{pinned}")),
+        "{downloads:?}"
+    );
 }
 
 #[test]
