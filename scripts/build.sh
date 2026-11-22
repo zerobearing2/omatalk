@@ -12,7 +12,8 @@ if [ "${1:-}" = "--pack-only" ]; then
   pack_only=1
 fi
 
-tag="v$(cargo_version Cargo.toml)"
+version="$(cargo_version Cargo.toml)"
+tag="v$version"
 
 if [ "$pack_only" -eq 0 ]; then
   cargo build --release --locked
@@ -23,6 +24,10 @@ if [ ! -f "$release_dir/omatalk" ]; then
   echo "missing $release_dir/omatalk (run cargo build --release --locked)" >&2
   exit 1
 fi
+
+stage="$(mktemp -d)"
+trap 'rm -rf "$stage"' EXIT
+stage_plugin "$ROOT" "$stage/omarchy-plugin" "$version"
 
 tar --sort=name \
   --mtime=@0 \
@@ -35,6 +40,7 @@ tar --sort=name \
   -C "$release_dir" omatalk \
   -C "$ROOT/systemd" omatalk.service \
   -C "$ROOT" LICENSE \
+  -C "$stage" omarchy-plugin \
   | gzip -n > "$TARBALL"
 
 sha256sum "$TARBALL" > "$TARBALL.sha256"

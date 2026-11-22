@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, UNIX_EPOCH};
 
-use common::{TempDir, chmod, read, read_tar_gz, repo, run, sha256, write};
+use common::{TempDir, chmod, copy_plugin, read, read_tar_gz, repo, run, sha256, write};
 
 const TARBALL: &str = "omatalk-x86_64.tar.gz";
 const FAKE_BINARY: &[u8] = b"\x7fELF fake omatalk binary";
@@ -34,6 +34,7 @@ fn checkout(tmp: &Path) -> PathBuf {
             .set_modified(modified)
             .unwrap();
     }
+    copy_plugin(&tree);
     write(tree.join("Cargo.toml"), MANIFEST);
     let binary = tmp.join("target/release/omatalk");
     write(&binary, FAKE_BINARY);
@@ -77,27 +78,37 @@ fn pack_is_byte_identical_across_runs() {
     assert_eq!(first, second);
 }
 
+const PLUGIN: &str = "omatalk/omarchy-plugin/zerobearing.omatalk";
+
 #[test]
-fn tarball_holds_the_binary_the_unit_and_the_license() {
+fn tarball_holds_the_binary_the_unit_the_license_and_the_plugin() {
     let tmp = TempDir::new("pack");
     let tree = checkout(tmp.path());
     pack(&tree);
 
     let members = read_tar_gz(tree.join(TARBALL));
-    let mut names: Vec<&str> = members.iter().map(|m| m.name.as_str()).collect();
+    let mut names: Vec<&str> = members
+        .iter()
+        .filter(|m| m.kind != b'5')
+        .map(|m| m.name.as_str())
+        .collect();
     names.sort();
     assert_eq!(
         names,
         [
             "omatalk/LICENSE",
+            "omatalk/omarchy-plugin/zerobearing.omatalk/BarWidget.qml",
+            "omatalk/omarchy-plugin/zerobearing.omatalk/LICENSE",
+            "omatalk/omarchy-plugin/zerobearing.omatalk/Panel.qml",
+            "omatalk/omarchy-plugin/zerobearing.omatalk/manifest.json",
             "omatalk/omatalk",
-            "omatalk/omatalk.service"
+            "omatalk/omatalk.service",
         ]
     );
     for member in &members {
         assert!(
-            member.kind == b'0' || member.kind == 0,
-            "{} is not a file",
+            member.kind == b'0' || member.kind == 0 || member.kind == b'5',
+            "{} is not a file or a directory",
             member.name
         );
         assert_eq!(
@@ -106,6 +117,9 @@ fn tarball_holds_the_binary_the_unit_and_the_license() {
             "{}",
             member.name
         );
+        if member.kind == b'5' {
+            assert_eq!(member.mode, 0o755, "{}", member.name);
+        }
     }
     let member = |name: &str| members.iter().find(|m| m.name == name).unwrap();
     assert_eq!(member("omatalk/omatalk").mode, 0o755);
@@ -114,6 +128,37 @@ fn tarball_holds_the_binary_the_unit_and_the_license() {
     assert_eq!(
         member("omatalk/omatalk.service").data,
         std::fs::read(repo("systemd/omatalk.service")).unwrap()
+    );
+    for file in ["BarWidget.qml", "Panel.qml", "LICENSE"] {
+        let packed = member(&format!("{PLUGIN}/{file}"));
+        assert_eq!(packed.mode, 0o644, "{file}");
+        assert_eq!(
+            packed.data,
+            std::fs::read(repo(&format!("plugin/zerobearing.omatalk/{file}"))).unwrap(),
+            "{file}"
+        );
+    }
+}
+
+#[test]
+fn packed_plugin_manifest_carries_the_release_version_and_nothing_else_changes() {
+    let tmp = TempDir::new("pack");
+    let tree = checkout(tmp.path());
+    pack(&tree);
+
+    let members = read_tar_gz(tree.join(TARBALL));
+    let manifest = members
+        .iter()
+        .find(|m| m.name == format!("{PLUGIN}/manifest.json"))
+        .unwrap();
+    let packed = String::from_utf8(manifest.data.clone()).unwrap();
+    let source = read(repo("plugin/zerobearing.omatalk/manifest.json"));
+
+    assert!(source.contains("\"version\": \"0.0.0-dev\""), "{source}");
+    assert!(packed.contains("\"version\": \"9.8.7\""), "{packed}");
+    assert_eq!(
+        packed,
+        source.replace("\"version\": \"0.0.0-dev\"", "\"version\": \"9.8.7\"")
     );
 }
 

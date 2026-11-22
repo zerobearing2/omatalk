@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
@@ -7,7 +6,7 @@ import qs.Ui
 // Voice + speed config panel once the Daemon launcher exists. Until then
 // this is a setup screen that links to the site's install instructions; the
 // plugin itself never downloads or runs an installer. Config CLI processes
-// stay stopped while ~/.local/bin/omatalk is missing.
+// stay stopped while /usr/bin/omatalk is missing.
 Panel {
   id: root
   moduleName: "zerobearing.omatalk"
@@ -19,19 +18,7 @@ Panel {
 
   readonly property var englishPrefixes: ["af_", "am_", "bf_", "bm_"]
   readonly property bool showingSetup: !daemonInstalled
-  property string launcherPath: {
-    var home = root.envText("HOME")
-    if (home !== "") return home + "/.local/bin/omatalk"
-    return ""
-  }
-
-  // Quickshell.env returns null when unset; String(null) is "null", which
-  // would make launcherPath unusable.
-  function envText(name) {
-    var v = Quickshell.env(name)
-    if (v === null || v === undefined) return ""
-    return String(v)
-  }
+  readonly property string launcherPath: "/usr/bin/omatalk"
 
   // PanelSlider only snaps `step` for wheel nudges — dragging reports
   // continuous precision, snapping is the caller's job per its own docs —
@@ -44,12 +31,7 @@ Panel {
   property string voiceError: ""
   property string speedError: ""
   property string daemonVersion: "unknown"
-  property string pluginVersion: "unknown"
-  readonly property string versionsLabel: {
-    var line = "plugin " + pluginVersion
-    if (root.daemonInstalled) line += " · omatalk " + daemonVersion
-    return line
-  }
+  readonly property string versionLabel: "omatalk " + daemonVersion
 
   function matchedPrefix(name) {
     for (var i = 0; i < englishPrefixes.length; i++) {
@@ -73,20 +55,13 @@ Panel {
     return "Hi, I'm " + stripped + ". This is what I sound like."
   }
 
-  // manifest.json lives in the plugin root (store clone or this checkout).
-  function pluginFile(name) {
-    var url = String(Qt.resolvedUrl(name))
-    if (url.indexOf("file://") === 0) return url.slice(7)
-    return url
-  }
-
   function openInstallPage() {
     openProc.command = ["xdg-open", root.installUrl]
     openProc.running = true
   }
 
   function refresh() {
-    if (!root.daemonInstalled || root.launcherPath === "") return
+    if (!root.daemonInstalled) return
     var bin = root.launcherPath
     voicesProc.command = [bin, "config", "voices", "--json"]
     getProc.command = [bin, "config", "get", "--json"]
@@ -180,22 +155,6 @@ Panel {
   }
 
   Process { id: openProc }
-
-  // Plugin version is this checkout's manifest.json, not `omatalk version`.
-  FileView {
-    id: manifestFile
-    path: root.pluginFile("manifest.json")
-    printErrors: false
-    onLoaded: {
-      try {
-        var parsed = JSON.parse(text())
-        if (parsed.version) root.pluginVersion = String(parsed.version)
-      } catch (e) {
-        root.pluginVersion = "unknown"
-      }
-    }
-    onLoadFailed: root.pluginVersion = "unknown"
-  }
 
   Process {
     id: versionProc
@@ -354,8 +313,9 @@ Panel {
         }
 
         Text {
-          objectName: "omatalkVersions"
-          text: root.versionsLabel
+          objectName: "omatalkVersion"
+          visible: root.daemonInstalled
+          text: root.versionLabel
           color: Qt.darker(Color.popups.text, 1.6)
           font.family: Style.font.family
           font.pixelSize: Style.font.caption

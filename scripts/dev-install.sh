@@ -59,6 +59,8 @@ trap 'rm -rf "$work"' EXIT
 cp packaging/dev/* "$work/"
 cp "${CARGO_TARGET_DIR:-$ROOT/target}/release/omatalk" "$work/omatalk"
 cp systemd/omatalk.service LICENSE "$work/"
+stage_plugin "$ROOT" "$work/stage" "$pkgver"
+tar -cf "$work/omarchy-plugin.tar" -C "$work/stage" "$PLUGIN_ID"
 
 cd "$work"
 OMATALK_PKGVER="$pkgver" PKGDEST="$work/out" makepkg --noprogressbar

@@ -36,3 +36,43 @@ installer_pin() {
   echo "$script has no $name= pin" >&2
   return 1
 }
+
+PLUGIN_ID="zerobearing.omatalk"
+PLUGIN_FILES=(manifest.json BarWidget.qml Panel.qml LICENSE)
+
+# Copy the runtime files of the plugin tree (no tests, no README) from
+# <root>/plugin/$PLUGIN_ID into <dest>/$PLUGIN_ID, with the manifest's version
+# set to the given one.
+stage_plugin() {
+  local root="$1"
+  local dest="$2"
+  local version="$3"
+  local source="$root/plugin/$PLUGIN_ID"
+  local target="$dest/$PLUGIN_ID"
+  local version_line='^( *"version": ")[^"]*(",?)$'
+  local file
+  local line
+  local stamped=0
+
+  mkdir -p "$target"
+  for file in "${PLUGIN_FILES[@]}"; do
+    if [ ! -f "$source/$file" ]; then
+      echo "missing plugin file $source/$file" >&2
+      return 1
+    fi
+    cp "$source/$file" "$target/$file"
+  done
+
+  : > "$target/manifest.json"
+  while IFS= read -r line; do
+    if [[ "$line" =~ $version_line ]]; then
+      line="${BASH_REMATCH[1]}$version${BASH_REMATCH[2]}"
+      stamped=1
+    fi
+    printf '%s\n' "$line" >> "$target/manifest.json"
+  done < "$source/manifest.json"
+  if [ "$stamped" -ne 1 ]; then
+    echo "no version line in $source/manifest.json" >&2
+    return 1
+  fi
+}

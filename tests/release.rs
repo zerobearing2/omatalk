@@ -6,7 +6,7 @@ mod common;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use common::{Run, System, chmod, names, read, repo, run, write};
+use common::{Run, System, chmod, copy_plugin, names, read, repo, run, write};
 
 const MANIFEST: &str = "[dependencies.early]\nversion = \"1.0.0\"\n\n\
                         [package]\nname = \"omatalk\"\nversion = \"0.9.0\"\n\n\
@@ -60,6 +60,7 @@ impl Fixture {
         ] {
             write(fx.work.join(name), std::fs::read(repo(name)).unwrap());
         }
+        copy_plugin(&fx.work);
         chmod(fx.work.join("scripts/release.sh"), 0o755);
         chmod(fx.work.join("scripts/build.sh"), 0o755);
         write(fx.work.join("Cargo.toml"), MANIFEST);

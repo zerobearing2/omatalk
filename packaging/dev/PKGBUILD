@@ -23,11 +23,12 @@ options=('!strip' '!debug')
 source=('omatalk'
         'omatalk.service'
         'LICENSE'
+        'omarchy-plugin.tar'
         'package-remove'
         'package-restart'
         'remove-user-services.hook'
         'restart-user-services.hook')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     install -Dm755 "${srcdir}/omatalk" "${pkgdir}/usr/bin/omatalk"
@@ -35,6 +36,16 @@ package() {
         "${pkgdir}/usr/lib/systemd/user/omatalk.service"
     install -Dm644 "${srcdir}/LICENSE" \
         "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+
+    # makepkg extracts omarchy-plugin.tar into srcdir. scripts/dev-install.sh
+    # stages it with the manifest version set to this pkgver; the check catches
+    # a PKGBUILD built without that step.
+    grep -q "\"version\": \"${pkgver}\"" "${srcdir}/zerobearing.omatalk/manifest.json"
+    install -d "${pkgdir}/usr/share/omatalk/omarchy-plugin"
+    cp -rL --no-preserve=mode "${srcdir}/zerobearing.omatalk" \
+        "${pkgdir}/usr/share/omatalk/omarchy-plugin/zerobearing.omatalk"
+    find "${pkgdir}/usr/share/omatalk" -type d -exec chmod 755 {} +
+    find "${pkgdir}/usr/share/omatalk" -type f -exec chmod 644 {} +
 
     install -Dm755 "${srcdir}/package-remove" "${pkgdir}/usr/lib/omatalk/package-remove"
     install -Dm755 "${srcdir}/package-restart" "${pkgdir}/usr/lib/omatalk/package-restart"

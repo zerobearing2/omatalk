@@ -15,15 +15,11 @@ BarWidget {
   property bool daemonInstalled: false
   readonly property string socketOverride: root.envText("OMATALK_SOCKET")
   readonly property string runtimeDir: root.envText("XDG_RUNTIME_DIR")
-  readonly property string homeDir: root.envText("HOME")
   readonly property bool speaking: daemonState === "speaking"
   readonly property bool daemonUnavailable: daemonInstalled && (
     daemonState === "error" || (connectionLost && !reconnectGrace.running)
   )
-  readonly property string launcherPath: {
-    if (homeDir !== "") return homeDir + "/.local/bin/omatalk"
-    return ""
-  }
+  readonly property string launcherPath: "/usr/bin/omatalk"
   readonly property string socketPath: {
     if (socketOverride !== "") return socketOverride
     if (runtimeDir !== "") return runtimeDir + "/omatalk/omatalk.sock"
@@ -58,7 +54,6 @@ BarWidget {
     if ("anchorItem" in target) target.anchorItem = button
     if ("daemonUnavailable" in target) target.daemonUnavailable = root.daemonUnavailable
     if ("daemonInstalled" in target) target.daemonInstalled = root.daemonInstalled
-    if ("launcherPath" in target && root.launcherPath !== "") target.launcherPath = root.launcherPath
   }
 
   function togglePanel() {
@@ -83,7 +78,6 @@ BarWidget {
   onDaemonInstalledChanged: injectPanel()
 
   function probeLauncher() {
-    if (root.launcherPath === "") return
     launcherProbe.command = ["test", "-f", root.launcherPath]
     launcherProbe.running = true
   }

@@ -11,8 +11,8 @@ for f in manifest.json BarWidget.qml Panel.qml README.md LICENSE preview.png; do
   fi
 done
 
-# The plugin never downloads or runs the Daemon installer; setup is the
-# site's install page the panel links to.
+# The plugin never downloads or runs the Daemon installer; setup is the site's
+# install page the panel links to.
 for f in install.sh uninstall.sh; do
   if [[ -e $f ]]; then
     echo "$f must not live in the plugin tree" >&2
@@ -20,39 +20,24 @@ for f in install.sh uninstall.sh; do
   fi
 done
 
-for f in AGENTS.md CONTEXT.md CLAUDE.md; do
-  if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
-    echo "workspace-only file must not be tracked: $f" >&2
-    exit 1
-  fi
-done
-if git ls-files | grep -E '^(docs/agents/|\.grok/)'; then
-  echo "workspace-only paths must not be in the plugin git tree" >&2
-  exit 1
-fi
-
-link=$(find . -name .git -prune -o -type l -print -quit)
+link=$(find . -type l -print -quit)
 if [[ -n $link ]]; then
   echo "symlinks are not allowed in the plugin tree: $link" >&2
   exit 1
 fi
 
-if ! grep -q 'omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable' README.md; then
-  echo "README must document the store add command" >&2
+id=$(jq -r '.id' manifest.json)
+if [[ $id != zerobearing.omatalk ]]; then
+  echo "manifest id must stay zerobearing.omatalk" >&2
   exit 1
 fi
 
-id=$(jq -r '.id' manifest.json)
-[[ $id == zerobearing.omatalk ]] || {
-  echo "manifest id must stay zerobearing.omatalk" >&2
-  exit 1
-}
-
+# scripts/build.sh stamps the release version into the packaged copy.
 ver=$(jq -r '.version' manifest.json)
-[[ $ver =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-  echo "manifest version must be semver x.y.z, got: $ver" >&2
+if [[ $ver != 0.0.0-dev ]]; then
+  echo "manifest version in the tree must stay 0.0.0-dev, got: $ver" >&2
   exit 1
-}
+fi
 
 if ! grep -q 'https://github.com/zerobearing2/omatalk' README.md; then
   echo "README must point at the Daemon repository" >&2
