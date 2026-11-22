@@ -85,6 +85,19 @@ to be a release. Nothing is pinned in a release commit: the tarball is the
 source of the `omatalk-bin` recipe in omacom/omarchy-pkgs, whose `pkgver` and
 tarball checksum change per release.
 
+A version bump needs no PR to omarchy-pkgs. OPR's `sync-upstream.yml` reads
+the recipe's GitHub Releases watch every 6 hours. When it sees a stable tag
+newer than `pkgver`, it opens `auto/sync-upstream-omatalk-bin`, which merges
+and publishes itself once its build is green. So `make release` reaches
+Omarchy users within hours, with no review. The watch skips prereleases, so
+an RC ships nothing.
+
+A packaging change does need a PR to omarchy-pkgs: edit
+`pkgbuilds/omatalk-bin/` and bump `pkgrel`, or make the edit in the next
+version's sync PR. That covers the hooks and their scripts, `depends`, and
+the PKGBUILD itself. The copies in `packaging/dev/` never reach OPR on their
+own.
+
 To test an RC, point a local `omatalk-bin` recipe at the RC's tarball, build it
 with `makepkg`, and install it with `sudo pacman -U`. `scripts/dev-install.sh`
 does the same for this checkout.
