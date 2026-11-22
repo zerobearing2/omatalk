@@ -79,7 +79,6 @@ fn uninstall_runs_the_embedded_uninstaller() {
     let result = run(omatalk(["uninstall"]).envs(sys.env()), "y\n");
 
     assert_eq!(result.code, 0, "{}", result.stderr);
-    assert!(sys.logged("systemctl --user disable --now omatalk.service"));
     assert!(!sys.home(".local/bin/omatalk").exists());
     assert!(!sys.install_home().exists());
     assert_eq!(common::names(sys.path("tmp")), Vec::<String>::new());

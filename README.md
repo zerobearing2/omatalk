@@ -153,10 +153,10 @@ monitor.bluez.rules = [
 binary. The bar plugin updates with the package, so it always matches the
 Daemon. Upgrades never touch `config.toml`.
 
-`omatalk uninstall` removes the Daemon's service, the bar plugin link, and any files
-the curl installer left. It asks before it deletes the models, your config, and
-the F8 binding, then runs `omarchy pkg drop omatalk-bin`. That drop alone
-removes the package and stops the service, and keeps your models and config.
+`omatalk uninstall` removes any files the curl installer left. It asks before
+it deletes the models, your config, and the F8 binding, then runs
+`omarchy pkg drop omatalk-bin`. That drop stops and disables the service and
+removes the bar plugin link, and alone it keeps your models and config.
 
 `omarchy plugin disable zerobearing.omatalk` hides only the megaphone. The
 Daemon, models, and config stay, and F8 still speaks. `omatalk setup` leaves a

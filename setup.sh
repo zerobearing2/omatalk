@@ -235,9 +235,15 @@ step_plugin() {
     return
   fi
 
-  local replaced=false
-  if [ -e "$PLUGIN_DIR" ] || [ -L "$PLUGIN_DIR" ]; then
-    replaced=true
+  local replaced=true
+  if [ -L "$PLUGIN_DIR" ]; then
+    warn "Replacing the link $PLUGIN_DIR -> $(readlink "$PLUGIN_DIR")"
+  elif [ -d "$PLUGIN_DIR/.git" ]; then
+    warn "Replacing the git checkout at $PLUGIN_DIR"
+  elif [ -e "$PLUGIN_DIR" ]; then
+    warn "Replacing $PLUGIN_DIR"
+  else
+    replaced=false
   fi
 
   msg "Linking the Omarchy bar plugin"

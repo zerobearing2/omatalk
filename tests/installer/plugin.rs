@@ -37,6 +37,7 @@ fn setup_twice_leaves_the_plugin_link_alone() {
     let second = fake.setup("");
 
     assert_eq!(second.code, 0, "{}", second.stderr);
+    assert!(!second.stdout.contains("Replacing"), "{}", second.stdout);
     assert!(is_link_to(&fake.plugin_dir(), &fake.plugin_source()));
     let added: Vec<String> = fake.commands()[before.len()..]
         .iter()
@@ -57,6 +58,14 @@ fn a_curl_era_checkout_is_replaced_by_the_link() {
     assert!(is_link_to(&fake.plugin_dir(), &fake.plugin_source()));
     assert!(!fake.plugin_source().join("old.txt").exists());
     assert!(!fake.plugin_dir().join("old.txt").exists());
+    assert!(
+        result.stdout.contains(&format!(
+            "Replacing the git checkout at {}",
+            fake.plugin_dir().display()
+        )),
+        "{}",
+        result.stdout
+    );
     let enable = fake.last_index(ENABLE_CMD);
     let restart = fake.last_index("omarchy restart shell");
     assert!(enable < restart, "{:?}", fake.commands());
@@ -90,6 +99,15 @@ fn a_link_to_another_directory_is_repointed_and_its_target_kept() {
     assert_eq!(result.code, 0, "{}", result.stderr);
     assert!(is_link_to(&fake.plugin_dir(), &fake.plugin_source()));
     assert_eq!(read(clone.join("manifest.json")), "{}\n");
+    assert!(
+        result.stdout.contains(&format!(
+            "Replacing the link {} -> {}",
+            fake.plugin_dir().display(),
+            clone.display()
+        )),
+        "{}",
+        result.stdout
+    );
     assert!(fake.logged("omarchy restart shell"));
 }
 
