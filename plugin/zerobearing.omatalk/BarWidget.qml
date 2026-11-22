@@ -14,6 +14,7 @@ BarWidget {
   property bool connectionLost: false
   readonly property string socketOverride: root.envText("OMATALK_SOCKET")
   readonly property string runtimeDir: root.envText("XDG_RUNTIME_DIR")
+  readonly property string glyph: "󰃦"
   readonly property bool speaking: daemonState === "speaking"
   readonly property bool daemonUnavailable: daemonState === "error"
     || (connectionLost && !reconnectGrace.running)
@@ -50,6 +51,8 @@ BarWidget {
     if ("bar" in target) target.bar = root.bar
     if ("anchorItem" in target) target.anchorItem = button
     if ("daemonUnavailable" in target) target.daemonUnavailable = root.daemonUnavailable
+    if ("daemonState" in target) target.daemonState = root.daemonState
+    if ("glyph" in target) target.glyph = root.glyph
   }
 
   function togglePanel() {
@@ -69,6 +72,7 @@ BarWidget {
 
   onBarChanged: injectPanel()
   onDaemonUnavailableChanged: injectPanel()
+  onDaemonStateChanged: injectPanel()
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -92,7 +96,7 @@ BarWidget {
     useActiveColor: true
     tooltipText: root.daemonUnavailable ? "Omatalk is unavailable"
       : (root.speaking ? "Omatalk is speaking" : "Omatalk")
-    text: "󰃦"
+    text: root.glyph
 
     onPressed: function(b) { if (b === Qt.LeftButton) root.togglePanel() }
   }

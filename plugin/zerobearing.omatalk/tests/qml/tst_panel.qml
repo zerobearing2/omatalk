@@ -36,6 +36,8 @@ TestCase {
     return null
   }
 
+  function hero() { return findChild(panel, "omatalkHero") }
+
   function test_sample_and_snap() {
     compare(panel.sampleTextFor("af_bella"), "Hi, I'm bella. This is what I sound like.")
     compare(panel.snapSpeed(1.73), 1.7)
@@ -60,7 +62,7 @@ TestCase {
     compare(panel.voice, "af_heart")
     compare(panel.speed, 1.25)
     compare(panel.daemonVersion, "0.2.1-test")
-    compare(panel.versionLabel, "omatalk 0.2.1-test")
+    compare(hero().detail, "0.2.1-test")
   }
 
   function test_refresh_fills_media_pause_and_wake_lead() {
@@ -84,7 +86,7 @@ TestCase {
     panel.refresh()
     findProc("omatalk version").complete(1, "", "nope")
     compare(panel.daemonVersion, "unknown")
-    compare(panel.versionLabel, "omatalk unknown")
+    compare(hero().detail, "unknown")
   }
 
   function test_set_voice_saves_and_previews() {
@@ -160,6 +162,54 @@ TestCase {
       0, '{"voice":"af_heart","speed":1.0,"pause_media":true,"wake_lead_ms":650}', "")
     compare(findChild(panel, "omatalkPauseMediaToggle").checked, true)
     compare(findChild(panel, "omatalkWakeLeadLabel").text, "650 ms")
+  }
+
+  function test_hero_icon_is_the_injected_glyph() {
+    panel.glyph = "G"
+    compare(hero().iconItem.text, "G")
+  }
+
+  function test_status_line_follows_the_daemon_state() {
+    compare(panel.statusLine, "Local text-to-speech · F8 reads your selection")
+    compare(hero().meta, panel.statusLine)
+
+    panel.daemonState = "speaking"
+    compare(hero().meta, "Speaking…")
+
+    panel.daemonUnavailable = true
+    compare(hero().meta, "Daemon not running")
+
+    panel.daemonState = "idle"
+    compare(hero().meta, "Daemon not running")
+
+    panel.daemonUnavailable = false
+    compare(hero().meta, "Local text-to-speech · F8 reads your selection")
+  }
+
+  function test_help_lines_sit_under_their_controls() {
+    compare(
+      findChild(panel, "omatalkPauseMediaToggle").description,
+      "Spotify, browsers and video pause, then resume when omatalk finishes.")
+    compare(
+      findChild(panel, "omatalkWakeLeadHelp").text,
+      "Silence before speech so headphones don't clip the first word.")
+  }
+
+  function test_preview_button_speaks_the_selected_voice_without_saving() {
+    var button = findChild(panel, "omatalkPreviewButton")
+    verify(button !== null)
+    compare(button.enabled, false)
+
+    panel.voice = "bf_emma"
+    compare(button.enabled, true)
+    button.clicked()
+    var speak = findProc("speak --voice")
+    verify(speak.running)
+    compare(
+      commandLine(speak),
+      launcherBin + " speak --voice bf_emma Hi, I'm emma. This is what I sound like."
+    )
+    compare(findProc("config set voice"), null)
   }
 
   function test_open_refreshes() {

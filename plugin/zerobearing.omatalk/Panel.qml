@@ -9,6 +9,8 @@ Panel {
 
   property var anchorItem: null
   property bool daemonUnavailable: false
+  property string daemonState: "idle"
+  property string glyph: ""
 
   readonly property var englishPrefixes: ["af_", "am_", "bf_", "bm_"]
   readonly property string launcherPath: "/usr/bin/omatalk"
@@ -36,7 +38,12 @@ Panel {
   property string pauseMediaError: ""
   property string wakeLeadError: ""
   property string daemonVersion: "unknown"
-  readonly property string versionLabel: "omatalk " + daemonVersion
+
+  readonly property string statusLine: {
+    if (daemonUnavailable) return "Daemon not running"
+    if (daemonState === "speaking") return "Speaking…"
+    return "Local text-to-speech · F8 reads your selection"
+  }
 
   function matchedPrefix(name) {
     for (var i = 0; i < englishPrefixes.length; i++) {
@@ -76,10 +83,14 @@ Panel {
     root.voice = value
     setVoiceProc.command = [root.launcherPath, "config", "set", "voice", value]
     setVoiceProc.running = true
-    // Not sequenced after setVoiceProc: the preview never touches
-    // config.toml or waits on the Daemon's reload, so there is nothing to
-    // wait for — it fires in parallel with the save.
-    previewProc.command = [root.launcherPath, "speak", "--voice", value, root.sampleTextFor(value)]
+    root.previewVoice(value)
+  }
+
+  // Not sequenced after setVoiceProc: the preview never touches
+  // config.toml or waits on the Daemon's reload, so there is nothing to
+  // wait for — it fires in parallel with the save.
+  function previewVoice(name) {
+    previewProc.command = [root.launcherPath, "speak", "--voice", name, root.sampleTextFor(name)]
     previewProc.running = true
   }
 
@@ -223,31 +234,60 @@ Panel {
         width: parent.width
         spacing: Style.space(14)
 
-        Text {
-          text: "Omatalk"
-          color: Color.popups.text
-          font.family: Style.font.family
-          font.pixelSize: Style.font.display
-          font.bold: true
+        PanelHero {
+          objectName: "omatalkHero"
+          width: parent.width
+          title: "Omatalk"
+          meta: root.statusLine
+          detail: root.daemonVersion
+          foreground: Color.popups.text
+          fontFamily: Style.font.family
+
+          iconComponent: Component {
+            Text {
+              text: root.glyph
+              color: Color.popups.text
+              font.family: Style.font.family
+              font.pixelSize: Style.font.display
+            }
+          }
         }
+
+        PanelSeparator {}
 
         Column {
           width: parent.width
           spacing: Style.space(14)
 
-          PanelSeparator {}
-
           PanelSectionHeader { text: "VOICE" }
 
-          SearchableDropdown {
-            id: voiceDropdown
-            objectName: "omatalkVoiceDropdown"
+          Row {
             width: parent.width
-            options: root.voiceOptions
-            placeholderText: "Search voices…"
-            onChanged: function(v) { root.setVoice(v) }
+            spacing: Style.space(8)
 
-            Binding on value { value: root.voice }
+            SearchableDropdown {
+              id: voiceDropdown
+              objectName: "omatalkVoiceDropdown"
+              width: parent.width - previewButton.width - parent.spacing
+              options: root.voiceOptions
+              placeholderText: "Search voices…"
+              onChanged: function(v) { root.setVoice(v) }
+
+              Binding on value { value: root.voice }
+            }
+
+            PanelActionButton {
+              id: previewButton
+              objectName: "omatalkPreviewButton"
+              anchors.verticalCenter: parent.verticalCenter
+              iconText: "󰐊"
+              tooltipText: "Preview voice"
+              foreground: Color.popups.text
+              fontFamily: Style.font.family
+              bordered: true
+              enabled: root.voice !== ""
+              onClicked: root.previewVoice(root.voice)
+            }
           }
 
           Text {
@@ -300,10 +340,15 @@ Panel {
             font.pixelSize: Style.font.bodySmall
           }
 
+          PanelSeparator {}
+
+          PanelSectionHeader { text: "PLAYBACK" }
+
           Toggle {
             objectName: "omatalkPauseMediaToggle"
             width: parent.width
             label: "Pause media while speaking"
+            description: "Spotify, browsers and video pause, then resume when omatalk finishes."
             foreground: Color.popups.text
             fontFamily: Style.font.family
             checked: root.pauseMedia
@@ -320,7 +365,14 @@ Panel {
             font.pixelSize: Style.font.bodySmall
           }
 
-          PanelSectionHeader { text: "BLUETOOTH AND HDMI WAKE" }
+          Text {
+            width: parent.width
+            text: "Bluetooth and HDMI wake"
+            color: Color.popups.text
+            font.family: Style.font.family
+            font.pixelSize: Style.font.subtitle
+            font.bold: true
+          }
 
           Row {
             width: parent.width
@@ -352,6 +404,16 @@ Panel {
           }
 
           Text {
+            objectName: "omatalkWakeLeadHelp"
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: "Silence before speech so headphones don't clip the first word."
+            color: Qt.darker(Color.popups.text, 1.5)
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+          }
+
+          Text {
             visible: root.wakeLeadError !== ""
             width: parent.width
             wrapMode: Text.WordWrap
@@ -371,14 +433,6 @@ Panel {
             font.pixelSize: Style.font.bodySmall
             font.italic: true
           }
-        }
-
-        Text {
-          objectName: "omatalkVersion"
-          text: root.versionLabel
-          color: Qt.darker(Color.popups.text, 1.6)
-          font.family: Style.font.family
-          font.pixelSize: Style.font.caption
         }
       }
     }

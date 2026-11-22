@@ -6,6 +6,8 @@ QtObject {
   readonly property QtObject font: QtObject {
     property string family: "sans"
     property int display: 16
+    property int title: 14
+    property int subtitle: 13
     property int body: 12
     property int bodySmall: 10
     property int caption: 9

@@ -10,3 +10,5 @@ PanelSlider 1.0 PanelSlider.qml
 Toggle 1.0 Toggle.qml
 BarWidget 1.0 BarWidget.qml
 BarIconButton 1.0 BarIconButton.qml
+PanelHero 1.0 PanelHero.qml
+PanelActionButton 1.0 PanelActionButton.qml
