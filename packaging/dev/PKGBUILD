@@ -1,0 +1,51 @@
+# Dev build of omatalk-bin from this checkout. scripts/dev-install.sh copies
+# this directory, target/release/omatalk, systemd/omatalk.service, and LICENSE
+# into a temp dir, sets OMATALK_PKGVER, and runs makepkg there. The recipe
+# submitted to omacom/omarchy-pkgs installs the same files from the release
+# tarball instead.
+
+pkgname=omatalk-bin
+pkgver=${OMATALK_PKGVER:?set OMATALK_PKGVER, or run scripts/dev-install.sh}
+pkgrel=1
+pkgdesc='Local text-to-speech for Omarchy (dev build)'
+arch=('x86_64')
+url='https://github.com/zerobearing2/omatalk'
+license=('MIT')
+depends=(
+    'glibc'
+    'gcc-libs'
+    'bzip2'
+    'onnxruntime-cpu'
+    'espeak-ng'
+    'pipewire-audio'
+    'libpulse'
+    'wl-clipboard'
+    'libnotify'
+    'curl'
+)
+install="${pkgname}.install"
+options=('!strip' '!debug')
+
+source=('omatalk'
+        'omatalk.service'
+        'LICENSE'
+        'package-remove'
+        'package-restart'
+        'remove-user-services.hook'
+        'restart-user-services.hook')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+    install -Dm755 "${srcdir}/omatalk" "${pkgdir}/usr/bin/omatalk"
+    install -Dm644 "${srcdir}/omatalk.service" \
+        "${pkgdir}/usr/lib/systemd/user/omatalk.service"
+    install -Dm644 "${srcdir}/LICENSE" \
+        "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+
+    install -Dm755 "${srcdir}/package-remove" "${pkgdir}/usr/lib/omatalk/package-remove"
+    install -Dm755 "${srcdir}/package-restart" "${pkgdir}/usr/lib/omatalk/package-restart"
+    install -Dm644 "${srcdir}/remove-user-services.hook" \
+        "${pkgdir}/usr/share/libalpm/hooks/30-omatalk-remove-user-services.hook"
+    install -Dm644 "${srcdir}/restart-user-services.hook" \
+        "${pkgdir}/usr/share/libalpm/hooks/30-omatalk-restart-user-services.hook"
+}

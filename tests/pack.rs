@@ -132,3 +132,99 @@ fn unit_runs_the_packaged_binary_as_the_daemon() {
         assert!(lines.contains(&want), "missing {want:?}");
     }
 }
+
+/// The `Key = value` lines of an alpm hook, as pairs.
+fn hook(name: &str) -> Vec<(String, String)> {
+    read(repo(&format!("packaging/dev/{name}")))
+        .lines()
+        .filter_map(|line| line.split_once(" = "))
+        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        .collect()
+}
+
+fn hook_has(hook: &[(String, String)], key: &str, value: &str) -> bool {
+    hook.iter().any(|(k, v)| k == key && v == value)
+}
+
+#[test]
+fn remove_hook_runs_before_removal_and_aborts_on_failure() {
+    let text = read(repo("packaging/dev/remove-user-services.hook"));
+    let hook = hook("remove-user-services.hook");
+
+    assert!(hook_has(&hook, "Operation", "Remove"));
+    assert!(hook_has(&hook, "Target", "omatalk-bin"));
+    assert!(hook_has(&hook, "When", "PreTransaction"));
+    assert!(hook_has(
+        &hook,
+        "Exec",
+        "/usr/lib/omatalk/package-remove omatalk"
+    ));
+    assert!(text.lines().any(|l| l == "AbortOnFail"));
+}
+
+#[test]
+fn restart_hook_runs_after_an_upgrade_and_never_fails_the_update() {
+    let text = read(repo("packaging/dev/restart-user-services.hook"));
+    let hook = hook("restart-user-services.hook");
+
+    assert!(hook_has(&hook, "Operation", "Upgrade"));
+    assert!(hook_has(&hook, "Target", "omatalk-bin"));
+    assert!(hook_has(&hook, "When", "PostTransaction"));
+    assert!(hook_has(
+        &hook,
+        "Exec",
+        "/usr/lib/omatalk/package-restart omatalk"
+    ));
+    assert!(!text.contains("AbortOnFail"));
+}
+
+/// `package-remove --user APP HOME RUNTIME` for a user with no manager running.
+fn package_remove_user(app: &str, tmp: &Path) -> common::Run {
+    run(
+        Command::new("bash")
+            .arg(repo("packaging/dev/package-remove"))
+            .args(["--user", app])
+            .arg(tmp.join("home"))
+            .arg(tmp.join("runtime")),
+        "",
+    )
+}
+
+#[test]
+fn package_remove_accepts_omatalk_and_drops_only_its_enablement_link() {
+    let tmp = TempDir::new("hook");
+    let wants = tmp
+        .path()
+        .join("home/.config/systemd/user/graphical-session.target.wants");
+    std::fs::create_dir_all(&wants).unwrap();
+    for unit in ["omatalk", "other"] {
+        std::os::unix::fs::symlink(
+            format!("/usr/lib/systemd/user/{unit}.service"),
+            wants.join(format!("{unit}.service")),
+        )
+        .unwrap();
+    }
+
+    let result = package_remove_user("omatalk", tmp.path());
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(!wants.join("omatalk.service").is_symlink());
+    assert!(wants.join("other.service").is_symlink());
+}
+
+#[test]
+fn package_remove_and_restart_refuse_every_other_app() {
+    let tmp = TempDir::new("hook");
+    for app in ["omaspeak", "omawake", ""] {
+        assert_eq!(package_remove_user(app, tmp.path()).code, 2, "{app:?}");
+        for script in ["package-remove", "package-restart"] {
+            let result = run(
+                Command::new("bash")
+                    .arg(repo(&format!("packaging/dev/{script}")))
+                    .arg(app),
+                "",
+            );
+            assert_eq!(result.code, 2, "{script} {app:?}");
+        }
+    }
+}

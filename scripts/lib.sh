@@ -1,4 +1,4 @@
-# Sourced by the scripts that read Cargo.toml or install.sh.
+# Sourced by the scripts that read Cargo.toml or setup.sh.
 
 # The [package] version in a Cargo.toml, never a dependency's.
 cargo_version() {
@@ -22,9 +22,9 @@ cargo_version() {
   printf '%s\n' "$version"
 }
 
-# The value of a NAME="value" pin in an install.sh.
+# The value of a NAME="value" pin in setup.sh.
 installer_pin() {
-  local installer="$1"
+  local script="$1"
   local name="$2"
   local line
   while IFS= read -r line; do
@@ -35,7 +35,7 @@ installer_pin() {
         return 0
         ;;
     esac
-  done < "$installer"
-  echo "$installer has no $name= pin" >&2
+  done < "$script"
+  echo "$script has no $name= pin" >&2
   return 1
 }
