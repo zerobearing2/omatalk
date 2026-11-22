@@ -181,18 +181,32 @@ step_plugin() {
     return
   fi
 
+  local replaced=false
+  if [ -e "$PLUGIN_DIR" ] || [ -L "$PLUGIN_DIR" ]; then
+    replaced=true
+  fi
+
   msg "Linking the Omarchy bar plugin"
   if ! link_plugin; then
     warn "Could not link $PLUGIN_DIR; F8 still speaks. Link it with: ln -sfn $PLUGIN_SOURCE $PLUGIN_DIR"
     return
   fi
 
-  if ! omarchy-shell -q shell rescanPlugins; then
-    warn "Could not rescan plugins; F8 still speaks. Reload the bar with: omarchy restart shell"
+  if ! $replaced; then
+    if ! omarchy-shell -q shell rescanPlugins; then
+      warn "Could not rescan plugins; F8 still speaks. Reload the bar with: omarchy restart shell"
+    fi
   fi
   if ! plugin_is_enabled; then
     if ! omarchy plugin enable "$PLUGIN_ID" >/dev/null 2>&1; then
       warn "Could not enable the bar plugin; F8 still speaks. Enable it with: omarchy plugin enable $PLUGIN_ID"
+    fi
+  fi
+  # A rescan reloads a replaced plugin without reconnecting its widget; only a
+  # shell restart brings it back.
+  if $replaced; then
+    if ! omarchy restart shell >/dev/null 2>&1; then
+      warn "Could not restart the shell; F8 still speaks. Restart it with: omarchy restart shell"
     fi
   fi
 }

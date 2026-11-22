@@ -57,7 +57,10 @@ fn a_curl_era_checkout_is_replaced_by_the_link() {
     assert!(is_link_to(&fake.plugin_dir(), &fake.plugin_source()));
     assert!(!fake.plugin_source().join("old.txt").exists());
     assert!(!fake.plugin_dir().join("old.txt").exists());
-    assert!(fake.logged(RESCAN_CMD));
+    let enable = fake.last_index(ENABLE_CMD);
+    let restart = fake.last_index("omarchy restart shell");
+    assert!(enable < restart, "{:?}", fake.commands());
+    assert!(!fake.logged(RESCAN_CMD));
 }
 
 #[test]
@@ -70,7 +73,7 @@ fn a_plugin_that_is_already_enabled_is_not_enabled_again() {
 
     assert_eq!(result.code, 0, "{}", result.stderr);
     assert!(is_link_to(&fake.plugin_dir(), &fake.plugin_source()));
-    assert!(fake.logged(RESCAN_CMD));
+    assert!(fake.logged("omarchy restart shell"));
     assert!(!fake.logged("omarchy plugin enable"));
 }
 
@@ -87,6 +90,7 @@ fn a_link_to_another_directory_is_repointed_and_its_target_kept() {
     assert_eq!(result.code, 0, "{}", result.stderr);
     assert!(is_link_to(&fake.plugin_dir(), &fake.plugin_source()));
     assert_eq!(read(clone.join("manifest.json")), "{}\n");
+    assert!(fake.logged("omarchy restart shell"));
 }
 
 #[test]
