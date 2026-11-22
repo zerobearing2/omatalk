@@ -12,14 +12,11 @@ BarWidget {
   moduleName: "zerobearing.omatalk"
   property string daemonState: "idle"
   property bool connectionLost: false
-  property bool daemonInstalled: false
   readonly property string socketOverride: root.envText("OMATALK_SOCKET")
   readonly property string runtimeDir: root.envText("XDG_RUNTIME_DIR")
   readonly property bool speaking: daemonState === "speaking"
-  readonly property bool daemonUnavailable: daemonInstalled && (
-    daemonState === "error" || (connectionLost && !reconnectGrace.running)
-  )
-  readonly property string launcherPath: "/usr/bin/omatalk"
+  readonly property bool daemonUnavailable: daemonState === "error"
+    || (connectionLost && !reconnectGrace.running)
   readonly property string socketPath: {
     if (socketOverride !== "") return socketOverride
     if (runtimeDir !== "") return runtimeDir + "/omatalk/omatalk.sock"
@@ -53,11 +50,9 @@ BarWidget {
     if ("bar" in target) target.bar = root.bar
     if ("anchorItem" in target) target.anchorItem = button
     if ("daemonUnavailable" in target) target.daemonUnavailable = root.daemonUnavailable
-    if ("daemonInstalled" in target) target.daemonInstalled = root.daemonInstalled
   }
 
   function togglePanel() {
-    if (!root.daemonInstalled) root.probeLauncher()
     if (panelLoader.item && panelLoader.item.toggle) panelLoader.item.toggle()
   }
 
@@ -65,7 +60,6 @@ BarWidget {
   readonly property var panelItem: panelLoader.item
 
   function open() {
-    if (!root.daemonInstalled) root.probeLauncher()
     if (panelLoader.item && panelLoader.item.open) panelLoader.item.open()
   }
 
@@ -75,26 +69,6 @@ BarWidget {
 
   onBarChanged: injectPanel()
   onDaemonUnavailableChanged: injectPanel()
-  onDaemonInstalledChanged: injectPanel()
-
-  function probeLauncher() {
-    launcherProbe.command = ["test", "-f", root.launcherPath]
-    launcherProbe.running = true
-  }
-
-  Process {
-    id: launcherProbe
-    onExited: function(exitCode) { if (exitCode === 0) root.daemonInstalled = true }
-  }
-
-  Timer {
-    id: launcherProbeTimer
-    interval: 1000
-    repeat: true
-    running: !root.daemonInstalled
-    triggeredOnStart: true
-    onTriggered: root.probeLauncher()
-  }
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -116,9 +90,8 @@ BarWidget {
     active: root.speaking || root.daemonUnavailable
     activeColor: root.daemonUnavailable ? Color.urgent : Color.accent
     useActiveColor: true
-    tooltipText: !root.daemonInstalled ? "Omatalk is not installed"
-      : (root.daemonUnavailable ? "Omatalk is unavailable"
-        : (root.speaking ? "Omatalk is speaking" : "Omatalk"))
+    tooltipText: root.daemonUnavailable ? "Omatalk is unavailable"
+      : (root.speaking ? "Omatalk is speaking" : "Omatalk")
     text: "󰃦"
 
     onPressed: function(b) { if (b === Qt.LeftButton) root.togglePanel() }
@@ -156,7 +129,6 @@ BarWidget {
   Loader {
     id: stateSocketLoader
     sourceComponent: stateSocketComponent
-    active: root.daemonInstalled
   }
 
   Timer {
@@ -165,8 +137,7 @@ BarWidget {
     // Driven by the socket's connected property instead of signal handlers,
     // so a missed signal can never stop the reconnect loop.
     repeat: true
-    running: root.daemonInstalled
-      && root.socketPath !== ""
+    running: root.socketPath !== ""
       && !(stateSocketLoader.item && stateSocketLoader.item.connected)
     // A Socket whose connect failed cannot redial itself (setConnected(true)
     // is a no-op while its internal QLocalSocket exists), so recreate it.

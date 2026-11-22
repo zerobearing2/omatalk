@@ -45,9 +45,8 @@ package and always matches the Daemon. It came from
 https://github.com/zerobearing2/omarchy-omatalk-plugin (v1.2.2) with its history.
 That repo is archived after the first stable package release.
 
-The plugin calls `/usr/bin/omatalk` only. It never installs the Daemon: its
-setup screen links to the site install page and shows no command. Its
-`manifest.json` stays at version `0.0.0-dev`, and `scripts/build.sh` and
+The plugin calls `/usr/bin/omatalk` only, and the package that ships it always
+installs that binary, so it has no not-installed mode. Its `manifest.json` stays at version `0.0.0-dev`, and `scripts/build.sh` and
 `scripts/dev-install.sh` stamp the package's version into the packaged copy.
 Only `manifest.json`, `BarWidget.qml`, `Panel.qml`, and `LICENSE` are
 packaged (`PLUGIN_FILES` in `scripts/lib.sh`).

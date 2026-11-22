@@ -27,10 +27,7 @@ it.
 
 ## Rules that still hold
 
-- The panel links to https://omatalk.zerobearing.com/#install with no command.
-  The plugin downloads, runs, displays, and copies no install command. Review
+- The plugin downloads, runs, displays, and copies no install command. Review
   closed #4712 over an installer in the plugin, and #8407's review objected to
   a `curl | bash` in the panel.
-- The plugin never ships or runs an installer. `tests/run.sh` in the plugin
-  tree fails if `install.sh` or `uninstall.sh` is there.
 - The plugin calls `/usr/bin/omatalk` only.

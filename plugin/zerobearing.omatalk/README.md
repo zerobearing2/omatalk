@@ -19,8 +19,7 @@ omarchy pkg add omatalk-bin && omatalk setup
 
 The package puts the plugin at
 `/usr/share/omatalk/omarchy-plugin/zerobearing.omatalk/`. `omatalk setup`
-links it into `~/.config/omarchy/plugins/` and enables it. Until the Daemon is
-installed, the panel links to https://omatalk.zerobearing.com/#install.
+links it into `~/.config/omarchy/plugins/` and enables it.
 
 If the megaphone is missing, reload the bar:
 

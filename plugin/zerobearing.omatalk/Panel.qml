@@ -3,20 +3,15 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-// Voice + speed config panel once the Daemon launcher exists. Until then
-// this is a setup screen that links to the site's install instructions; the
-// plugin itself never downloads or runs an installer.
+// Voice + speed config panel.
 Panel {
   id: root
   moduleName: "zerobearing.omatalk"
 
   property var anchorItem: null
   property bool daemonUnavailable: false
-  property bool daemonInstalled: false
-  readonly property string installUrl: "https://omatalk.zerobearing.com/#install"
 
   readonly property var englishPrefixes: ["af_", "am_", "bf_", "bm_"]
-  readonly property bool showingSetup: !daemonInstalled
   readonly property string launcherPath: "/usr/bin/omatalk"
 
   // PanelSlider only snaps `step` for wheel nudges — dragging reports
@@ -54,13 +49,7 @@ Panel {
     return "Hi, I'm " + stripped + ". This is what I sound like."
   }
 
-  function openInstallPage() {
-    openProc.command = ["xdg-open", root.installUrl]
-    openProc.running = true
-  }
-
   function refresh() {
-    if (!root.daemonInstalled) return
     var bin = root.launcherPath
     voicesProc.command = [bin, "config", "voices", "--json"]
     getProc.command = [bin, "config", "get", "--json"]
@@ -70,8 +59,7 @@ Panel {
     versionProc.running = true
   }
 
-  onOpenedChanged: if (opened && root.daemonInstalled) refresh()
-  onDaemonInstalledChanged: if (opened && root.daemonInstalled) refresh()
+  onOpenedChanged: if (opened) refresh()
 
   function setVoice(value) {
     root.voice = value
@@ -153,8 +141,6 @@ Panel {
     onExited: function(exitCode) { if (exitCode === 0) root.speedError = "" }
   }
 
-  Process { id: openProc }
-
   Process {
     id: versionProc
     command: ["omatalk", "version"]
@@ -201,36 +187,6 @@ Panel {
         }
 
         Column {
-          visible: !root.daemonInstalled
-          width: parent.width
-          spacing: Style.space(14)
-
-          Text {
-            objectName: "omatalkSetupNote"
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: "Omatalk's speech Daemon is not installed.\n\nInstall instructions:\n" + root.installUrl
-            color: Color.popups.text
-            font.family: Style.font.family
-            font.pixelSize: Style.font.body
-          }
-
-          Button {
-            objectName: "omatalkOpenInstallButton"
-            width: parent.width
-            text: "Open install instructions"
-            bordered: true
-            foreground: Color.popups.text
-            fontFamily: Style.font.family
-            onClicked: {
-              root.openInstallPage()
-              root.close()
-            }
-          }
-        }
-
-        Column {
-          visible: root.daemonInstalled
           width: parent.width
           spacing: Style.space(14)
 
@@ -313,7 +269,6 @@ Panel {
 
         Text {
           objectName: "omatalkVersion"
-          visible: root.daemonInstalled
           text: root.versionLabel
           color: Qt.darker(Color.popups.text, 1.6)
           font.family: Style.font.family

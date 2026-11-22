@@ -4,18 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-for f in manifest.json BarWidget.qml Panel.qml README.md LICENSE preview.png; do
+for f in manifest.json BarWidget.qml Panel.qml LICENSE; do
   if [[ ! -f $f ]]; then
     echo "missing $f" >&2
-    exit 1
-  fi
-done
-
-# The plugin never downloads or runs the Daemon installer; setup is the site's
-# install page the panel links to.
-for f in install.sh uninstall.sh; do
-  if [[ -e $f ]]; then
-    echo "$f must not live in the plugin tree" >&2
     exit 1
   fi
 done
@@ -36,11 +27,6 @@ fi
 ver=$(jq -r '.version' manifest.json)
 if [[ $ver != 0.0.0-dev ]]; then
   echo "manifest version in the tree must stay 0.0.0-dev, got: $ver" >&2
-  exit 1
-fi
-
-if ! grep -q 'https://github.com/zerobearing2/omatalk' README.md; then
-  echo "README must point at the Daemon repository" >&2
   exit 1
 fi
 

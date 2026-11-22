@@ -80,26 +80,21 @@ _Avoid_: install (the package install is `omarchy pkg add`)
 Silence played before speech when the default sink is a suspended Bluetooth or
 HDMI sink, so the device can unmute. Set by `wake_lead_ms`.
 
-The Omarchy bar widget (megaphone, setup and config panel) lives in
+The Omarchy bar widget (megaphone and config panel) lives in
 `plugin/zerobearing.omatalk/` and ships inside the Package at
 `/usr/share/omatalk/omarchy-plugin/zerobearing.omatalk/`. Setup links it into
 `~/.config/omarchy/plugins/`. It calls `/usr/bin/omatalk` only. See
-`docs/adr/0009-the-omarchy-package-is-the-only-install.md`. Installed means
-`/usr/bin/omatalk` exists. Do not use `command -v omatalk` as the only probe.
+`docs/adr/0009-the-omarchy-package-is-the-only-install.md`.
 
 ## Bar states
 
-- Not installed: normal color, tooltip "Omatalk is not installed". No socket
-  follow, no unavailable.
-- Installed and follow connected: idle or speaking.
-- Installed and follow failed past a three-second grace, or Daemon `error`:
-  unavailable (urgent).
+- Follow connected: idle or speaking.
+- Follow failed past a three-second grace, or Daemon `error`: unavailable
+  (urgent).
 
 ## Panel states
 
-- Not installed: setup. It links to the site install page, and the user runs
-  the install command in a terminal. No `omatalk config`, `version`, or preview
-  `speak`.
-- Installed: voice, speed, and the Daemon version (`omatalk version`). The
-  plugin ships with the Daemon, so there is one version. Config CLI uses
-  `/usr/bin/omatalk`.
+Voice, speed, and the Daemon version (`omatalk version`). The plugin ships with
+the Daemon, so there is one version. Config CLI uses `/usr/bin/omatalk`. While
+the bar is unavailable, the panel notes that changes apply once the Daemon
+starts.
