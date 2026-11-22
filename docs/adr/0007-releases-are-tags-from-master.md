@@ -1,5 +1,7 @@
 # Releases are tags from master
 
+The `install.sh` pin parts are superseded by `0009-the-omarchy-package-is-the-only-install.md`.
+
 Until 0.9.0 a release was a bump, a commit, and a push to `master`, then a
 GitHub Release. Anything that reached `master` was one command from stable
 users, and the site deployed on every push that touched `public/`. Merging a
