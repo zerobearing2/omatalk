@@ -21,8 +21,9 @@ selected text. Use the terms in `GLOSSARY.md`. The Omarchy package
   [Bar plugin](#bar-plugin).
 - `setup.sh` is the per-user work the package cannot do: models, unit enable,
   F8 binding, bar plugin link, welcome speech. `omatalk setup` execs the copy
-  embedded in the binary, like `omatalk uninstall` does with `uninstall.sh`. The
-  model pins live in `setup.sh`.
+  embedded in the binary. The model pins live in `setup.sh`. There is no
+  `omatalk uninstall`: `omarchy pkg drop omatalk-bin` removes it, and the
+  user's models, config, and F8 line stay, as with any package.
 - `install.sh` is a migration shim for curl installs, not an installer. It runs
   `omarchy pkg add omatalk-bin` and execs `omatalk setup`. Setup itself deletes
   the curl-era binary and unit, so either path migrates. `public/install.sh` dispatches to the latest release's copy.

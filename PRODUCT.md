@@ -37,7 +37,7 @@ an Omarchy package and updates with `omarchy update`.
 - Install: `omarchy pkg add omatalk-bin && omatalk setup`. Setup downloads
   the models (about 355MB), enables the service, asks before binding F8, and
   links the bar plugin.
-- Update: `omarchy update`. Uninstall: `omatalk uninstall`.
+- Update: `omarchy update`. Uninstall: `omarchy pkg drop omatalk-bin`.
 - Users who installed with the old curl installer run `omatalk upgrade` once;
   the site shows no curl command.
 - Daily use: highlight anywhere, press F8; press again to interrupt. A

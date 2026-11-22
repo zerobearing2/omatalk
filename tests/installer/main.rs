@@ -8,4 +8,3 @@ mod migrate;
 mod pins;
 mod plugin;
 mod setup;
-mod uninstall;

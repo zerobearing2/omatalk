@@ -64,48 +64,6 @@ fn setup_rejects_extra_arguments() {
     assert_eq!(sys.commands(), Vec::<String>::new());
 }
 
-/// A fake machine with an installed launcher and models dir.
-fn installed() -> System {
-    let sys = System::new();
-    write(sys.home(".local/bin/omatalk"), "launcher");
-    std::fs::create_dir_all(sys.install_home().join("models")).unwrap();
-    sys
-}
-
-#[test]
-fn uninstall_runs_the_embedded_uninstaller() {
-    let sys = installed();
-
-    let result = run(omatalk(["uninstall"]).envs(sys.env()), "y\n");
-
-    assert_eq!(result.code, 0, "{}", result.stderr);
-    assert!(!sys.home(".local/bin/omatalk").exists());
-    assert!(!sys.install_home().exists());
-    assert_eq!(common::names(sys.path("tmp")), Vec::<String>::new());
-    assert!(
-        result.stdout.contains("Omatalk files removed."),
-        "{}",
-        result.stdout
-    );
-    assert!(sys.logged("omarchy pkg drop omatalk-bin"));
-}
-
-#[test]
-fn uninstall_rejects_extra_arguments() {
-    let sys = installed();
-
-    let result = run(omatalk(["uninstall", "now"]).envs(sys.env()), "");
-
-    assert_eq!(result.code, 2);
-    assert!(
-        result.stderr.starts_with("error: ") && result.stderr.contains("Usage: omatalk "),
-        "{}",
-        result.stderr
-    );
-    assert_eq!(sys.commands(), Vec::<String>::new());
-    assert!(sys.install_home().exists());
-}
-
 /// A config whose notify command is the fake, and its notify log.
 fn notify_environment(tmp: &Path) -> (Vec<(&'static str, PathBuf)>, PathBuf) {
     let config = tmp.join("config.toml");
