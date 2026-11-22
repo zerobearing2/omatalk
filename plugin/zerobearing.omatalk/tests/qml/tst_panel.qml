@@ -170,7 +170,7 @@ TestCase {
   }
 
   function test_status_line_follows_the_daemon_state() {
-    compare(panel.statusLine, "Local text-to-speech · F8 reads your selection")
+    compare(panel.statusLine, "Local TTS · press F8 to speak")
     compare(hero().meta, panel.statusLine)
 
     panel.daemonState = "speaking"
@@ -183,7 +183,7 @@ TestCase {
     compare(hero().meta, "Daemon not running")
 
     panel.daemonUnavailable = false
-    compare(hero().meta, "Local text-to-speech · F8 reads your selection")
+    compare(hero().meta, "Local TTS · press F8 to speak")
   }
 
   function test_help_lines_sit_under_their_controls() {

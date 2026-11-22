@@ -42,7 +42,7 @@ Panel {
   readonly property string statusLine: {
     if (daemonUnavailable) return "Daemon not running"
     if (daemonState === "speaking") return "Speaking…"
-    return "Local text-to-speech · F8 reads your selection"
+    return "Local TTS · press F8 to speak"
   }
 
   function matchedPrefix(name) {
@@ -365,13 +365,28 @@ Panel {
             font.pixelSize: Style.font.bodySmall
           }
 
-          Text {
+          Column {
             width: parent.width
-            text: "Bluetooth and HDMI wake"
-            color: Color.popups.text
-            font.family: Style.font.family
-            font.pixelSize: Style.font.subtitle
-            font.bold: true
+            spacing: Style.space(2)
+
+            Text {
+              width: parent.width
+              text: "Bluetooth and HDMI wake"
+              color: Color.popups.text
+              font.family: Style.font.family
+              font.pixelSize: Style.font.subtitle
+              font.bold: true
+            }
+
+            Text {
+              objectName: "omatalkWakeLeadHelp"
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: "Silence before speech so headphones don't clip the first word."
+              color: Qt.darker(Color.popups.text, 1.5)
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+            }
           }
 
           Row {
@@ -403,15 +418,6 @@ Panel {
             }
           }
 
-          Text {
-            objectName: "omatalkWakeLeadHelp"
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: "Silence before speech so headphones don't clip the first word."
-            color: Qt.darker(Color.popups.text, 1.5)
-            font.family: Style.font.family
-            font.pixelSize: Style.font.caption
-          }
 
           Text {
             visible: root.wakeLeadError !== ""
