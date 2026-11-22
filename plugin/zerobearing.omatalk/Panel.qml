@@ -42,7 +42,7 @@ Panel {
   readonly property string statusLine: {
     if (daemonUnavailable) return "Daemon not running"
     if (daemonState === "speaking") return "Speaking…"
-    return "Local TTS · press F8 to speak"
+    return "Local TTS · F8 to speak"
   }
 
   function matchedPrefix(name) {

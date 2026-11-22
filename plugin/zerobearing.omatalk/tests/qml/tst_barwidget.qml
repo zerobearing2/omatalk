@@ -38,7 +38,7 @@ TestCase {
   }
 
   function test_the_panel_status_line_follows_the_daemon_state() {
-    compare(widget.panelItem.statusLine, "Local TTS · press F8 to speak")
+    compare(widget.panelItem.statusLine, "Local TTS · F8 to speak")
 
     widget.applyState("speaking")
     compare(widget.panelItem.daemonState, "speaking")
@@ -48,6 +48,6 @@ TestCase {
     compare(widget.panelItem.statusLine, "Daemon not running")
 
     widget.applyState("idle")
-    compare(widget.panelItem.statusLine, "Local TTS · press F8 to speak")
+    compare(widget.panelItem.statusLine, "Local TTS · F8 to speak")
   }
 }
