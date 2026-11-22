@@ -27,3 +27,4 @@ models/
 
 # Embedded G2P data (the *.bin rule above is for models)
 !/data/tagger.bin
+/tmp/
