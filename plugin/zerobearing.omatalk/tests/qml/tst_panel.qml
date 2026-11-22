@@ -36,9 +36,17 @@ TestCase {
     return null
   }
 
+  function hero() { return findChild(panel, "omatalkHero") }
+
   function test_sample_and_snap() {
     compare(panel.sampleTextFor("af_bella"), "Hi, I'm bella. This is what I sound like.")
     compare(panel.snapSpeed(1.73), 1.7)
+    compare(panel.snapWakeLead(626), 650)
+    compare(panel.snapWakeLead(624), 600)
+    compare(panel.snapWakeLead(-30), 0)
+    compare(panel.snapWakeLead(2030), 2000)
+    compare(panel.wakeLeadLabel(0), "Off")
+    compare(panel.wakeLeadLabel(650), "650 ms")
     verify(panel.isEnglishVoice("bf_emma"))
     verify(!panel.isEnglishVoice("jf_alpha"))
   }
@@ -54,19 +62,36 @@ TestCase {
     compare(panel.voice, "af_heart")
     compare(panel.speed, 1.25)
     compare(panel.daemonVersion, "0.2.1-test")
-    compare(panel.versionLabel, "omatalk 0.2.1-test")
+    compare(hero().detail, "0.2.1-test")
   }
 
+  function test_refresh_fills_media_pause_and_wake_lead() {
+    compare(panel.pauseMedia, true)
+    compare(panel.wakeLeadMs, 650)
+    panel.refresh()
+    findProc("config get --json").complete(
+      0, '{"voice":"af_heart","speed":1.0,"pause_media":false,"wake_lead_ms":0}', "")
+    compare(panel.pauseMedia, false)
+    compare(panel.wakeLeadMs, 0)
+  }
+
+  function test_get_without_the_new_keys_keeps_the_defaults() {
+    panel.refresh()
+    findProc("config get --json").complete(0, '{"voice":"af_heart","speed":1.0}', "")
+    compare(panel.pauseMedia, true)
+    compare(panel.wakeLeadMs, 650)
+  }
 
   function test_failed_version_is_unknown() {
     panel.refresh()
     findProc("omatalk version").complete(1, "", "nope")
     compare(panel.daemonVersion, "unknown")
-    compare(panel.versionLabel, "omatalk unknown")
+    compare(hero().detail, "unknown")
   }
 
-  function test_set_voice_saves_and_previews() {
-    panel.setVoice("bf_emma")
+  function test_choosing_a_voice_saves_and_previews_it() {
+    findChild(panel, "omatalkVoiceDropdown").changed("bf_emma")
+    compare(panel.voice, "bf_emma")
     compare(commandLine(findProc("config set voice")), launcherBin + " config set voice bf_emma")
     compare(
       commandLine(findProc("speak --voice")),
@@ -74,9 +99,111 @@ TestCase {
     )
   }
 
-  function test_set_speed_saves_snapped_value() {
-    panel.setSpeed(panel.snapSpeed(1.73))
+  function test_the_speed_slider_saves_the_snapped_value() {
+    findChild(panel, "omatalkSpeedSlider").released(1.73)
+    compare(panel.speed, 1.7)
     compare(commandLine(findProc("config set speed")), launcherBin + " config set speed 1.7")
+  }
+
+  function test_a_failed_save_shows_its_error_until_a_save_succeeds() {
+    var toggle = findChild(panel, "omatalkPauseMediaToggle")
+    var error = findChild(panel, "omatalkPauseMediaError")
+    toggle.clicked()
+    findProc("config set pause_media").complete(1, "", "false: nope\n")
+    compare(error.text, "false: nope")
+    toggle.clicked()
+    findProc("config set pause_media").complete(0, "", "")
+    compare(error.text, "")
+
+    var slider = findChild(panel, "omatalkWakeLeadSlider")
+    error = findChild(panel, "omatalkWakeLeadError")
+    slider.released(650)
+    findProc("config set wake_lead_ms").complete(1, "", "bad\n")
+    compare(error.text, "bad")
+    compare(findChild(panel, "omatalkPauseMediaError").text, "")
+    slider.released(700)
+    findProc("config set wake_lead_ms").complete(0, "", "")
+    compare(error.text, "")
+  }
+
+  function test_controls_drive_the_setters() {
+    var toggle = findChild(panel, "omatalkPauseMediaToggle")
+    var slider = findChild(panel, "omatalkWakeLeadSlider")
+    verify(toggle !== null)
+    verify(slider !== null)
+    compare(toggle.label, "Pause media while speaking")
+
+    toggle.clicked()
+    compare(commandLine(findProc("config set pause_media")), launcherBin + " config set pause_media false")
+    compare(toggle.checked, false)
+    toggle.clicked()
+    compare(commandLine(findProc("config set pause_media")), launcherBin + " config set pause_media true")
+
+    slider.released(1233)
+    compare(commandLine(findProc("config set wake_lead_ms")), launcherBin + " config set wake_lead_ms 1250")
+    compare(slider.maximum, 2000)
+    compare(slider.step, 50)
+  }
+
+  function test_controls_show_what_get_returned() {
+    panel.refresh()
+    findProc("config get --json").complete(
+      0, '{"voice":"af_heart","speed":1.0,"pause_media":false,"wake_lead_ms":0}', "")
+    compare(findChild(panel, "omatalkPauseMediaToggle").checked, false)
+    compare(findChild(panel, "omatalkWakeLeadSlider").value, 0)
+    compare(findChild(panel, "omatalkWakeLeadLabel").text, "Off")
+    findProc("config get --json").complete(
+      0, '{"voice":"af_heart","speed":1.0,"pause_media":true,"wake_lead_ms":650}', "")
+    compare(findChild(panel, "omatalkPauseMediaToggle").checked, true)
+    compare(findChild(panel, "omatalkWakeLeadLabel").text, "650 ms")
+  }
+
+  function test_hero_icon_is_the_injected_glyph() {
+    panel.glyph = "G"
+    compare(hero().iconItem.text, "G")
+  }
+
+  function test_status_line_follows_the_daemon_state() {
+    compare(panel.statusLine, "Local TTS · F8 to speak")
+    compare(hero().meta, panel.statusLine)
+
+    panel.daemonState = "speaking"
+    compare(hero().meta, "Speaking…")
+
+    panel.daemonUnavailable = true
+    compare(hero().meta, "Daemon not running")
+
+    panel.daemonState = "idle"
+    compare(hero().meta, "Daemon not running")
+
+    panel.daemonUnavailable = false
+    compare(hero().meta, "Local TTS · F8 to speak")
+  }
+
+  function test_help_lines_sit_under_their_controls() {
+    compare(
+      findChild(panel, "omatalkPauseMediaToggle").description,
+      "Spotify, browsers and video pause, then resume when omatalk finishes.")
+    compare(
+      findChild(panel, "omatalkWakeLeadHelp").text,
+      "Silence before speech so headphones don't clip the first word.")
+  }
+
+  function test_preview_button_speaks_the_selected_voice_without_saving() {
+    var button = findChild(panel, "omatalkPreviewButton")
+    verify(button !== null)
+    compare(button.enabled, false)
+
+    panel.voice = "bf_emma"
+    compare(button.enabled, true)
+    button.clicked()
+    var speak = findProc("speak --voice")
+    verify(speak.running)
+    compare(
+      commandLine(speak),
+      launcherBin + " speak --voice bf_emma Hi, I'm emma. This is what I sound like."
+    )
+    compare(findProc("config set voice"), null)
   }
 
   function test_open_refreshes() {

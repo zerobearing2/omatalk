@@ -3,13 +3,14 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-// Voice + speed config panel.
 Panel {
   id: root
   moduleName: "zerobearing.omatalk"
 
   property var anchorItem: null
   property bool daemonUnavailable: false
+  property string daemonState: "idle"
+  property string glyph: ""
 
   readonly property var englishPrefixes: ["af_", "am_", "bf_", "bm_"]
   readonly property string launcherPath: "/usr/bin/omatalk"
@@ -19,13 +20,26 @@ Panel {
   // so both the live label and the committed value round through this.
   function snapSpeed(v) { return Math.round(v * 10) / 10 }
 
+  readonly property int wakeLeadMax: 2000
+  readonly property int wakeLeadStep: 50
+  function snapWakeLead(v) {
+    var snapped = Math.round(v / wakeLeadStep) * wakeLeadStep
+    return Math.max(0, Math.min(wakeLeadMax, snapped))
+  }
+  function wakeLeadLabel(ms) { return ms === 0 ? "Off" : ms + " ms" }
+
   property var voiceOptions: []
   property string voice: ""
   property real speed: 1.0
-  property string voiceError: ""
-  property string speedError: ""
+  property bool pauseMedia: true
+  property int wakeLeadMs: 650
   property string daemonVersion: "unknown"
-  readonly property string versionLabel: "omatalk " + daemonVersion
+
+  readonly property string statusLine: {
+    if (daemonUnavailable) return "Daemon not running"
+    if (daemonState === "speaking") return "Speaking…"
+    return "Local TTS · F8 to speak"
+  }
 
   function matchedPrefix(name) {
     for (var i = 0; i < englishPrefixes.length; i++) {
@@ -61,22 +75,45 @@ Panel {
 
   onOpenedChanged: if (opened) refresh()
 
-  function setVoice(value) {
-    root.voice = value
-    setVoiceProc.command = [root.launcherPath, "config", "set", "voice", value]
-    setVoiceProc.running = true
-    // Not sequenced after setVoiceProc: the preview never touches
-    // config.toml or waits on the Daemon's reload, so there is nothing to
-    // wait for — it fires in parallel with the save.
-    previewProc.command = [root.launcherPath, "speak", "--voice", value, root.sampleTextFor(value)]
+  // Not sequenced after the voice save: the preview never touches
+  // config.toml or waits on the Daemon's reload, so there is nothing to
+  // wait for — it fires in parallel with the save.
+  function previewVoice(name) {
+    previewProc.command = [root.launcherPath, "speak", "--voice", name, root.sampleTextFor(name)]
     previewProc.running = true
   }
 
-  function setSpeed(value) {
-    root.speed = value
-    setSpeedProc.command = [root.launcherPath, "config", "set", "speed", String(value)]
-    setSpeedProc.running = true
+  // `config set <key>`. Its stderr line is the error shown under the
+  // control until a later save of the same key succeeds.
+  component ConfigSetter: Process {
+    id: setter
+    property string key
+    property string error: ""
+    function save(value) {
+      setter.command = [root.launcherPath, "config", "set", setter.key, String(value)]
+      setter.running = true
+    }
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: setter.error = text.trim()
+    }
+    onExited: function(exitCode) { if (exitCode === 0) setter.error = "" }
   }
+
+  component ErrorLine: Text {
+    visible: text !== ""
+    width: parent.width
+    wrapMode: Text.WordWrap
+    color: Color.urgent
+    font.family: Style.font.family
+    font.pixelSize: Style.font.bodySmall
+  }
+
+  ConfigSetter { id: voiceSetter; key: "voice" }
+  ConfigSetter { id: speedSetter; key: "speed" }
+  ConfigSetter { id: pauseMediaSetter; key: "pause_media" }
+  ConfigSetter { id: wakeLeadSetter; key: "wake_lead_ms" }
 
   Process {
     id: voicesProc
@@ -108,6 +145,8 @@ Panel {
           var cfg = JSON.parse(text)
           if (cfg.voice !== undefined) root.voice = cfg.voice
           if (cfg.speed !== undefined) root.speed = cfg.speed
+          if (cfg.pause_media !== undefined) root.pauseMedia = cfg.pause_media
+          if (cfg.wake_lead_ms !== undefined) root.wakeLeadMs = cfg.wake_lead_ms
         } catch (e) {
           // Leave the previous values in place on a bad/empty response.
         }
@@ -116,29 +155,9 @@ Panel {
   }
 
   Process {
-    id: setVoiceProc
-    stdout: StdioCollector { waitForEnd: true }
-    stderr: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.voiceError = text.trim()
-    }
-    onExited: function(exitCode) { if (exitCode === 0) root.voiceError = "" }
-  }
-
-  Process {
     id: previewProc
     stdout: StdioCollector { waitForEnd: true }
     stderr: StdioCollector { waitForEnd: true }
-  }
-
-  Process {
-    id: setSpeedProc
-    stdout: StdioCollector { waitForEnd: true }
-    stderr: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.speedError = text.trim()
-    }
-    onExited: function(exitCode) { if (exitCode === 0) root.speedError = "" }
   }
 
   Process {
@@ -178,42 +197,67 @@ Panel {
         width: parent.width
         spacing: Style.space(14)
 
-        Text {
-          text: "Omatalk"
-          color: Color.popups.text
-          font.family: Style.font.family
-          font.pixelSize: Style.font.display
-          font.bold: true
+        PanelHero {
+          objectName: "omatalkHero"
+          width: parent.width
+          title: "Omatalk"
+          meta: root.statusLine
+          detail: root.daemonVersion
+          foreground: Color.popups.text
+          fontFamily: Style.font.family
+
+          iconComponent: Component {
+            Text {
+              text: root.glyph
+              color: Color.popups.text
+              font.family: Style.font.family
+              font.pixelSize: Style.font.display
+            }
+          }
         }
+
+        PanelSeparator {}
 
         Column {
           width: parent.width
           spacing: Style.space(14)
 
-          PanelSeparator {}
-
           PanelSectionHeader { text: "VOICE" }
 
-          SearchableDropdown {
-            id: voiceDropdown
-            objectName: "omatalkVoiceDropdown"
+          Row {
             width: parent.width
-            options: root.voiceOptions
-            placeholderText: "Search voices…"
-            onChanged: function(v) { root.setVoice(v) }
+            spacing: Style.space(8)
 
-            Binding on value { value: root.voice }
+            SearchableDropdown {
+              id: voiceDropdown
+              objectName: "omatalkVoiceDropdown"
+              width: parent.width - previewButton.width - parent.spacing
+              options: root.voiceOptions
+              placeholderText: "Search voices…"
+              onChanged: function(v) {
+                root.voice = v
+                voiceSetter.save(v)
+                root.previewVoice(v)
+              }
+
+              Binding on value { value: root.voice }
+            }
+
+            PanelActionButton {
+              id: previewButton
+              objectName: "omatalkPreviewButton"
+              anchors.verticalCenter: parent.verticalCenter
+              iconText: "󰐊"
+              tooltipText: "Preview voice"
+              foreground: Color.popups.text
+              fontFamily: Style.font.family
+              bordered: true
+              enabled: root.voice !== ""
+              onClicked: root.previewVoice(root.voice)
+            }
           }
 
-          Text {
-            visible: root.voiceError !== ""
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: root.voiceError
-            color: Color.urgent
-            font.family: Style.font.family
-            font.pixelSize: Style.font.bodySmall
-          }
+          ErrorLine { objectName: "omatalkVoiceError"; text: voiceSetter.error }
 
           PanelSectionHeader { text: "SPEED" }
 
@@ -232,7 +276,10 @@ Panel {
               value: root.speed
               tickCount: 16
               tickColor: Color.popups.background
-              onReleased: function(v) { root.setSpeed(root.snapSpeed(v)) }
+              onReleased: function(v) {
+                root.speed = root.snapSpeed(v)
+                speedSetter.save(root.speed)
+              }
             }
 
             Text {
@@ -245,15 +292,85 @@ Panel {
             }
           }
 
-          Text {
-            visible: root.speedError !== ""
+          ErrorLine { objectName: "omatalkSpeedError"; text: speedSetter.error }
+
+          PanelSeparator {}
+
+          PanelSectionHeader { text: "PLAYBACK" }
+
+          Toggle {
+            objectName: "omatalkPauseMediaToggle"
             width: parent.width
-            wrapMode: Text.WordWrap
-            text: root.speedError
-            color: Color.urgent
-            font.family: Style.font.family
-            font.pixelSize: Style.font.bodySmall
+            label: "Pause media while speaking"
+            description: "Spotify, browsers and video pause, then resume when omatalk finishes."
+            foreground: Color.popups.text
+            fontFamily: Style.font.family
+            checked: root.pauseMedia
+            onClicked: {
+              root.pauseMedia = !root.pauseMedia
+              pauseMediaSetter.save(root.pauseMedia)
+            }
           }
+
+          ErrorLine { objectName: "omatalkPauseMediaError"; text: pauseMediaSetter.error }
+
+          Column {
+            width: parent.width
+            spacing: Style.space(2)
+
+            Text {
+              width: parent.width
+              text: "Bluetooth and HDMI wake"
+              color: Color.popups.text
+              font.family: Style.font.family
+              font.pixelSize: Style.font.subtitle
+              font.bold: true
+            }
+
+            Text {
+              objectName: "omatalkWakeLeadHelp"
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: "Silence before speech so headphones don't clip the first word."
+              color: Qt.darker(Color.popups.text, 1.5)
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+            }
+          }
+
+          Row {
+            width: parent.width
+            spacing: Style.space(12)
+
+            PanelSlider {
+              id: wakeLeadSlider
+              objectName: "omatalkWakeLeadSlider"
+              bar: root.bar
+              width: parent.width - wakeLeadLabelText.width - Style.space(12)
+              minimum: 0
+              maximum: root.wakeLeadMax
+              step: root.wakeLeadStep
+              value: root.wakeLeadMs
+              tickCount: 5
+              tickColor: Color.popups.background
+              onReleased: function(v) {
+                root.wakeLeadMs = root.snapWakeLead(v)
+                wakeLeadSetter.save(root.wakeLeadMs)
+              }
+            }
+
+            Text {
+              id: wakeLeadLabelText
+              objectName: "omatalkWakeLeadLabel"
+              text: root.wakeLeadLabel(root.snapWakeLead(wakeLeadSlider.liveValue))
+              color: Color.popups.text
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+              width: Style.space(64)
+            }
+          }
+
+          ErrorLine { objectName: "omatalkWakeLeadError"; text: wakeLeadSetter.error }
 
           Text {
             visible: root.daemonUnavailable
@@ -265,14 +382,6 @@ Panel {
             font.pixelSize: Style.font.bodySmall
             font.italic: true
           }
-        }
-
-        Text {
-          objectName: "omatalkVersion"
-          text: root.versionLabel
-          color: Qt.darker(Color.popups.text, 1.6)
-          font.family: Style.font.family
-          font.pixelSize: Style.font.caption
         }
       }
     }

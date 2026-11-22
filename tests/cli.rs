@@ -404,6 +404,110 @@ fn config_set_speed_rejects_non_numeric() {
 }
 
 #[test]
+fn config_set_pause_media_persists_and_get_reports_it() {
+    let env = config_environment();
+    for (value, want) in [("false", false), ("true", true)] {
+        let result = env.config(&["set", "pause_media", value]);
+
+        assert_eq!(result.code, 0, "{value}: {}", result.stderr);
+        assert_eq!(env.written()["pause_media"].as_bool(), Some(want));
+        let got = env.config(&["get", "--json"]);
+        let cfg: serde_json::Value = serde_json::from_str(&got.stdout).unwrap();
+        assert_eq!(cfg["pause_media"], want);
+    }
+}
+
+#[test]
+fn config_set_pause_media_rejects_anything_but_true_or_false() {
+    for value in ["yes", "1", "TRUE", ""] {
+        let env = config_environment();
+
+        let result = env.config(&["set", "pause_media", value]);
+
+        assert_eq!(result.code, 1, "{value}");
+        assert_eq!(
+            result.stderr.trim(),
+            format!("{value}: pause_media must be true or false")
+        );
+        assert!(!env.config.exists());
+    }
+}
+
+#[test]
+fn config_set_wake_lead_persists_as_an_integer_and_get_reports_it() {
+    let env = config_environment();
+    for ms in [0, 350, 2000] {
+        let result = env.config(&["set", "wake_lead_ms", &ms.to_string()]);
+
+        assert_eq!(result.code, 0, "{ms}: {}", result.stderr);
+        assert_eq!(env.written()["wake_lead_ms"].as_integer(), Some(ms));
+        let got = env.config(&["get", "--json"]);
+        let cfg: serde_json::Value = serde_json::from_str(&got.stdout).unwrap();
+        assert_eq!(cfg["wake_lead_ms"], ms);
+    }
+}
+
+#[test]
+fn config_set_wake_lead_rejects_bad_values_with_the_config_wording() {
+    for value in ["2001", "600.0", "soon", ""] {
+        let env = config_environment();
+
+        let result = env.config(&["set", "wake_lead_ms", value]);
+
+        assert_eq!(result.code, 1, "{value}");
+        assert_eq!(
+            result.stderr.trim(),
+            format!("{value}: wake_lead_ms must be an integer between 0 and 2000")
+        );
+        assert!(!env.config.exists());
+    }
+}
+
+#[test]
+fn config_set_and_a_bad_config_file_give_the_same_reason() {
+    for (key, value, toml) in [
+        ("wake_lead_ms", "2001", "2001"),
+        ("wake_lead_ms", "600.0", "600.0"),
+        ("pause_media", "yes", "\"yes\""),
+    ] {
+        let env = config_environment();
+        let set = env.config(&["set", key, value]);
+        write(&env.config, format!("{key} = {toml}\n"));
+        let load = env.config(&["get"]);
+
+        assert_eq!((set.code, load.code), (1, 1), "{key} {value}");
+        let reason = |stderr: &str| {
+            stderr
+                .trim()
+                .split_once(&format!("{key} must be "))
+                .map(|(_, what)| what.to_owned())
+        };
+        assert!(reason(&set.stderr).is_some(), "{}", set.stderr);
+        assert_eq!(reason(&set.stderr), reason(&load.stderr), "{key} {value}");
+    }
+}
+
+#[test]
+fn config_set_keeps_the_file_loadable_for_the_daemon() {
+    let env = config_environment();
+    write(&env.config, "# mine\nplayer = [\"custom\"]\n");
+
+    let lead = env.config(&["set", "wake_lead_ms", "400"]);
+    let pause = env.config(&["set", "pause_media", "false"]);
+
+    assert_eq!(lead.code, 0, "{}", lead.stderr);
+    assert_eq!(pause.code, 0, "{}", pause.stderr);
+
+    let text = read(&env.config);
+    assert!(
+        text.starts_with("# mine\nplayer = [\"custom\"]\n"),
+        "{text}"
+    );
+    let got = env.config(&["get", "--json"]);
+    assert_eq!(got.code, 0, "{}", got.stderr);
+}
+
+#[test]
 fn config_set_rejects_unsettable_key() {
     for key in ["player", "notify", "capture_primary", "lang", "bogus"] {
         let env = config_environment();
@@ -412,7 +516,9 @@ fn config_set_rejects_unsettable_key() {
 
         assert_eq!(result.code, 2, "{key}");
         assert!(
-            result.stderr.contains("[possible values: voice, speed]"),
+            result
+                .stderr
+                .contains("[possible values: voice, speed, pause_media, wake_lead_ms]"),
             "{key}: {}",
             result.stderr
         );

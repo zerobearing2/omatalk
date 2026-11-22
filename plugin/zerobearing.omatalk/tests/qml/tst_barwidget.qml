@@ -31,4 +31,23 @@ TestCase {
     compare(widget.daemonUnavailable, true)
     compare(widget.panelItem.daemonUnavailable, true)
   }
+
+  function test_the_panel_shows_the_bar_glyph() {
+    compare(widget.panelItem.glyph, widget.glyph)
+    verify(widget.glyph !== "")
+  }
+
+  function test_the_panel_status_line_follows_the_daemon_state() {
+    compare(widget.panelItem.statusLine, "Local TTS · F8 to speak")
+
+    widget.applyState("speaking")
+    compare(widget.panelItem.daemonState, "speaking")
+    compare(widget.panelItem.statusLine, "Speaking…")
+
+    widget.applyState("error")
+    compare(widget.panelItem.statusLine, "Daemon not running")
+
+    widget.applyState("idle")
+    compare(widget.panelItem.statusLine, "Local TTS · F8 to speak")
+  }
 }

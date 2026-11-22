@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 
 use crate::config::Config;
 use crate::exec::{self, Argv};
-use crate::sink::WakeLead;
+use crate::sink::WakeProbe;
 use crate::speech::{
     Delivery, Engine, SAMPLE_RATE, SpeechError, StopToken, Text, Utterance, s16le,
 };
@@ -165,9 +165,9 @@ impl Stream {
             wake_lead,
             ..
         } = config;
-        let wake = WakeLead {
+        let wake = WakeProbe {
             probe: sink_probe,
-            lead: wake_lead,
+            lead: wake_lead.get(),
         };
         let stop = StopToken::default();
         let (pcm_tx, pcm_rx) = std::sync::mpsc::sync_channel(PCM_QUEUE);
@@ -224,7 +224,7 @@ fn settle(outcome: Outcome, stopped: bool) -> Outcome {
 /// Invariant: on every exit path `pcm` is dropped BEFORE any player is cut.
 /// A synth thread blocked on a full queue then unblocks at once instead of
 /// waiting out REAP_GRACE, so the next Utterance's first ORT run is not delayed.
-fn playback(player: &Argv, wake: &WakeLead, pcm: Receiver<Pcm>, stop: &StopToken) -> Outcome {
+fn playback(player: &Argv, wake: &WakeProbe, pcm: Receiver<Pcm>, stop: &StopToken) -> Outcome {
     let Ok(mut speech) = Player::spawn(player) else {
         return PlayerExited.into();
     };
@@ -390,6 +390,7 @@ fn reap(mut child: Child) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::WakeLead;
     use crate::speech::Audio;
     use crate::testutil::{TempDir, log_lines, wait_for};
     use std::fs;
@@ -435,7 +436,7 @@ mod tests {
             player: argv(player),
             notify: Argv::new(vec!["true".into()]).unwrap(),
             sink_probe: Argv::new(vec!["false".into()]).unwrap(),
-            wake_lead: Duration::from_millis(600),
+            wake_lead: WakeLead::parse("600").unwrap(),
             ..Config::defaults()
         }
     }
@@ -595,7 +596,7 @@ mod tests {
             let dir = TempDir::new("lead");
             let config = Config {
                 sink_probe: probe(&dir, sink, state),
-                wake_lead: Duration::from_millis(lead_ms),
+                wake_lead: WakeLead::parse(&lead_ms.to_string()).unwrap(),
                 ..config(&echo_player(&dir))
             };
             let (_stream, rx) = start_with(batches(vec![samples.clone()]), config);
@@ -653,7 +654,7 @@ mod tests {
         // parked in the lead write when stopped.
         let config = Config {
             sink_probe: probe(&dir, "bluez_output.X.1", "SUSPENDED"),
-            wake_lead: Duration::from_secs(2),
+            wake_lead: WakeLead::parse("2000").unwrap(),
             ..config(&player)
         };
         let (engine, _release) = gated(vec![vec![0.1; 24]], 0);

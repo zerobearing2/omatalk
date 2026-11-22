@@ -94,7 +94,7 @@ The Omarchy bar widget (megaphone and config panel) lives in
 
 ## Panel states
 
-Voice, speed, and the Daemon version (`omatalk version`). The plugin ships with
-the Daemon, so there is one version. Config CLI uses `/usr/bin/omatalk`. While
-the bar is unavailable, the panel notes that changes apply once the Daemon
-starts.
+Voice, speed, media pause, wake lead, and the Daemon version (`omatalk
+version`). The plugin ships with the Daemon, so there is one version. Config CLI
+uses `/usr/bin/omatalk`. While the bar is unavailable, the panel notes that
+changes apply once the Daemon starts.

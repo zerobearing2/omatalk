@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use clap::{CommandFactory, Parser, Subcommand};
 
-use crate::config::{Config, Paths, Setting, Speed};
+use crate::config::{Config, Paths, SettableKey, Setting, Speed};
 use crate::protocol::{self, Request, SpeakRequest};
 use crate::render;
 use crate::speech::{Delivery, Text, Utterance};
@@ -93,9 +93,8 @@ pub enum ConfigCommand {
     /// Change one setting
     Set {
         /// Setting to change
-        #[arg(value_parser = ["voice", "speed"])]
-        key: String,
-        /// A voice name, or a speed from 0.5 to 2.0
+        key: SettableKey,
+        /// A voice name, a speed from 0.5 to 2.0, true or false, or a wake lead in ms from 0 to 2000
         value: String,
     },
     /// List the installed voices
@@ -149,7 +148,7 @@ pub fn run(cli: Cli, paths: &Paths) -> ExitCode {
             Err(e) => fail(voices::VoiceError::Archive(e)),
         },
         Cli::Config(ConfigCommand::Set { key, value }) => {
-            match Setting::parse(&paths.models, &key, &value) {
+            match Setting::parse(&paths.models, key, &value) {
                 Ok(setting) => match setting.write(&paths.config) {
                     Ok(()) => ExitCode::SUCCESS,
                     Err(e) => fail(format!("{}: {e}", paths.config.display())),
@@ -482,7 +481,7 @@ mod tests {
         assert_eq!(
             p(&["config", "set", "speed", "1"]),
             Ok(Cli::Config(ConfigCommand::Set {
-                key: "speed".into(),
+                key: SettableKey::Speed,
                 value: "1".into()
             }))
         );

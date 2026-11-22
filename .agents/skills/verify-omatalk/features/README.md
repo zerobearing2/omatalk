@@ -49,4 +49,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Stop](./stop.md) covers cutting off an utterance that is already speaking.
 - [Status](./status.md) covers idle, speaking, and a Daemon that is not running.
 - [Render](./render.md) covers a script to a WAV file from arguments or stdin, its pauses, and its refusals.
-- [Config](./config.md) covers reading and writing voice and speed, and listing voices.
+- [Config](./config.md) covers reading and writing voice, speed, media pause, and wake lead, and listing voices.

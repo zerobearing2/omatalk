@@ -1,6 +1,6 @@
 # Config
 
-Config shows the saved voice and speed, changes them, and lists the voices the model directory contains. The next utterance uses the file on disk. An utterance that has already started keeps the voice and speed it started with.
+Config shows the saved voice, speed, media pause, and wake lead, changes them, and lists the voices the model directory contains. The next utterance uses the file on disk. An utterance that has already started keeps the voice and speed it started with.
 
 ## Sub-features
 

@@ -37,25 +37,27 @@ empty, speech stops. If it changed, the new text replaces the old.
 
 The megaphone in the bar uses the normal color when ready, the accent color
 while speaking, and red when the Daemon reported an error or the bar lost it for
-more than 3 seconds. Click it to set the voice and speed. Picking a voice speaks
-a short sample.
+more than 3 seconds. Click it to set the voice, speed, media pause, and wake
+lead. Picking a voice speaks a short sample.
 
 ![Omatalk's voice and speed config panel](public/images/omatalk-config-panel.png)
 
 From a terminal:
 
 ```sh
-omatalk speak                       # capture and speak (what the hotkey runs)
-omatalk speak "text here"           # speak given text
-omatalk speak --voice af_bella "hi" # speak once in a voice, default unchanged
-omatalk stop                        # cut off the current speech
-omatalk status                      # idle | speaking | error
-omatalk version                     # print the installed release
-omatalk setup                       # models, service, F8, bar plugin (safe to rerun)
-omatalk config get [--json]         # print the effective config
-omatalk config set voice af_bella   # set the voice
-omatalk config set speed 1.25       # set the speed (0.5-2.0)
-omatalk config voices [--json]      # list voice names
+omatalk speak                        # capture and speak (what the hotkey runs)
+omatalk speak "text here"            # speak given text
+omatalk speak --voice af_bella "hi"  # speak once in a voice, default unchanged
+omatalk stop                         # cut off the current speech
+omatalk status                       # idle | speaking | error
+omatalk version                      # print the installed release
+omatalk setup                        # models, service, F8, bar plugin (safe to rerun)
+omatalk config get [--json]          # print the effective config
+omatalk config set voice af_bella    # set the voice
+omatalk config set speed 1.25        # set the speed (0.5-2.0)
+omatalk config set pause_media false # keep media playing while it speaks
+omatalk config set wake_lead_ms 650  # Bluetooth and HDMI wake lead (0-2000, 0 is off)
+omatalk config voices [--json]       # list voice names
 ```
 
 ## Render a voiceover
@@ -95,7 +97,8 @@ the path and the audio's length.
 ## Config
 
 The panel and `omatalk config set` save to `~/.config/omatalk/config.toml`.
-They set voice and speed. Edit the file by hand for the rest. The file does not
+They set voice, speed, media pause, and wake lead. Edit the file by hand for
+the rest. The file does not
 exist until you set something, and every key is optional. Each press reads the
 file again, so changes apply to the next press with no restart.
 
