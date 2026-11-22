@@ -13,6 +13,7 @@ PLUGIN_ID="zerobearing.omatalk"
 PLUGIN_SOURCE="/usr/share/omatalk/omarchy-plugin/zerobearing.omatalk"
 PLUGIN_DIR="$HOME/.config/omarchy/plugins/$PLUGIN_ID"
 BINDINGS="$HOME/.config/hypr/bindings.lua"
+CURL_UNIT="$HOME/.config/systemd/user/omatalk.service"
 BIND_LINE='o.bind("F8", "Omatalk", "omatalk speak")'
 
 msg() {
@@ -81,6 +82,31 @@ step_enable() {
   msg "Enabling omatalk.service"
   systemctl --user daemon-reload
   systemctl --user enable omatalk.service
+}
+
+step_curl_era() {
+  local stop_status
+
+  if [ -e "$CURL_UNIT" ]; then
+    set +e
+    systemctl --user disable --now omatalk.service 2>/dev/null
+    stop_status=$?
+    set -e
+    if [ "$stop_status" -ne 0 ]; then
+      if [ "$stop_status" -ne 5 ]; then
+        msg "Could not stop the current daemon; refusing to remove its files"
+        exit "$stop_status"
+      fi
+    fi
+    msg "Removing the curl-era systemd unit"
+    rm -f "$CURL_UNIT"
+    systemctl --user daemon-reload
+  fi
+
+  rm -f "$HOME/.local/bin/omatalk" "$HOME/.local/bin/omatalkd"
+  rm -rf "$OMATALK_HOME/venv" "$OMATALK_HOME/src"
+  rm -f "$OMATALK_HOME/models/kokoro-v1.0.fp16.onnx" "$OMATALK_HOME/omatalk-src.tar.gz" \
+    "$OMATALK_HOME/omatalk-src.tar.gz.sha256"
 }
 
 step_restart_daemon() {
@@ -222,6 +248,7 @@ if [ ! -x "$OMATALK_BIN" ]; then
   exit 1
 fi
 
+step_curl_era
 step_models
 step_enable
 step_restart_daemon

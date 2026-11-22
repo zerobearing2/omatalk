@@ -18,14 +18,14 @@ fn setup_calls(fake: &Fake) -> usize {
 }
 
 #[test]
-fn curl_install_migrates_to_the_package_and_keeps_user_files() {
+fn setup_migrates_a_curl_era_install_and_keeps_user_files() {
     let fake = Fake::new();
     let (config, bindings) = fake.seed_curl_install();
     let config_before = bytes(&config);
     let bindings_before = bytes(&bindings);
     let model_before = bytes(fake.model(FP32));
 
-    let result = fake.install("");
+    let result = fake.setup("");
 
     assert_eq!(result.code, 0, "{}", result.stderr);
     assert!(!fake.launcher().exists());
@@ -33,12 +33,21 @@ fn curl_install_migrates_to_the_package_and_keeps_user_files() {
     assert_eq!(bytes(&config), config_before);
     assert_eq!(bytes(&bindings), bindings_before);
     assert_eq!(bytes(fake.model(FP32)), model_before);
-    assert_eq!(setup_calls(&fake), 1);
-    let add = fake.last_index("omarchy pkg add omatalk-bin");
     let stop = fake.last_index("systemctl --user disable --now omatalk.service");
-    let reload = fake.last_index("systemctl --user daemon-reload");
-    assert!(add < stop && stop < reload, "{:?}", fake.commands());
-    assert_eq!(fake.downloads(), Vec::<String>::new());
+    let enable = fake.last_index("systemctl --user enable omatalk.service");
+    assert!(stop < enable, "{:?}", fake.commands());
+}
+
+#[test]
+fn the_shim_installs_the_package_then_runs_setup() {
+    let fake = Fake::new();
+    fake.seed_curl_install();
+
+    let result = fake.install("");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert_eq!(changes(&fake), ["omarchy pkg add omatalk-bin"]);
+    assert_eq!(setup_calls(&fake), 1);
 }
 
 #[test]
@@ -48,11 +57,11 @@ fn python_leftovers_are_removed_and_models_stay() {
     let config_before = bytes(&config);
     let bindings_before = bytes(&bindings);
 
-    let result = fake.install("");
+    let result = fake.setup("");
 
     assert_eq!(result.code, 0, "{}", result.stderr);
     assert_eq!(names(fake.install_home()), ["models"]);
-    assert_eq!(names(fake.install_home().join("models")), [VOICES]);
+    assert_eq!(names(fake.install_home().join("models")), [FP32, VOICES]);
     assert!(!fake.home(".local/bin/omatalkd").exists());
     assert!(!fake.launcher().exists());
     assert!(!fake.installed_unit().exists());
@@ -86,23 +95,6 @@ fn failed_pkg_add_changes_nothing() {
 }
 
 #[test]
-fn rerunning_on_a_migrated_home_only_adds_and_sets_up_again() {
-    let fake = Fake::new();
-    fake.seed_curl_install();
-    assert_eq!(fake.install("").code, 0);
-    let first = changes(&fake);
-
-    let result = fake.install("");
-
-    assert_eq!(result.code, 0, "{}", result.stderr);
-    assert_eq!(
-        changes(&fake)[first.len()..],
-        ["omarchy pkg add omatalk-bin"]
-    );
-    assert_eq!(setup_calls(&fake), 2);
-}
-
-#[test]
 fn a_clean_home_just_installs_the_package_and_sets_up() {
     let fake = Fake::new();
 
@@ -120,12 +112,12 @@ fn a_daemon_that_will_not_stop_keeps_its_files() {
     fake.seed_curl_install();
     fake.set("FAKE_STOP_STATUS", "1");
 
-    let result = fake.install("");
+    let result = fake.setup("");
 
     assert_eq!(result.code, 1);
     assert_eq!(read(fake.launcher()), launcher_script("curl-era"));
     assert!(fake.installed_unit().is_file());
-    assert_eq!(setup_calls(&fake), 0);
+    assert!(!fake.logged("systemctl --user enable"));
 }
 
 #[test]
@@ -134,11 +126,10 @@ fn a_missing_unit_is_tolerated() {
     fake.seed_curl_install();
     fake.set("FAKE_STOP_STATUS", "5");
 
-    let result = fake.install("");
+    let result = fake.setup("");
 
     assert_eq!(result.code, 0, "{}", result.stderr);
     assert!(!fake.installed_unit().exists());
-    assert_eq!(setup_calls(&fake), 1);
 }
 
 #[test]

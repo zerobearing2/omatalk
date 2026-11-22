@@ -24,8 +24,8 @@ selected text. Use the terms in `GLOSSARY.md`. The Omarchy package
   embedded in the binary, like `omatalk uninstall` does with `uninstall.sh`. The
   model pins live in `setup.sh`.
 - `install.sh` is a migration shim for curl installs, not an installer. It runs
-  `omarchy pkg add omatalk-bin`, deletes the curl-era binary and unit, and execs
-  `omatalk setup`. `public/install.sh` dispatches to the latest release's copy.
+  `omarchy pkg add omatalk-bin` and execs `omatalk setup`. Setup itself deletes
+  the curl-era binary and unit, so either path migrates. `public/install.sh` dispatches to the latest release's copy.
   Retire both at 1.0.
 - `packaging/dev/` is a PKGBUILD and the two alpm hooks with their scripts
   (`package-remove`, `package-restart`). The recipe in omacom/omarchy-pkgs
@@ -54,7 +54,8 @@ packaged (`PLUGIN_FILES` in `scripts/lib.sh`).
 
 `omatalk setup` links `~/.config/omarchy/plugins/zerobearing.omatalk` to the
 packaged directory, rescans, and enables it. A curl-era git checkout there is
-deleted first. Edit the QML in place, then
+deleted first, then the shell restarts, because a rescan does not reconnect a
+replaced widget. Edit the QML in place, then
 `ln -sfn $PWD/plugin/zerobearing.omatalk ~/.config/omarchy/plugins/zerobearing.omatalk`
 and `omarchy-shell -q shell rescanPlugins` to try a change before packaging.
 
@@ -150,8 +151,8 @@ site-only fix, run that dispatch. It deploys everything in `public/` on master.
    The `readlink` must print `/usr/bin/omatalk` with no `(deleted)`. A
    `(deleted)` means the Daemon still runs an old binary: run
    `systemctl --user restart omatalk.service`. The two `ls` paths are the
-   curl-era install. If either exists, run `bash -c "$(curl -fsSL https://omatalk.zerobearing.com/install.sh)"`
-   to migrate. The plugin `readlink` must print
+   curl-era install. If either exists, run `omatalk setup` (after
+   `omarchy pkg add omatalk-bin`) to migrate. The plugin `readlink` must print
    `/usr/share/omatalk/omarchy-plugin/zerobearing.omatalk`. A plain directory
    there is the curl-era checkout: `omatalk setup` replaces it with the link.
 

@@ -24,7 +24,11 @@ Now `omarchy pkg add omatalk-bin && omatalk setup` is the one install, and
   `plugin/zerobearing.omatalk/` with its history, so it always matches the
   Daemon it came with and updates with pacman. `omatalk setup` links it into
   `~/.config/omarchy/plugins/`, rescans, and enables it. A curl-era git
-  checkout at that path is deleted first. The plugin ID stays
+  checkout at that path is deleted first, and the shell restarts.
+- `omatalk setup` also migrates a curl install: it disables and deletes the
+  curl-era unit, binary, and v0.5 leftovers, and keeps models, config, and
+  the F8 line. So `omarchy pkg add omatalk-bin && omatalk setup` migrates as
+  well as the shim does. The plugin ID stays
   `zerobearing.omatalk`, so a saved bar placement keeps working. The plugin
   calls `/usr/bin/omatalk` only, and `scripts/build.sh` stamps the release
   version into its manifest. This supersedes ADR 0004.
@@ -37,8 +41,8 @@ Now `omarchy pkg add omatalk-bin && omatalk setup` is the one install, and
   online user manager after an upgrade, so nobody keeps running a deleted
   binary. A failed restart never fails the update. The hooks and their scripts
   live in `packaging/dev/` and are copied into the recipe in omacom/omarchy-pkgs.
-- `install.sh` becomes a migration shim. It installs the package, deletes the
-  curl-era binary, unit, and v0.5 leftovers, and execs `omatalk setup`. Old
+- `install.sh` becomes a migration shim. It installs the package and execs
+  `omatalk setup`, which does the migration. Old
   binaries' `omatalk upgrade` and the site's dispatcher both reach it through
   `releases/latest/download/install.sh`. If `omarchy pkg add` fails, it
   changes nothing. Retire the shim and `public/install.sh` at 1.0.
@@ -71,6 +75,6 @@ Consequences: a dev build is a package too. `scripts/dev-install.sh` builds
 `packaging/dev` at `<newest tag>.r<commits>.g<sha>`, which sorts above that
 tag and below the next RC or release, so `omarchy update` leaves it alone until
 one ships. A curl-era user who has not migrated keeps the v1.2.2 plugin
-checkout, which still calls `~/.local/bin/omatalk`, until the shim replaces it.
+checkout, which still calls `~/.local/bin/omatalk`, until `omatalk setup` replaces it.
 The Daemon's version is not on the socket, so after an upgrade the check is
 that `readlink /proc/<MainPID>/exe` is `/usr/bin/omatalk` without `(deleted)`.
