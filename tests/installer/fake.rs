@@ -4,7 +4,9 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::common::{Run, System, TempDir, chmod, read, repo, run, sha256, sha256_bytes, write};
+use crate::common::{
+    Run, System, TempDir, chmod, read, repo, run, sha256, sha256_bytes, write, write_executable,
+};
 
 pub use omatalk::speech::kokoro::MODEL_FILE as FP32;
 pub use omatalk::voices::VOICES_FILE as VOICES;
@@ -24,7 +26,7 @@ pub fn bytes(path: impl AsRef<Path>) -> Vec<u8> {
     std::fs::read(path).unwrap()
 }
 
-/// Stands in for the omatalk binary: status and speak against FAKE_STATE.
+/// Stands in for the omatalk binary: status, speak, and setup against FAKE_STATE.
 pub fn launcher_script(release: &str) -> String {
     format!(
         r#"#!/bin/sh
@@ -35,6 +37,7 @@ case "${{1:-}}" in
     printf '%s\n' "$*" >> "$FAKE_STATE/speech"
     exit "${{FAKE_SPEAK_STATUS:-0}}"
     ;;
+  setup) printf 'setup\n' >> "$FAKE_STATE/setup-calls" ;;
 esac
 "#
     )
@@ -64,9 +67,9 @@ pub fn installer_pins(script: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-/// The value of install.sh's `name` pin.
+/// The value of setup.sh's `name` pin.
 pub fn pin(name: &str) -> Option<String> {
-    installer_pins(&read(repo("install.sh")))
+    installer_pins(&read(repo("setup.sh")))
         .into_iter()
         .find(|(k, _)| k == name)
         .map(|(_, v)| v)
@@ -93,7 +96,9 @@ impl std::ops::DerefMut for Fake {
 
 impl Fake {
     pub fn new() -> Fake {
-        let sys = System::new();
+        let mut sys = System::new();
+        write_executable(sys.path("usr/bin/omatalk"), &launcher_script("package"));
+        sys.set("OMATALK_BIN", sys.path("usr/bin/omatalk"));
         let model = b"fake model";
         let voices = b"fake voices";
         write(sys.site("models").join(FP32), model);
@@ -175,6 +180,31 @@ impl Fake {
         let path = self.path("install.sh");
         write(&path, script);
         path
+    }
+
+    /// setup.sh with its download and plugin pins rewritten for the fake site.
+    fn pinned_setup(&self) -> PathBuf {
+        let mut script = read(repo("setup.sh"));
+        let current = installer_pins(&script);
+        for name in ["MODEL_BASE", "MODEL_SHA256", "VOICES_SHA256", "PLUGIN_REPO"] {
+            let (_, value) = self.pins.iter().find(|(k, _)| *k == name).unwrap();
+            let (_, old) = current
+                .iter()
+                .find(|(k, _)| k == name)
+                .unwrap_or_else(|| panic!("setup.sh has no {name}= pin"));
+            script = script.replacen(
+                &format!("{name}=\"{old}\""),
+                &format!("{name}=\"{value}\""),
+                1,
+            );
+        }
+        let path = self.path("setup.sh");
+        write(&path, script);
+        path
+    }
+
+    pub fn setup(&self, answer: &str) -> Run {
+        self.bash(&self.pinned_setup(), answer)
     }
 
     pub fn bash(&self, script: &Path, answer: &str) -> Run {

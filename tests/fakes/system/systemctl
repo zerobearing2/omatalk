@@ -1,4 +1,9 @@
 #!/bin/sh
+# Logs every call and keeps two bits of state under $FAKE_STATE: `ready`
+# (the Daemon runs; start and restart create it, stop and disable remove it)
+# and `enabled` (enable creates it, disable removes it, is-enabled reads it).
+# FAKE_STOP_STATUS is the exit status of stop and disable. FAKE_DAEMON_DOWN=1
+# keeps start and restart from bringing the Daemon up.
 set -eu
 printf 'systemctl %s\n' "$*" >> "$FAKE_LOG"
 case "$*" in
@@ -6,9 +11,19 @@ case "$*" in
     rm -f "$FAKE_STATE/ready"
     exit "${FAKE_STOP_STATUS:-0}"
     ;;
-  --user\ start*)
+  --user\ start* | --user\ restart*)
     if [ "${FAKE_DAEMON_DOWN:-0}" != 1 ]; then
       touch "$FAKE_STATE/ready"
     fi
+    ;;
+  --user\ enable*)
+    touch "$FAKE_STATE/enabled"
+    ;;
+  --user\ disable*)
+    rm -f "$FAKE_STATE/enabled" "$FAKE_STATE/ready"
+    exit "${FAKE_STOP_STATUS:-0}"
+    ;;
+  --user\ is-enabled*)
+    test -f "$FAKE_STATE/enabled"
     ;;
 esac

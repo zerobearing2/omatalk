@@ -73,6 +73,8 @@ pub enum Cli {
     /// Read or change settings
     #[command(subcommand, arg_required_else_help = true)]
     Config(ConfigCommand),
+    /// Download the models and set up the service, F8 binding, and bar plugin
+    Setup,
     /// Remove Omatalk from this machine
     Uninstall,
     /// Run the Daemon (started by omatalk.service)
@@ -155,6 +157,7 @@ pub fn run(cli: Cli, paths: &Paths) -> ExitCode {
                 Err(e) => fail(e),
             }
         }
+        Cli::Setup => setup(),
         Cli::Uninstall => uninstall(),
         Cli::Daemon => match crate::daemon::serve(paths) {
             Ok(never) => match never {},
@@ -276,6 +279,11 @@ fn read_stdin() -> std::io::Result<Option<String>> {
     let mut raw = String::new();
     stdin.lock().read_to_string(&mut raw)?;
     Ok(Some(raw))
+}
+
+/// The embedded `setup.sh`: the per-user work the package cannot do.
+fn setup() -> ExitCode {
+    exec_script(include_str!("../setup.sh"), "omatalk setup")
 }
 
 /// The embedded `uninstall.sh`: no dependency on files under OMATALK_HOME,
@@ -462,6 +470,8 @@ mod tests {
         assert_eq!(p(&["stop"]), Ok(Cli::Stop));
         assert_eq!(p(&["status"]), Ok(Cli::Status));
         assert_eq!(p(&["daemon"]), Ok(Cli::Daemon));
+        assert_eq!(p(&["setup"]), Ok(Cli::Setup));
+        assert_eq!(p(&["uninstall"]), Ok(Cli::Uninstall));
         assert_eq!(
             p(&["config", "get", "--json"]),
             Ok(Cli::Config(ConfigCommand::Get { json: true }))
@@ -503,6 +513,8 @@ mod tests {
     fn extra_or_missing_words_are_usage() {
         for words in [
             &["frob"][..],
+            &["setup", "now"],
+            &["upgrade"],
             &["uninstall", "now"],
             &["status", "--follow"],
             &["version", "x"],

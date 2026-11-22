@@ -16,6 +16,9 @@ case "${1:-} ${2:-}" in
     mkdir -p "$plugin_dir/.git"
     printf '{"id":"zerobearing.omatalk"}\n' > "$plugin_dir/manifest.json"
     ;;
+  "plugin update")
+    exit "${FAKE_PLUGIN_UPDATE_FAIL:-0}"
+    ;;
   "plugin remove")
     if [ "${FAKE_PLUGIN_REMOVE_FAIL:-0}" = 1 ]; then
       exit 1

@@ -2,6 +2,7 @@ mod common;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use common::{FAKES, System, TempDir, omatalk, read, run, write, write_voices_archive};
 
@@ -12,6 +13,50 @@ fn upgrade_is_not_a_command() {
     let sys = System::new();
 
     let result = run(omatalk(["upgrade"]).envs(sys.env()), "");
+
+    assert_eq!(result.code, 2);
+    assert!(
+        result.stderr.starts_with("error: ") && result.stderr.contains("Usage: omatalk "),
+        "{}",
+        result.stderr
+    );
+    assert_eq!(sys.commands(), Vec::<String>::new());
+}
+
+/// Run from a directory that holds no setup.sh, so only the copy embedded in
+/// the binary can be the script. Its first step downloads the pinned model,
+/// which the fake site does not serve: the script stops there.
+#[test]
+fn setup_runs_the_embedded_setup_script() {
+    let sys = System::new();
+    let elsewhere = TempDir::new("cli");
+
+    let result = run(
+        Command::new(common::OMATALK)
+            .arg("setup")
+            .current_dir(elsewhere.path())
+            .envs(sys.env())
+            .env("OMATALK_BIN", "/usr/bin/true"),
+        "",
+    );
+
+    assert_ne!(result.code, 0);
+    let downloads = sys.downloads();
+    assert_eq!(downloads.len(), 1, "{downloads:?}");
+    assert!(
+        downloads[0].ends_with(
+            " https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx"
+        ),
+        "{downloads:?}"
+    );
+    assert!(!sys.logged("systemctl"));
+}
+
+#[test]
+fn setup_rejects_extra_arguments() {
+    let sys = System::new();
+
+    let result = run(omatalk(["setup", "now"]).envs(sys.env()), "");
 
     assert_eq!(result.code, 2);
     assert!(
