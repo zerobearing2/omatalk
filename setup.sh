@@ -31,7 +31,7 @@ warn() {
   printf '\033[1;33m==>\033[0m %s\n' "$1"
 }
 
-# Prompts read the terminal when piped via curl | bash; fall back to stdin
+# Prompts read the terminal even when stdin is a pipe; fall back to stdin
 # for scripted runs where /dev/tty is unavailable. Tests set ASK_FROM.
 if [ -z "${ASK_FROM:-}" ]; then
   ASK_FROM=/dev/tty

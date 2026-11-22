@@ -198,7 +198,7 @@ fn install_commands_match_readme_and_cname() {
     let plugin =
         "omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable"
             .to_owned();
-    let install = format!("curl -fsSL https://{host}/install.sh | bash");
+    let install = "omarchy pkg add omatalk-bin && omatalk setup".to_owned();
     let uninstall = "omatalk uninstall".to_owned();
     let cards = copy_cards(&page());
     let shown: BTreeSet<&str> = cards.iter().map(|c| c.trim()).collect();
@@ -207,6 +207,12 @@ fn install_commands_match_readme_and_cname() {
         assert!(shown.contains(command.as_str()), "page lacks {command}");
         assert!(readme.contains(command.as_str()), "README lacks {command}");
     }
+    // The one-time migration for curl installs: the dispatcher stays, in the
+    // README and in the page's prose, but not as the install card.
+    let migrate = format!("curl -fsSL https://{host}/install.sh | bash");
+    assert!(!shown.contains(migrate.as_str()));
+    assert!(readme.contains(&migrate));
+    assert!(read(public("index.html")).contains(&migrate));
     assert!(public("install.sh").is_file());
     assert!(!public("uninstall.sh").exists());
 }

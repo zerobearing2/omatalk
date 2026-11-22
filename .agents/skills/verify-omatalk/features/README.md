@@ -11,7 +11,7 @@ The harness is `.agents/skills/verify-omatalk/scripts/verify`. The bar plugin, t
 - The isolated config starts at voice `af_heart` and speed `1.0`.
 - The selection file and the clipboard file hold the sentences `doctor` prints. Speak with no text reads those files. It does not read the Wayland selection or clipboard.
 - The player records PCM. It does not play through the speakers.
-- Never drive a Daemon this run did not start. Never run `omatalk upgrade` or `omatalk uninstall`.
+- Never drive a Daemon this run did not start. Never run `omatalk setup` or `omatalk uninstall`.
 
 ## Driving conventions
 

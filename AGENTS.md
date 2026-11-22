@@ -1,7 +1,8 @@
 # Omatalk
 
 Local text-to-speech for Omarchy: a hotkey makes the machine speak your
-selected text. Use the terms in `GLOSSARY.md`.
+selected text. Use the terms in `GLOSSARY.md`. The Omarchy package
+`omatalk-bin` is the only install (`docs/adr/0009-the-omarchy-package-is-the-only-install.md`).
 
 ## Repository map
 
@@ -14,9 +15,21 @@ selected text. Use the terms in `GLOSSARY.md`.
 - `tools/parity/` holds standalone uv scripts, outside the test suite, that
   regenerate reference data from Python spaCy and misaki. Run one directly:
   `tools/parity/dump_misaki.py lines.txt out.jsonl`. See `data/NOTICE.md`.
-- `scripts/dev-install.sh` dogfoods this checkout: it installs a release build
-  over `~/.local/bin/omatalk` with this tree's unit and restarts the Daemon. It
-  needs models from an earlier install. `omatalk upgrade` goes back.
+- `setup.sh` is the per-user work the package cannot do: models, unit enable,
+  F8 binding, bar plugin, welcome speech. `omatalk setup` execs the copy
+  embedded in the binary, like `omatalk uninstall` does with `uninstall.sh`. The
+  model pins live in `setup.sh`.
+- `install.sh` is a migration shim for curl installs, not an installer. It runs
+  `omarchy pkg add omatalk-bin`, deletes the curl-era binary and unit, and execs
+  `omatalk setup`. `public/install.sh` dispatches to the latest release's copy.
+  Retire both at 1.0.
+- `packaging/dev/` is a PKGBUILD and the two alpm hooks with their scripts
+  (`package-remove`, `package-restart`). The recipe in omacom/omarchy-pkgs
+  carries the same hooks. A hook change lands in both.
+- `scripts/dev-install.sh` dogfoods this checkout: it builds `packaging/dev` as
+  `omatalk-bin` at `<latest stable>.r<commits>.g<sha>` and runs
+  `sudo pacman -U` on it. It needs models from an earlier `omatalk setup`.
+  `omarchy pkg drop omatalk-bin && omarchy pkg add omatalk-bin` goes back.
 - `scripts/build.sh` runs from `scripts/release.sh`. Keep both build scripts
   out of the Makefile.
 
@@ -50,23 +63,26 @@ The script builds in a temporary worktree. It sets the version, runs
 `gh release create --verify-tag`. A release commit never goes on a branch.
 
 Keep master's `Cargo.toml` version at `0.0.0-dev`, so a local build never claims
-to be a release. Master's `install.sh` pin is stale by design. Each tag's commit
-holds the real values: `scripts/build.sh` writes `RELEASE_TAG` and
-`TARBALL_SHA256`.
+to be a release. Nothing is pinned in a release commit: the tarball is the
+source of the `omatalk-bin` recipe in omacom/omarchy-pkgs, whose `pkgver` and
+tarball checksum change per release.
 
-To test an RC, run
-`bash -c "$(curl -fsSL https://github.com/zerobearing2/omatalk/releases/download/TAG/install.sh)"`.
+To test an RC, point a local `omatalk-bin` recipe at the RC's tarball, build it
+with `makepkg`, and install it with `sudo pacman -U`. `scripts/dev-install.sh`
+does the same for this checkout.
 
-`releases/latest` feeds the site installer and `omatalk upgrade`. Only
-`scripts/release.sh` sets it, and it verifies the result. RCs never take it. A
+`releases/latest` feeds the site's install.sh dispatcher, which old binaries'
+`omatalk upgrade` also read. Only `scripts/release.sh` sets it, and it verifies
+the result. RCs never take it. A
 stable release takes it only when its version is numerically higher than the
 current latest. If the script cannot read it (anything but a 404), it refuses
 before it pushes.
 
-The tarball `omatalk-x86_64.tar.gz` holds the `omatalk` binary,
+The release assets are the tarball `omatalk-x86_64.tar.gz` with its `.sha256`,
+and the shim `install.sh`. The tarball holds the `omatalk` binary,
 `omatalk.service`, and `LICENSE`. The binary dlopens `onnxruntime-cpu` and
-`espeak-ng` only in `omatalk daemon` and `omatalk render`. `install.sh`
-installs both with `omarchy pkg add`.
+`espeak-ng` only in `omatalk daemon` and `omatalk render`. The package depends
+on both.
 
 ### Hotfix an old version
 
@@ -78,8 +94,8 @@ Use a `release-X.Y.x` branch, so unreleased master code stays out.
    If the cherry-pick is too hard, fix on the branch and port to master at once.
 3. On the branch, run `make rc VERSION=0.9.1`, then `make release VERSION=0.9.1`.
 
-A hotfix of an old line does not take `releases/latest`, so the site, the site
-installer, and `omatalk upgrade` keep serving the newest line.
+A hotfix of an old line does not take `releases/latest`, so the site and its
+install.sh dispatcher keep serving the newest line.
 
 ### Plugin release
 
@@ -103,15 +119,24 @@ site-only fix, run that dispatch. It deploys everything in `public/` on master.
    ```sh
    omatalk version
    omatalk status
+   pacman -Q omatalk-bin
    systemctl --user status omatalk.service --no-pager -l
    journalctl --user -u omatalk.service -b --no-pager -n 80
+   readlink /proc/$(systemctl --user show -p MainPID --value omatalk.service)/exe
    stat -c '%A %U:%G %n' "${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk/omatalk.sock" \
      ~/.config/omarchy/plugins/zerobearing.omatalk/manifest.json \
      ~/.config/omarchy/plugins/zerobearing.omatalk/BarWidget.qml
    ss -xap | grep -E 'omatalk|quickshell'
+   ls ~/.local/bin/omatalk ~/.config/systemd/user/omatalk.service
    omarchy plugin list --json | grep -C 3 'zerobearing.omatalk'
    omarchy-shell shell listPlugins | grep -C 3 'zerobearing.omatalk'
    ```
+
+   The `readlink` must print `/usr/bin/omatalk` with no `(deleted)`. A
+   `(deleted)` means the Daemon still runs an old binary: run
+   `systemctl --user restart omatalk.service`. The two `ls` paths are the
+   curl-era install. If either exists, run `bash -c "$(curl -fsSL https://omatalk.zerobearing.com/install.sh)"`
+   to migrate.
 
 2. Check each layer: the service and `omatalk status`, the socket and its
    Quickshell peer, whether the plugin is present and enabled, and QML errors in
