@@ -3,7 +3,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-// Voice + speed config panel.
+// Voice, speed, media pause, and wake lead config panel.
 Panel {
   id: root
   moduleName: "zerobearing.omatalk"
@@ -19,11 +19,24 @@ Panel {
   // so both the live label and the committed value round through this.
   function snapSpeed(v) { return Math.round(v * 10) / 10 }
 
+  readonly property int wakeLeadMax: 2000
+  readonly property int wakeLeadStep: 50
+  // Same reason as snapSpeed. Clamped because `config set` rejects past 2000.
+  function snapWakeLead(v) {
+    var snapped = Math.round(v / wakeLeadStep) * wakeLeadStep
+    return Math.max(0, Math.min(wakeLeadMax, snapped))
+  }
+  function wakeLeadLabel(ms) { return ms === 0 ? "Off" : ms + " ms" }
+
   property var voiceOptions: []
   property string voice: ""
   property real speed: 1.0
   property string voiceError: ""
   property string speedError: ""
+  property bool pauseMedia: true
+  property int wakeLeadMs: 650
+  property string pauseMediaError: ""
+  property string wakeLeadError: ""
   property string daemonVersion: "unknown"
   readonly property string versionLabel: "omatalk " + daemonVersion
 
@@ -78,6 +91,18 @@ Panel {
     setSpeedProc.running = true
   }
 
+  function setPauseMedia(value) {
+    root.pauseMedia = value
+    setPauseMediaProc.command = [root.launcherPath, "config", "set", "pause_media", String(value)]
+    setPauseMediaProc.running = true
+  }
+
+  function setWakeLead(value) {
+    root.wakeLeadMs = value
+    setWakeLeadProc.command = [root.launcherPath, "config", "set", "wake_lead_ms", String(value)]
+    setWakeLeadProc.running = true
+  }
+
   Process {
     id: voicesProc
     command: ["omatalk", "config", "voices", "--json"]
@@ -108,6 +133,8 @@ Panel {
           var cfg = JSON.parse(text)
           if (cfg.voice !== undefined) root.voice = cfg.voice
           if (cfg.speed !== undefined) root.speed = cfg.speed
+          if (cfg.pause_media !== undefined) root.pauseMedia = cfg.pause_media
+          if (cfg.wake_lead_ms !== undefined) root.wakeLeadMs = cfg.wake_lead_ms
         } catch (e) {
           // Leave the previous values in place on a bad/empty response.
         }
@@ -139,6 +166,26 @@ Panel {
       onStreamFinished: root.speedError = text.trim()
     }
     onExited: function(exitCode) { if (exitCode === 0) root.speedError = "" }
+  }
+
+  Process {
+    id: setPauseMediaProc
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.pauseMediaError = text.trim()
+    }
+    onExited: function(exitCode) { if (exitCode === 0) root.pauseMediaError = "" }
+  }
+
+  Process {
+    id: setWakeLeadProc
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.wakeLeadError = text.trim()
+    }
+    onExited: function(exitCode) { if (exitCode === 0) root.wakeLeadError = "" }
   }
 
   Process {
@@ -250,6 +297,67 @@ Panel {
             width: parent.width
             wrapMode: Text.WordWrap
             text: root.speedError
+            color: Color.urgent
+            font.family: Style.font.family
+            font.pixelSize: Style.font.bodySmall
+          }
+
+          Toggle {
+            objectName: "omatalkPauseMediaToggle"
+            width: parent.width
+            label: "Pause media while speaking"
+            foreground: Color.popups.text
+            fontFamily: Style.font.family
+            checked: root.pauseMedia
+            onClicked: root.setPauseMedia(!root.pauseMedia)
+          }
+
+          Text {
+            visible: root.pauseMediaError !== ""
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: root.pauseMediaError
+            color: Color.urgent
+            font.family: Style.font.family
+            font.pixelSize: Style.font.bodySmall
+          }
+
+          PanelSectionHeader { text: "BLUETOOTH AND HDMI WAKE" }
+
+          Row {
+            width: parent.width
+            spacing: Style.space(12)
+
+            PanelSlider {
+              id: wakeLeadSlider
+              objectName: "omatalkWakeLeadSlider"
+              bar: root.bar
+              width: parent.width - wakeLeadLabelText.width - Style.space(12)
+              minimum: 0
+              maximum: root.wakeLeadMax
+              step: root.wakeLeadStep
+              value: root.wakeLeadMs
+              tickCount: 5
+              tickColor: Color.popups.background
+              onReleased: function(v) { root.setWakeLead(root.snapWakeLead(v)) }
+            }
+
+            Text {
+              id: wakeLeadLabelText
+              objectName: "omatalkWakeLeadLabel"
+              text: root.wakeLeadLabel(root.snapWakeLead(wakeLeadSlider.liveValue))
+              color: Color.popups.text
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+              width: Style.space(64)
+            }
+          }
+
+          Text {
+            visible: root.wakeLeadError !== ""
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: root.wakeLeadError
             color: Color.urgent
             font.family: Style.font.family
             font.pixelSize: Style.font.bodySmall

@@ -7,5 +7,6 @@ PanelSeparator 1.0 PanelSeparator.qml
 PanelSectionHeader 1.0 PanelSectionHeader.qml
 SearchableDropdown 1.0 SearchableDropdown.qml
 PanelSlider 1.0 PanelSlider.qml
+Toggle 1.0 Toggle.qml
 BarWidget 1.0 BarWidget.qml
 BarIconButton 1.0 BarIconButton.qml

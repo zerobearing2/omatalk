@@ -39,6 +39,12 @@ TestCase {
   function test_sample_and_snap() {
     compare(panel.sampleTextFor("af_bella"), "Hi, I'm bella. This is what I sound like.")
     compare(panel.snapSpeed(1.73), 1.7)
+    compare(panel.snapWakeLead(626), 650)
+    compare(panel.snapWakeLead(624), 600)
+    compare(panel.snapWakeLead(-30), 0)
+    compare(panel.snapWakeLead(2030), 2000)
+    compare(panel.wakeLeadLabel(0), "Off")
+    compare(panel.wakeLeadLabel(650), "650 ms")
     verify(panel.isEnglishVoice("bf_emma"))
     verify(!panel.isEnglishVoice("jf_alpha"))
   }
@@ -57,6 +63,22 @@ TestCase {
     compare(panel.versionLabel, "omatalk 0.2.1-test")
   }
 
+  function test_refresh_fills_media_pause_and_wake_lead() {
+    compare(panel.pauseMedia, true)
+    compare(panel.wakeLeadMs, 650)
+    panel.refresh()
+    findProc("config get --json").complete(
+      0, '{"voice":"af_heart","speed":1.0,"pause_media":false,"wake_lead_ms":0}', "")
+    compare(panel.pauseMedia, false)
+    compare(panel.wakeLeadMs, 0)
+  }
+
+  function test_get_without_the_new_keys_keeps_the_defaults() {
+    panel.refresh()
+    findProc("config get --json").complete(0, '{"voice":"af_heart","speed":1.0}', "")
+    compare(panel.pauseMedia, true)
+    compare(panel.wakeLeadMs, 650)
+  }
 
   function test_failed_version_is_unknown() {
     panel.refresh()
@@ -77,6 +99,67 @@ TestCase {
   function test_set_speed_saves_snapped_value() {
     panel.setSpeed(panel.snapSpeed(1.73))
     compare(commandLine(findProc("config set speed")), launcherBin + " config set speed 1.7")
+  }
+
+  function test_set_pause_media_saves_the_flipped_value() {
+    panel.setPauseMedia(false)
+    compare(panel.pauseMedia, false)
+    compare(commandLine(findProc("config set pause_media")), launcherBin + " config set pause_media false")
+    panel.setPauseMedia(true)
+    compare(commandLine(findProc("config set pause_media")), launcherBin + " config set pause_media true")
+  }
+
+  function test_set_wake_lead_saves_snapped_value() {
+    panel.setWakeLead(panel.snapWakeLead(1230))
+    compare(commandLine(findProc("config set wake_lead_ms")), launcherBin + " config set wake_lead_ms 1250")
+    panel.setWakeLead(panel.snapWakeLead(0))
+    compare(commandLine(findProc("config set wake_lead_ms")), launcherBin + " config set wake_lead_ms 0")
+  }
+
+  function test_set_errors_show_and_clear() {
+    panel.setPauseMedia(false)
+    findProc("config set pause_media").complete(1, "", "false: nope\n")
+    compare(panel.pauseMediaError, "false: nope")
+    panel.setPauseMedia(true)
+    findProc("config set pause_media").complete(0, "", "")
+    compare(panel.pauseMediaError, "")
+
+    panel.setWakeLead(650)
+    findProc("config set wake_lead_ms").complete(1, "", "bad\n")
+    compare(panel.wakeLeadError, "bad")
+    panel.setWakeLead(700)
+    findProc("config set wake_lead_ms").complete(0, "", "")
+    compare(panel.wakeLeadError, "")
+  }
+
+  function test_controls_drive_the_setters() {
+    var toggle = findChild(panel, "omatalkPauseMediaToggle")
+    var slider = findChild(panel, "omatalkWakeLeadSlider")
+    verify(toggle !== null)
+    verify(slider !== null)
+    compare(toggle.label, "Pause media while speaking")
+
+    toggle.clicked()
+    compare(commandLine(findProc("config set pause_media")), launcherBin + " config set pause_media false")
+    compare(toggle.checked, false)
+
+    slider.released(1233)
+    compare(commandLine(findProc("config set wake_lead_ms")), launcherBin + " config set wake_lead_ms 1250")
+    compare(slider.maximum, 2000)
+    compare(slider.step, 50)
+  }
+
+  function test_controls_show_what_get_returned() {
+    panel.refresh()
+    findProc("config get --json").complete(
+      0, '{"voice":"af_heart","speed":1.0,"pause_media":false,"wake_lead_ms":0}', "")
+    compare(findChild(panel, "omatalkPauseMediaToggle").checked, false)
+    compare(findChild(panel, "omatalkWakeLeadSlider").value, 0)
+    compare(findChild(panel, "omatalkWakeLeadLabel").text, "Off")
+    findProc("config get --json").complete(
+      0, '{"voice":"af_heart","speed":1.0,"pause_media":true,"wake_lead_ms":650}', "")
+    compare(findChild(panel, "omatalkPauseMediaToggle").checked, true)
+    compare(findChild(panel, "omatalkWakeLeadLabel").text, "650 ms")
   }
 
   function test_open_refreshes() {
