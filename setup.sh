@@ -55,6 +55,7 @@ download() {
 download_model() {
   local file="$1"
   local sha256="$2"
+  local size="$3"
   local path="$OMATALK_HOME/models/$file"
 
   if [ -s "$path" ]; then
@@ -64,15 +65,15 @@ download_model() {
   fi
 
   rm -f "$path"
-  msg "Downloading $file (~355MB total) — this can take a few minutes depending on your connection"
+  msg "Downloading $file (~$size) — this can take a few minutes depending on your connection"
   download "$MODEL_BASE/$file" "$path" "$MODEL_MAX_BYTES" --progress-bar
   echo "$sha256  $path" | sha256sum -c --quiet
 }
 
 step_models() {
   mkdir -p "$OMATALK_HOME/models"
-  download_model "$MODEL_FILE" "$MODEL_SHA256"
-  download_model "$VOICES_FILE" "$VOICES_SHA256"
+  download_model "$MODEL_FILE" "$MODEL_SHA256" 326MB
+  download_model "$VOICES_FILE" "$VOICES_SHA256" 28MB
 }
 
 step_enable() {

@@ -38,6 +38,10 @@ fn fresh_setup_fetches_each_model_once_then_enables_and_starts_the_unit() {
         fake.commands()
     );
     assert!(result.stdout.contains("Done."), "{}", result.stdout);
+    for (file, size) in [(FP32, "326MB"), (VOICES, "28MB")] {
+        let line = format!("Downloading {file} (~{size})");
+        assert!(result.stdout.contains(&line), "{}", result.stdout);
+    }
     assert!(read(fake.path("state/speech")).contains("speak Welcome to omatalk!"));
 }
 
