@@ -1,4 +1,4 @@
-use crate::common::{names, read};
+use crate::common::{names, read, write};
 use crate::fake::*;
 
 fn changes(fake: &Fake) -> Vec<String> {
@@ -164,4 +164,37 @@ fn a_failed_model_download_leaves_a_curl_era_install_running() {
     assert!(fake.installed_unit().is_file());
     assert!(!fake.logged("systemctl --user disable"));
     assert!(!fake.logged("systemctl --user stop"));
+}
+
+#[test]
+fn a_curl_era_unit_with_an_absolute_launcher_path_is_migrated() {
+    let fake = Fake::new();
+    fake.seed_curl_install();
+    let exec_start = format!("ExecStart={} daemon", fake.launcher().display());
+    write(fake.installed_unit(), format!("[Service]\n{exec_start}\n"));
+
+    let result = fake.setup("");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(!fake.installed_unit().exists());
+    assert!(fake.logged("systemctl --user disable --now omatalk.service"));
+}
+
+#[test]
+fn a_users_own_unit_override_is_kept_and_its_daemon_left_running() {
+    let fake = Fake::new();
+    let unit = "[Unit]\nDescription=mine\n[Service]\nExecStart=/usr/bin/omatalk daemon\nNice=5\n";
+    write(fake.installed_unit(), unit);
+
+    let result = fake.setup("");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert_eq!(read(fake.installed_unit()), unit);
+    assert!(!fake.logged("systemctl --user disable"));
+    assert!(!fake.logged("systemctl --user stop"));
+    assert!(
+        result.stdout.contains("not a curl-era unit"),
+        "{}",
+        result.stdout
+    );
 }

@@ -84,23 +84,51 @@ step_enable() {
   systemctl --user enable omatalk.service
 }
 
-step_curl_era() {
+# Curl installs copied the unit verbatim, so its ExecStart is one of two
+# %h paths. `systemctl --user edit --full` writes a user's own override to
+# the same file.
+is_curl_era_unit() {
+  local exec_start
+
+  if ! exec_start=$(grep -m 1 '^ExecStart=' "$CURL_UNIT"); then
+    return 1
+  fi
+  case "${exec_start#ExecStart=}" in
+    "%h/.local/bin/omatalk"* | "$HOME/.local/bin/omatalk"*)
+      return 0
+      ;;
+    "%h/.local/share/omatalk/venv/"* | "$HOME/.local/share/omatalk/venv/"*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+stop_curl_era_unit() {
   local stop_status
 
-  if [ -e "$CURL_UNIT" ]; then
-    set +e
-    systemctl --user disable --now omatalk.service 2>/dev/null
-    stop_status=$?
-    set -e
-    if [ "$stop_status" -ne 0 ]; then
-      if [ "$stop_status" -ne 5 ]; then
-        msg "Could not stop the current daemon; refusing to remove its files"
-        exit "$stop_status"
-      fi
+  set +e
+  systemctl --user disable --now omatalk.service 2>/dev/null
+  stop_status=$?
+  set -e
+  if [ "$stop_status" -ne 0 ]; then
+    if [ "$stop_status" -ne 5 ]; then
+      msg "Could not stop the current daemon; refusing to remove its files"
+      exit "$stop_status"
     fi
-    msg "Removing the curl-era systemd unit"
-    rm -f "$CURL_UNIT"
-    systemctl --user daemon-reload
+  fi
+  msg "Removing the curl-era systemd unit"
+  rm -f "$CURL_UNIT"
+  systemctl --user daemon-reload
+}
+
+step_curl_era() {
+  if [ -e "$CURL_UNIT" ]; then
+    if is_curl_era_unit; then
+      stop_curl_era_unit
+    else
+      warn "$CURL_UNIT is not a curl-era unit; leaving it. It overrides the packaged unit"
+    fi
   fi
 
   rm -f "$HOME/.local/bin/omatalk" "$HOME/.local/bin/omatalkd"
