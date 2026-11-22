@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Build the release binary and pack the runtime tarball. Tag is
+# v$(Cargo.toml version). --pack-only packs the binary already in
+# target/release (tests/pack.rs uses it).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -29,6 +32,9 @@ stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 stage_plugin "$ROOT" "$stage/omarchy-plugin" "$version"
 
+# Reproducible: bytes depend only on the binary, the unit, LICENSE, and the
+# staged plugin. install.sh is not in this archive; it is a sibling release
+# asset.
 tar --sort=name \
   --mtime=@0 \
   --owner=0 \

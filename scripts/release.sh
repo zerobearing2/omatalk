@@ -5,6 +5,11 @@
 #   VERSION=x.y.z scripts/release.sh rc      publishes vX.Y.Z-rc.N as a prerelease
 #   VERSION=x.y.z scripts/release.sh stable  publishes vX.Y.Z, as latest only
 #                                            when it is higher than the current latest
+#
+# On release-X.Y.x, VERSION must be X.Y.z. The version change and the release
+# commit exist only in a temporary worktree. The commit is tagged, and only the
+# tag is pushed. A stable release requires that the highest RC was built from
+# this exact HEAD. install.sh is a tracked file uploaded beside the tarball.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -219,7 +224,7 @@ cargo test --locked
 make lint
 scripts/build.sh
 
-for asset in "$TARBALL" "$TARBALL.sha256" install.sh; do
+for asset in "$TARBALL" "$TARBALL.sha256"; do
   if [ ! -f "$asset" ]; then
     die "missing $asset after build"
   fi
