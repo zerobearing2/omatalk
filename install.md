@@ -109,7 +109,7 @@ EXECUTE NOW: Start with Step 0. Mark TODO items complete as you go. Stop when `p
 
 ## Migrating a curl install
 
-A machine installed with the old curl command has ${HOME}/.local/bin/omatalk and ${HOME}/.config/systemd/user/omatalk.service. Run the shim once. It installs the package, deletes those files, and runs `omatalk setup`. Models, config, and the F8 binding stay. The packaged plugin replaces the old plugin checkout.
+A machine installed with the old curl command has ${HOME}/.local/bin/omatalk and ${HOME}/.config/systemd/user/omatalk.service. Run the shim once. It installs the package and runs `omatalk setup`, which deletes those files. Models, config, and the F8 binding stay. The packaged plugin replaces the old plugin checkout.
 
 ```bash
 ASK_FROM="${HOME}/.local/share/omatalk-install-answer" bash -c "$(curl -fsSL https://omatalk.zerobearing.com/install.sh)"
@@ -117,4 +117,4 @@ ASK_FROM="${HOME}/.local/share/omatalk-install-answer" bash -c "$(curl -fsSL htt
 
 ## Optional: Dogfood this checkout
 
-After Step 5 has passed, `scripts/dev-install.sh` builds this checkout as an omatalk-bin package and installs it with `sudo pacman -U`, so run it only with the person's go-ahead. It downloads nothing. The model files must already be present. `omarchy pkg drop omatalk-bin && omarchy pkg add omatalk-bin` returns to the published package.
+After Step 5 has passed, `scripts/dev-install.sh` builds this checkout as an omatalk-bin package and installs it with `sudo pacman -U`, so run it only with the person's go-ahead. It downloads nothing. The model files must already be present. `omarchy pkg drop omatalk-bin && omarchy pkg add omatalk-bin && omatalk setup` returns to the published package. The drop disables the unit and removes the plugin link, so setup must run again.

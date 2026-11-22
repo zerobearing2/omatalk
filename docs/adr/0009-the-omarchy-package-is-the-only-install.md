@@ -1,6 +1,6 @@
 # The Omarchy package is the only install
 
-Through 0.10, Omatalk installed with a curl script. `install.sh` downloaded a
+Through 0.11, Omatalk installed with a curl script. `install.sh` downloaded a
 pinned tarball into `~/.local/bin`, wrote a user unit into
 `~/.config/systemd/user`, fetched the models, and added the plugin.
 `omatalk upgrade` fetched the next release's script and ran it. Omarchy already

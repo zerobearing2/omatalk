@@ -231,7 +231,7 @@ step_plugin() {
   fi
 
   if [ ! -d "$PLUGIN_SOURCE" ]; then
-    warn "$PLUGIN_SOURCE is missing; F8 still speaks. Reinstall the package: omarchy pkg drop omatalk-bin && omarchy pkg add omatalk-bin"
+    warn "$PLUGIN_SOURCE is missing; F8 still speaks. Reinstall the package: omarchy pkg drop omatalk-bin && omarchy pkg add omatalk-bin && omatalk setup"
     return
   fi
 
