@@ -5,8 +5,7 @@ import qs.Ui
 
 // Voice + speed config panel once the Daemon launcher exists. Until then
 // this is a setup screen that links to the site's install instructions; the
-// plugin itself never downloads or runs an installer. Config CLI processes
-// stay stopped while /usr/bin/omatalk is missing.
+// plugin itself never downloads or runs an installer.
 Panel {
   id: root
   moduleName: "zerobearing.omatalk"

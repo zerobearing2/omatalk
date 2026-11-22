@@ -9,7 +9,7 @@ description: >
 
 # Verify Omatalk
 
-Omatalk is a local CLI plus a Daemon on a Unix socket. The bar plugin is a separate repo and this skill does not drive it. The static site under `public/` is not part of a speech proof.
+Omatalk is a local CLI plus a Daemon on a Unix socket. The bar plugin lives in `plugin/zerobearing.omatalk/` and this skill does not drive it. The static site under `public/` is not part of a speech proof.
 
 The harness is `.agents/skills/verify-omatalk/scripts/verify`. It builds `target/release/omatalk` when that binary is missing or older than `src/`, `data/`, `Cargo.toml`, or `Cargo.lock`, then starts a Daemon whose socket, config, and player are private to the run. It never uses the user socket at `${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk/omatalk.sock`, and it never runs `setup` or `uninstall`.
 

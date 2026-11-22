@@ -40,9 +40,6 @@ installer_pin() {
 PLUGIN_ID="zerobearing.omatalk"
 PLUGIN_FILES=(manifest.json BarWidget.qml Panel.qml LICENSE)
 
-# Copy the runtime files of the plugin tree (no tests, no README) from
-# <root>/plugin/$PLUGIN_ID into <dest>/$PLUGIN_ID, with the manifest's version
-# set to the given one.
 stage_plugin() {
   local root="$1"
   local dest="$2"

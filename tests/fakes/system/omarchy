@@ -16,30 +16,22 @@ case "${1:-} ${2:-}" in
   "pkg add")
     exit "${FAKE_PKG_ADD_FAIL:-0}"
     ;;
-  "plugin add")
-    if [ "${FAKE_PLUGIN_ADD_FAIL:-0}" = 1 ]; then
+  "plugin enable")
+    if [ "${FAKE_PLUGIN_ENABLE_FAIL:-0}" = 1 ]; then
       exit 1
     fi
-    if [ -e "$plugin_dir" ]; then
-      exit 1
-    fi
-    mkdir -p "$plugin_dir/.git"
-    printf '{"id":"zerobearing.omatalk"}\n' > "$plugin_dir/manifest.json"
-    ;;
-  "plugin update")
-    exit "${FAKE_PLUGIN_UPDATE_FAIL:-0}"
-    ;;
-  "plugin remove")
-    if [ "${FAKE_PLUGIN_REMOVE_FAIL:-0}" = 1 ]; then
-      exit 1
-    fi
-    rm -rf "$plugin_dir"
+    touch "$FAKE_STATE/plugin-enabled"
     ;;
   "plugin list")
     if [ -f "$plugin_dir/manifest.json" ]; then
-      printf '[{"id":"zerobearing.omatalk"}]\n'
+      enabled=false
+      if [ -f "$FAKE_STATE/plugin-enabled" ]; then
+        enabled=true
+      fi
+      printf '[{"id":"omarchy.clock","name":"Clock","kinds":["bar-widget"],"enabled":true},'
+      printf '{"id":"zerobearing.omatalk","name":"Omatalk","kinds":["bar-widget"],"enabled":%s}]\n' "$enabled"
     else
-      printf '[]\n'
+      printf '[{"id":"omarchy.clock","name":"Clock","kinds":["bar-widget"],"enabled":true}]\n'
     fi
     ;;
 esac

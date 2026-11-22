@@ -72,7 +72,7 @@ _Avoid_: installer (that was the curl script), release (a tag and its tarball)
 
 **Setup**:
 `omatalk setup`: the per-user work the Package cannot do. It fetches the
-models, enables the unit, asks before it binds F8, and adds the bar plugin.
+models, enables the unit, asks before it binds F8, and links the bar plugin.
 Every step skips itself when done, so it is safe to rerun.
 _Avoid_: install (the package install is `omarchy pkg add`)
 
@@ -81,10 +81,11 @@ Silence played before speech when the default sink is a suspended Bluetooth or
 HDMI sink, so the device can unmute. Set by `wake_lead_ms`.
 
 The Omarchy bar widget (megaphone, setup and config panel) lives in
-https://github.com/zerobearing2/omarchy-omatalk-plugin, released on its own.
-See `docs/adr/0004-plugin-own-repo.md`. Installed means `/usr/bin/omatalk`
-exists, or `~/.local/bin/omatalk` for a curl-era install not yet migrated. Do
-not use `command -v omatalk` as the only probe.
+`plugin/zerobearing.omatalk/` and ships inside the Package at
+`/usr/share/omatalk/omarchy-plugin/zerobearing.omatalk/`. Setup links it into
+`~/.config/omarchy/plugins/`. It calls `/usr/bin/omatalk` only. See
+`docs/adr/0009-the-omarchy-package-is-the-only-install.md`. Installed means
+`/usr/bin/omatalk` exists. Do not use `command -v omatalk` as the only probe.
 
 ## Bar states
 
@@ -97,7 +98,8 @@ not use `command -v omatalk` as the only probe.
 ## Panel states
 
 - Not installed: setup. It links to the site install page, and the user runs
-  the install command in a terminal. Plugin version comes from the plugin's
-  `manifest.json`. No `omatalk config`, `version`, or preview `speak`.
-- Installed: voice, speed, plugin version, and Daemon version
-  (`omatalk version`). Config CLI uses the installed launcher path.
+  the install command in a terminal. No `omatalk config`, `version`, or preview
+  `speak`.
+- Installed: voice, speed, and the Daemon version (`omatalk version`). The
+  plugin ships with the Daemon, so there is one version. Config CLI uses
+  `/usr/bin/omatalk`.

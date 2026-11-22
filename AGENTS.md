@@ -15,8 +15,12 @@ selected text. Use the terms in `GLOSSARY.md`. The Omarchy package
 - `tools/parity/` holds standalone uv scripts, outside the test suite, that
   regenerate reference data from Python spaCy and misaki. Run one directly:
   `tools/parity/dump_misaki.py lines.txt out.jsonl`. See `data/NOTICE.md`.
+- `plugin/zerobearing.omatalk/` is the bar plugin: QML, its tests, and its
+  README. The package installs it at
+  `/usr/share/omatalk/omarchy-plugin/zerobearing.omatalk/`. See
+  [Bar plugin](#bar-plugin).
 - `setup.sh` is the per-user work the package cannot do: models, unit enable,
-  F8 binding, bar plugin, welcome speech. `omatalk setup` execs the copy
+  F8 binding, bar plugin link, welcome speech. `omatalk setup` execs the copy
   embedded in the binary, like `omatalk uninstall` does with `uninstall.sh`. The
   model pins live in `setup.sh`.
 - `install.sh` is a migration shim for curl installs, not an installer. It runs
@@ -25,7 +29,8 @@ selected text. Use the terms in `GLOSSARY.md`. The Omarchy package
   Retire both at 1.0.
 - `packaging/dev/` is a PKGBUILD and the two alpm hooks with their scripts
   (`package-remove`, `package-restart`). The recipe in omacom/omarchy-pkgs
-  carries the same hooks. A hook change lands in both.
+  carries the same hooks. A hook change lands in both. `package-remove` also
+  deletes each user's plugin link, but only a link into `/usr/share/omatalk/`.
 - `scripts/dev-install.sh` dogfoods this checkout: it builds `packaging/dev` as
   `omatalk-bin` at `<newest tag>.r<commits>.g<sha>` and runs
   `sudo pacman -U` on it. It needs models from an earlier `omatalk setup`.
@@ -33,13 +38,25 @@ selected text. Use the terms in `GLOSSARY.md`. The Omarchy package
 - `scripts/build.sh` runs from `scripts/release.sh`. Keep both build scripts
   out of the Makefile.
 
-The bar plugin is the separate repo
-https://github.com/zerobearing2/omarchy-omatalk-plugin, with its own release.
-Change it in a plain clone at `~/Work/omarchy-omatalk-plugin`. The installed
-plugin at `~/.config/omarchy/plugins/zerobearing.omatalk` is a git clone too.
-Keep its agent docs here, because the listed tree must not track `AGENTS.md`,
-`GLOSSARY.md`, or `docs/agents/`. The plugin never installs the Daemon. Its
-setup screen links to the site install page and shows no command.
+## Bar plugin
+
+The bar plugin lives in `plugin/zerobearing.omatalk/`, so it ships in the
+package and always matches the Daemon. It came from
+https://github.com/zerobearing2/omarchy-omatalk-plugin (v1.2.2) with its history.
+That repo is archived after the first stable package release.
+
+The plugin calls `/usr/bin/omatalk` only. It never installs the Daemon: its
+setup screen links to the site install page and shows no command. Its
+`manifest.json` stays at version `0.0.0-dev`, and `scripts/build.sh` and
+`scripts/dev-install.sh` stamp the package's version into the packaged copy.
+Only `manifest.json`, `BarWidget.qml`, `Panel.qml`, and `LICENSE` are
+packaged (`PLUGIN_FILES` in `scripts/lib.sh`).
+
+`omatalk setup` links `~/.config/omarchy/plugins/zerobearing.omatalk` to the
+packaged directory, rescans, and enables it. A curl-era git checkout there is
+deleted first. Edit the QML in place, then
+`ln -sfn $PWD/plugin/zerobearing.omatalk ~/.config/omarchy/plugins/zerobearing.omatalk`
+and `omarchy-shell -q shell rescanPlugins` to try a change before packaging.
 
 ## Release
 
@@ -80,7 +97,8 @@ before it pushes.
 
 The release assets are the tarball `omatalk-x86_64.tar.gz` with its `.sha256`,
 and the shim `install.sh`. The tarball holds the `omatalk` binary,
-`omatalk.service`, and `LICENSE`. The binary dlopens `onnxruntime-cpu` and
+`omatalk.service`, `LICENSE`, and `omarchy-plugin/zerobearing.omatalk/` with the
+release version stamped into its manifest. The binary dlopens `onnxruntime-cpu` and
 `espeak-ng` only in `omatalk daemon` and `omatalk render`. The package depends
 on both.
 
@@ -99,12 +117,8 @@ install.sh dispatcher keep serving the newest line.
 
 ### Plugin release
 
-Run `make bump`, then `make release` (`manifest.json`; test, validate, commit,
-push, `gh`) in the plugin clone. These targets exist only there. Keep plugin RC
-work on a plugin branch, because `omarchy plugin add` and `update` use mutable
-HEAD. A Daemon release never requires a plugin release, and the reverse.
-
-After a plugin SHA change, follow `docs/agents/plugin-marketplace.md`.
+There is none. A plugin change releases with the next Daemon release, in the
+same tarball and package.
 
 ### Site
 
@@ -128,6 +142,7 @@ site-only fix, run that dispatch. It deploys everything in `public/` on master.
      ~/.config/omarchy/plugins/zerobearing.omatalk/BarWidget.qml
    ss -xap | grep -E 'omatalk|quickshell'
    ls ~/.local/bin/omatalk ~/.config/systemd/user/omatalk.service
+   readlink ~/.config/omarchy/plugins/zerobearing.omatalk
    omarchy plugin list --json | grep -C 3 'zerobearing.omatalk'
    omarchy-shell shell listPlugins | grep -C 3 'zerobearing.omatalk'
    ```
@@ -136,7 +151,9 @@ site-only fix, run that dispatch. It deploys everything in `public/` on master.
    `(deleted)` means the Daemon still runs an old binary: run
    `systemctl --user restart omatalk.service`. The two `ls` paths are the
    curl-era install. If either exists, run `bash -c "$(curl -fsSL https://omatalk.zerobearing.com/install.sh)"`
-   to migrate.
+   to migrate. The plugin `readlink` must print
+   `/usr/share/omatalk/omarchy-plugin/zerobearing.omatalk`. A plain directory
+   there is the curl-era checkout: `omatalk setup` replaces it with the link.
 
 2. Check each layer: the service and `omatalk status`, the socket and its
    Quickshell peer, whether the plugin is present and enabled, and QML errors in
@@ -162,15 +179,17 @@ Single-context: `GLOSSARY.md` at root + `docs/adr/`. See `docs/agents/domain.md`
 
 ### Bar plugin tests
 
-In the plugin clone, `make test` and `omarchy plugin validate .` must pass.
-`make release` runs both. QML tests need `qmltestrunner`: they skip with a note
-when it is missing, and plugin CI requires it.
+`make test-plugin` runs `plugin/zerobearing.omatalk/tests/run.sh`: file checks,
+`omarchy plugin validate`, and the QML tests. The QML tests need
+`qmltestrunner` (`/usr/lib/qt6/bin/qmltestrunner`): they skip with a note when
+it is missing, and CI sets `CI` so a missing runner fails there. Run
+`make test-plugin` as well as `cargo test` for a plugin change.
 
 ### Marketplace listing
 
-Listed at https://omarchyplugins.com/plugin.html?id=zerobearing.omatalk. The
-plugin must show no install command. File a `[Verify]:` issue for the plugin's
-`master` HEAD after each plugin release. See `docs/agents/plugin-marketplace.md`.
+The old marketplace listing of `zerobearing.omatalk` retires with the plugin
+repo. The plugin must still show no install command. See
+`docs/agents/plugin-marketplace.md`.
 
 ### Tests
 

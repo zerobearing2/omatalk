@@ -56,6 +56,22 @@ unquote_manager_value() {
   unquoted_value=$decoded
 }
 
+# The link omatalk setup makes to the packaged plugin. Only a link into
+# /usr/share/omatalk/ goes; a git checkout, a copy, or a link to someone's own
+# clone stays.
+unlink_plugin() {
+  local link="$1/omarchy/plugins/zerobearing.omatalk"
+  if [[ -L $link ]]; then
+    case $(readlink -- "$link") in
+      /usr/share/omatalk/*)
+        if ! rm -- "$link"; then
+          echo ":: Could not remove the bar plugin link $link; delete it by hand." >&2
+        fi
+        ;;
+    esac
+  fi
+}
+
 remove_for_user() {
   local app=$1 user_home=$2 runtime=$3 config="$2/.config" unit="$1.service"
   local online=false effective path target manager_environment load_state
@@ -76,12 +92,17 @@ remove_for_user() {
           ;;
       esac
     done <<< "$manager_environment"
+    unlink_plugin "$config"
+    if command -v omarchy-shell >/dev/null; then
+      omarchy-shell -q shell rescanPlugins
+    fi
     effective=$(systemctl --user show "$unit" --property=ExecStart --value) || return 1
     if [[ -n $effective && $effective != *"path=/usr/bin/$app ;"* ]]; then
       echo ":: Preserving $unit for $user_home: it uses another executable."
       return 0
     fi
   fi
+  if ! $online; then unlink_plugin "$config"; fi
   path="$config/systemd/user/$unit"
   if ! $online && grep -qs "$execstart_assignment" "$path.d/"*.conf; then
     echo ":: Preserving offline service with an executable override: $path."

@@ -5,8 +5,8 @@ use crate::common::{Run, System, read, repo, run, sha256_bytes, write, write_exe
 pub use omatalk::speech::kokoro::MODEL_FILE as FP32;
 pub use omatalk::voices::VOICES_FILE as VOICES;
 
-pub const PLUGIN_ADD_CMD: &str =
-    "omarchy plugin add https://example.test/omarchy-omatalk-plugin.git --enable --yes";
+pub const RESCAN_CMD: &str = "omarchy-shell -q shell rescanPlugins";
+pub const ENABLE_CMD: &str = "omarchy plugin enable zerobearing.omatalk";
 pub const FP16: &str = "kokoro-v1.0.fp16.onnx";
 pub const SITE_URL: &str = "https://release.test";
 pub const BIND_LINE: &str = r#"o.bind("F8", "Omatalk", "omatalk speak")"#;
@@ -81,14 +81,16 @@ impl Fake {
         let voices = b"fake voices";
         write(sys.site("models").join(FP32), model);
         write(sys.site("models").join(VOICES), voices);
+        let plugin_source = sys.path("usr/share/omatalk/omarchy-plugin/zerobearing.omatalk");
+        write(
+            plugin_source.join("manifest.json"),
+            "{\"id\": \"zerobearing.omatalk\"}\n",
+        );
         let pins = vec![
             ("MODEL_BASE", format!("{SITE_URL}/models")),
             ("MODEL_SHA256", sha256_bytes(model)),
             ("VOICES_SHA256", sha256_bytes(voices)),
-            (
-                "PLUGIN_REPO",
-                "https://example.test/omarchy-omatalk-plugin.git".to_owned(),
-            ),
+            ("PLUGIN_SOURCE", plugin_source.display().to_string()),
         ];
         Fake { sys, pins }
     }
@@ -99,6 +101,10 @@ impl Fake {
 
     pub fn installed_unit(&self) -> PathBuf {
         self.home(".config/systemd/user/omatalk.service")
+    }
+
+    pub fn plugin_source(&self) -> PathBuf {
+        self.path("usr/share/omatalk/omarchy-plugin/zerobearing.omatalk")
     }
 
     pub fn plugin_dir(&self) -> PathBuf {
@@ -116,7 +122,12 @@ impl Fake {
     fn pinned_setup(&self) -> PathBuf {
         let mut script = read(repo("setup.sh"));
         let current = installer_pins(&script);
-        for name in ["MODEL_BASE", "MODEL_SHA256", "VOICES_SHA256", "PLUGIN_REPO"] {
+        for name in [
+            "MODEL_BASE",
+            "MODEL_SHA256",
+            "VOICES_SHA256",
+            "PLUGIN_SOURCE",
+        ] {
             let (_, value) = self.pins.iter().find(|(k, _)| *k == name).unwrap();
             let (_, old) = current
                 .iter()
@@ -169,6 +180,7 @@ impl Fake {
     pub fn without_omarchy(&mut self) {
         let fake_bin = self.path("bin");
         std::fs::remove_file(fake_bin.join("omarchy")).unwrap();
+        std::fs::remove_file(fake_bin.join("omarchy-shell")).unwrap();
         let tools = [
             "tar",
             "sha256sum",
@@ -184,6 +196,10 @@ impl Fake {
             "date",
             "bash",
             "touch",
+            "seq",
+            "ln",
+            "readlink",
+            "dirname",
         ];
         for tool in tools {
             let found = std::env::split_paths(&std::env::var_os("PATH").unwrap())
@@ -196,12 +212,17 @@ impl Fake {
         self.set("PATH", fake_bin);
     }
 
-    pub fn seed_copy_plugin(&self) {
+    pub fn seed_checkout_plugin(&self) {
+        std::fs::create_dir_all(self.plugin_dir().join(".git")).unwrap();
         write(
             self.plugin_dir().join("manifest.json"),
             "{\"id\": \"zerobearing.omatalk\"}\n",
         );
-        write(self.plugin_dir().join("old.txt"), "legacy copy\n");
+        write(self.plugin_dir().join("old.txt"), "curl-era checkout\n");
+    }
+
+    pub fn plugin_enabled(&self) -> bool {
+        self.path("state/plugin-enabled").exists()
     }
 
     pub fn seed_curl_install(&self) -> (PathBuf, PathBuf) {

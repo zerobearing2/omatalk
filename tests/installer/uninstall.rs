@@ -137,3 +137,41 @@ fn uninstall_script_text_does_not_match_its_own_pkill_patterns() {
         );
     }
 }
+
+#[test]
+fn uninstall_removes_the_plugin_link_keeps_its_target_and_rescans() {
+    let fake = Fake::new();
+    std::fs::create_dir_all(fake.plugin_dir().parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(fake.plugin_source(), fake.plugin_dir()).unwrap();
+
+    let result = fake.uninstall("");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(!fake.plugin_dir().exists());
+    assert!(!fake.plugin_dir().is_symlink());
+    assert!(fake.plugin_source().join("manifest.json").is_file());
+    assert!(fake.logged(RESCAN_CMD));
+    assert!(!fake.logged("omarchy plugin"));
+}
+
+#[test]
+fn uninstall_removes_a_curl_era_plugin_checkout() {
+    let fake = Fake::new();
+    fake.seed_checkout_plugin();
+
+    let result = fake.uninstall("");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(!fake.plugin_dir().exists());
+    assert!(fake.logged(RESCAN_CMD));
+}
+
+#[test]
+fn uninstall_without_a_plugin_does_not_rescan() {
+    let fake = Fake::new();
+
+    let result = fake.uninstall("");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(!fake.logged("omarchy-shell"));
+}

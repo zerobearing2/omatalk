@@ -114,7 +114,7 @@ fn defaults() -> serde_json::Value {
 #[test]
 fn copy_buttons_copy_the_visible_snippet() {
     let cards = copy_cards(&page());
-    assert_eq!(cards.len(), 7);
+    assert_eq!(cards.len(), 6);
     for pre in &cards {
         let text = pre.trim();
         assert!(!text.is_empty());
@@ -192,18 +192,18 @@ fn voice_buttons_match_clips_and_default() {
 #[test]
 fn install_commands_match_readme_and_cname() {
     let host = host();
-    let plugin =
-        "omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable"
-            .to_owned();
+    let plugin = "omarchy plugin add";
     let install = "omarchy pkg add omatalk-bin && omatalk setup".to_owned();
     let uninstall = "omatalk uninstall".to_owned();
     let cards = copy_cards(&page());
     let shown: BTreeSet<&str> = cards.iter().map(|c| c.trim()).collect();
     let readme = read(repo("README.md"));
-    for command in [&plugin, &install, &uninstall] {
+    for command in [&install, &uninstall] {
         assert!(shown.contains(command.as_str()), "page lacks {command}");
         assert!(readme.contains(command.as_str()), "README lacks {command}");
     }
+    assert!(!read(public("index.html")).contains(plugin));
+    assert!(!readme.contains(plugin));
     let migrate = format!("curl -fsSL https://{host}/install.sh | bash");
     assert!(!shown.contains(migrate.as_str()));
     assert!(readme.contains(&migrate));

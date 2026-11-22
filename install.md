@@ -76,7 +76,7 @@ Expected: one `omatalk-bin` version line, then `binary`.
 
 ## Step 4: Run omatalk setup
 
-This downloads any model whose checksum differs, enables and starts the user unit, adds the F8 binding after the answer from Step 2, and adds or updates the bar plugin. The last action speaks a short welcome, so the speakers play one sentence. ${HOME}/.config/omatalk/config.toml is not created or edited. Running the command again is safe.
+This downloads any model whose checksum differs, enables and starts the user unit, adds the F8 binding after the answer from Step 2, and links the bar plugin from the package, replacing any curl-era or Marketplace checkout. The last action speaks a short welcome, so the speakers play one sentence. ${HOME}/.config/omatalk/config.toml is not created or edited. Running the command again is safe.
 
 ```bash
 ASK_FROM="${HOME}/.local/share/omatalk-install-answer" omatalk setup
@@ -109,7 +109,7 @@ EXECUTE NOW: Start with Step 0. Mark TODO items complete as you go. Stop when `p
 
 ## Migrating a curl install
 
-A machine installed with the old curl command has ${HOME}/.local/bin/omatalk and ${HOME}/.config/systemd/user/omatalk.service. Run the shim once. It installs the package, deletes those files, and runs `omatalk setup`. Models, config, the F8 binding, and the plugin stay.
+A machine installed with the old curl command has ${HOME}/.local/bin/omatalk and ${HOME}/.config/systemd/user/omatalk.service. Run the shim once. It installs the package, deletes those files, and runs `omatalk setup`. Models, config, and the F8 binding stay. The packaged plugin replaces the old plugin checkout.
 
 ```bash
 ASK_FROM="${HOME}/.local/share/omatalk-install-answer" bash -c "$(curl -fsSL https://omatalk.zerobearing.com/install.sh)"

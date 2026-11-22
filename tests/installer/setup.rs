@@ -9,7 +9,8 @@ fn changes(fake: &Fake) -> Vec<String> {
                 || l.starts_with("systemctl --user daemon-reload")
                 || l.starts_with("systemctl --user enable")
                 || l.starts_with("systemctl --user restart")
-                || l.starts_with("omarchy plugin add")
+                || l.starts_with("omarchy plugin enable")
+                || l.starts_with("omarchy-shell")
         })
         .collect()
 }
@@ -60,13 +61,6 @@ fn setup_twice_changes_nothing_and_asks_nothing() {
     assert_eq!(bytes(fake.model(FP32)), model_before);
     assert!(!second.stdout.contains("To bind F8"), "{}", second.stdout);
     assert_eq!(read(fake.bindings()), format!("\n{BIND_LINE}\n"));
-    assert!(
-        fake.commands()
-            .iter()
-            .any(|l| l == "omarchy plugin update zerobearing.omatalk --yes"),
-        "{:?}",
-        fake.commands()
-    );
 }
 
 #[test]
@@ -124,6 +118,7 @@ fn setup_fails_if_daemon_never_becomes_ready() {
         result.stdout
     );
     assert!(!fake.logged("omarchy plugin"));
+    assert!(!fake.plugin_dir().exists());
 }
 
 #[test]

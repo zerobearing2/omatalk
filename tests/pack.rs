@@ -271,3 +271,48 @@ fn package_remove_and_restart_refuse_every_other_app() {
         }
     }
 }
+
+fn plugin_link(tmp: &Path) -> PathBuf {
+    let plugins = tmp.join("home/.config/omarchy/plugins");
+    std::fs::create_dir_all(&plugins).unwrap();
+    plugins.join("zerobearing.omatalk")
+}
+
+#[test]
+fn package_remove_deletes_the_plugin_link_into_usr_share_omatalk() {
+    let tmp = TempDir::new("hook");
+    let link = plugin_link(tmp.path());
+    std::os::unix::fs::symlink(
+        "/usr/share/omatalk/omarchy-plugin/zerobearing.omatalk",
+        &link,
+    )
+    .unwrap();
+
+    let result = package_remove_user("omatalk", tmp.path());
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(!link.is_symlink());
+}
+
+#[test]
+fn package_remove_leaves_a_plugin_that_is_not_a_link_into_usr_share_omatalk() {
+    let tmp = TempDir::new("hook");
+    let link = plugin_link(tmp.path());
+    let clone = tmp.path().join("clone");
+    write(clone.join("manifest.json"), "{}\n");
+
+    std::fs::create_dir_all(link.join(".git")).unwrap();
+    let result = package_remove_user("omatalk", tmp.path());
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(link.join(".git").is_dir(), "a git checkout was removed");
+    std::fs::remove_dir_all(&link).unwrap();
+
+    for target in [clone.to_str().unwrap(), "/usr/share/omatalk-other/plugin"] {
+        std::os::unix::fs::symlink(target, &link).unwrap();
+        let result = package_remove_user("omatalk", tmp.path());
+        assert_eq!(result.code, 0, "{}", result.stderr);
+        assert!(link.is_symlink(), "a link to {target} was removed");
+        std::fs::remove_file(&link).unwrap();
+    }
+    assert!(clone.join("manifest.json").is_file());
+}

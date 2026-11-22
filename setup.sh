@@ -3,7 +3,6 @@ set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
 OMATALK_BIN="${OMATALK_BIN:-/usr/bin/omatalk}"
-PLUGIN_REPO="https://github.com/zerobearing2/omarchy-omatalk-plugin.git"
 MODEL_BASE="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
 MODEL_SHA256="7d5df8ecf7d4b1878015a32686053fd0eebe2bc377234608764cc0ef3636a6c5"
 VOICES_SHA256="bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
@@ -11,6 +10,7 @@ MODEL_MAX_BYTES=536870912
 MODEL_FILE="kokoro-v1.0.onnx"
 VOICES_FILE="voices-v1.0.bin"
 PLUGIN_ID="zerobearing.omatalk"
+PLUGIN_SOURCE="/usr/share/omatalk/omarchy-plugin/zerobearing.omatalk"
 PLUGIN_DIR="$HOME/.config/omarchy/plugins/$PLUGIN_ID"
 BINDINGS="$HOME/.config/hypr/bindings.lua"
 BIND_LINE='o.bind("F8", "Omatalk", "omatalk speak")'
@@ -141,39 +141,60 @@ step_wait() {
   exit 1
 }
 
-add_bar_plugin() {
-  if omarchy plugin add "$PLUGIN_REPO" --enable --yes >/dev/null 2>&1; then
-    return
+plugin_is_linked() {
+  if [ -L "$PLUGIN_DIR" ]; then
+    if [ "$(readlink "$PLUGIN_DIR")" = "$PLUGIN_SOURCE" ]; then
+      return 0
+    fi
   fi
-  warn "Could not add $PLUGIN_REPO; F8 still speaks. Add the plugin with: omarchy plugin add $PLUGIN_REPO --enable"
+  return 1
+}
+
+# What is at the path is a curl-era git checkout or copy, or a stale link.
+# rm -rf removes a link without following it.
+link_plugin() {
+  if ! rm -rf "$PLUGIN_DIR"; then
+    return 1
+  fi
+  if ! mkdir -p "$(dirname "$PLUGIN_DIR")"; then
+    return 1
+  fi
+  ln -sfn "$PLUGIN_SOURCE" "$PLUGIN_DIR"
+}
+
+plugin_is_enabled() {
+  omarchy plugin list --json 2>/dev/null | grep -Eq '"id":"zerobearing\.omatalk"[^}]*"enabled":true'
 }
 
 step_plugin() {
   if ! command -v omarchy >/dev/null 2>&1; then
-    warn "omarchy not found; F8 still speaks. Add the plugin with: omarchy plugin add $PLUGIN_REPO --enable"
+    warn "omarchy not found; F8 still speaks. Without the bar plugin, rerun omatalk setup on Omarchy"
     return
   fi
 
-  if [ -e "$PLUGIN_DIR/.git" ]; then
-    msg "Updating the Omarchy bar plugin"
-    if ! omarchy plugin update "$PLUGIN_ID" --yes >/dev/null 2>&1; then
-      warn "Could not update the bar plugin; F8 still speaks. Update it with: omarchy plugin update $PLUGIN_ID --yes"
+  if plugin_is_linked; then
+    return
+  fi
+
+  if [ ! -d "$PLUGIN_SOURCE" ]; then
+    warn "$PLUGIN_SOURCE is missing; F8 still speaks. Reinstall the package: omarchy pkg drop omatalk-bin && omarchy pkg add omatalk-bin"
+    return
+  fi
+
+  msg "Linking the Omarchy bar plugin"
+  if ! link_plugin; then
+    warn "Could not link $PLUGIN_DIR; F8 still speaks. Link it with: ln -sfn $PLUGIN_SOURCE $PLUGIN_DIR"
+    return
+  fi
+
+  if ! omarchy-shell -q shell rescanPlugins; then
+    warn "Could not rescan plugins; F8 still speaks. Reload the bar with: omarchy restart shell"
+  fi
+  if ! plugin_is_enabled; then
+    if ! omarchy plugin enable "$PLUGIN_ID" >/dev/null 2>&1; then
+      warn "Could not enable the bar plugin; F8 still speaks. Enable it with: omarchy plugin enable $PLUGIN_ID"
     fi
-    return
   fi
-
-  if [ -d "$PLUGIN_DIR" ]; then
-    msg "Replacing copy-based Omarchy bar plugin with $PLUGIN_REPO"
-    if omarchy plugin remove "$PLUGIN_ID" --yes >/dev/null 2>&1; then
-      add_bar_plugin
-    else
-      warn "Could not remove the copy-based plugin; F8 still speaks. Convert it with: omarchy plugin remove $PLUGIN_ID --yes && omarchy plugin add $PLUGIN_REPO --enable"
-    fi
-    return
-  fi
-
-  msg "Installing Omarchy bar plugin"
-  add_bar_plugin
 }
 
 step_welcome() {

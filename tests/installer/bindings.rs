@@ -11,10 +11,7 @@ fn setup_does_not_bind_f8_on_eof_or_decline() {
         assert_eq!(result.code, 0, "{answer:?}: {}", result.stderr);
         assert!(!fake.bindings().exists(), "{answer:?}");
         assert!(result.stdout.contains("To bind F8"), "{answer:?}");
-        assert!(
-            fake.commands().iter().any(|l| l == PLUGIN_ADD_CMD),
-            "{answer:?}"
-        );
+        assert!(fake.logged(RESCAN_CMD), "{answer:?}");
         assert!(!fake.logged("hyprctl"), "{answer:?}");
     }
 }
@@ -37,10 +34,7 @@ fn setup_binds_f8_on_yes_or_enter() {
             fake.commands().iter().any(|l| l == "hyprctl reload"),
             "{answer:?}"
         );
-        assert!(
-            fake.commands().iter().any(|l| l == PLUGIN_ADD_CMD),
-            "{answer:?}"
-        );
+        assert!(fake.logged(RESCAN_CMD), "{answer:?}");
     }
 }
 

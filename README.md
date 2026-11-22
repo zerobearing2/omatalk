@@ -12,22 +12,17 @@ omarchy pkg add omatalk-bin && omatalk setup
 The package installs the Daemon, which does the speaking, and its systemd
 unit. `omatalk setup` does the rest for your user: it downloads the models
 (about 355MB), enables the service, asks before it binds F8, and adds the bar
-plugin, which is the megaphone and voice panel. If F8 is taken, it prints a
-command to paste instead. A plugin you already added from the Omarchy
-Marketplace is updated, not replaced. `omatalk setup` is safe to run again.
+plugin, which is the megaphone and voice panel. The package carries the plugin
+and `omatalk setup` links it into `~/.config/omarchy/plugins/`, replacing a
+copy you added from the Omarchy Marketplace. If F8 is taken, it prints a
+command to paste instead. `omatalk setup` is safe to run again.
 
 Installed with the old curl command? Run it once more. It installs the package,
-removes the files the curl installer left, and keeps your models, config, F8
-binding, and plugin.
+removes the files the curl installer left, and keeps your models, config, and F8
+binding.
 
 ```sh
 curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
-```
-
-If the plugin add failed, run this. The plugin does nothing without the Daemon.
-
-```sh
-omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable
 ```
 
 ## Use it
@@ -155,16 +150,17 @@ monitor.bluez.rules = [
 ## Upgrade and uninstall
 
 `omarchy update` upgrades the package and restarts a running Daemon on the new
-binary. Upgrades never touch `config.toml`. `omarchy plugin update
-zerobearing.omatalk` updates the bar plugin, which releases on its own.
+binary. The bar plugin updates with the package, so it always matches the
+Daemon. Upgrades never touch `config.toml`.
 
-`omatalk uninstall` removes the Daemon's service, the bar plugin, and any files
+`omatalk uninstall` removes the Daemon's service, the bar plugin link, and any files
 the curl installer left. It asks before it deletes the models, your config, and
 the F8 binding, then runs `omarchy pkg drop omatalk-bin`. That drop alone
 removes the package and stops the service, and keeps your models and config.
 
-`omarchy plugin remove zerobearing.omatalk` removes only the megaphone. The
-Daemon, models, and config stay, and F8 still speaks.
+`omarchy plugin disable zerobearing.omatalk` hides only the megaphone. The
+Daemon, models, and config stay, and F8 still speaks. `omatalk setup` leaves a
+disabled plugin alone once it is linked.
 
 ## Troubleshooting
 
@@ -189,7 +185,7 @@ omatalk.service`.
 ## More
 
 [Domain language](GLOSSARY.md), [design decisions](docs/adr/),
-[bar plugin](https://github.com/zerobearing2/omarchy-omatalk-plugin), and the
+[bar plugin](plugin/zerobearing.omatalk/README.md), and the
 [contributor guide](AGENTS.md).
 
 The voice is [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) by

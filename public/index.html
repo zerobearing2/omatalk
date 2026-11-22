@@ -871,9 +871,9 @@
   <section id="install">
     <div class="eyebrow">install</div>
     <h2>Get it running</h2>
-    <p class="prose" style="margin-top:14px;">Omatalk has two parts: the Daemon, which does the speaking, and the bar plugin, the megaphone and voice panel. One command installs both.</p>
+    <p class="prose" style="margin-top:14px;">Omatalk has two parts: the Daemon, which does the speaking, and the bar plugin, the megaphone and voice panel. The package carries both.</p>
 
-    <p class="prose" style="margin-top:14px;">Run it in a terminal. <code class="inline-code">omarchy pkg add</code> installs the speech Daemon and the <code class="inline-code">omatalk</code> command. <code class="inline-code">omatalk setup</code> downloads the models (about 355MB), enables the service, asks before binding F8, and adds the bar plugin. If you added the plugin from the Omarchy Marketplace first, its panel links here: run this, and it updates the plugin you have. Updates arrive with <code class="inline-code">omarchy update</code>.</p>
+    <p class="prose" style="margin-top:14px;">Run it in a terminal. <code class="inline-code">omarchy pkg add</code> installs the speech Daemon and the <code class="inline-code">omatalk</code> command. <code class="inline-code">omatalk setup</code> downloads the models (about 355MB), enables the service, asks before binding F8, and links the bar plugin from the package. If you added the plugin from the Omarchy Marketplace first, its panel links here: run this, and the packaged plugin replaces it. Updates arrive with <code class="inline-code">omarchy update</code>.</p>
     <div class="code-card" style="margin-top:12px;">
       <div class="cc-title">
         install
@@ -884,23 +884,10 @@
       </div>
       <pre>omarchy pkg add omatalk-bin &amp;&amp; omatalk setup</pre>
     </div>
-    <p class="prose" style="margin-top:12px;">Installed with the old curl command? Run <code class="inline-code">curl -fsSL https://omatalk.zerobearing.com/install.sh | bash</code> once more. It installs the package and removes the files the curl installer left, and keeps your models, config, F8 binding, and plugin.</p>
-
-    <h3 class="install-step">Bar plugin only</h3>
-    <p class="prose" style="margin-top:10px;"><code class="inline-code">omatalk setup</code> already adds it. Use this only if that failed or you removed the plugin. The plugin does nothing without the Daemon.</p>
-    <div class="code-card" style="margin-top:12px;">
-      <div class="cc-title">
-        plugin
-        <button class="copy-btn" type="button">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
-          <span class="copy-label">copy</span>
-        </button>
-      </div>
-      <pre>omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable</pre>
-    </div>
+    <p class="prose" style="margin-top:12px;">Installed with the old curl command? Run <code class="inline-code">curl -fsSL https://omatalk.zerobearing.com/install.sh | bash</code> once more. It installs the package and removes the files the curl installer left, and keeps your models, config, and F8 binding. The packaged plugin replaces the one it left.</p>
 
     <h3 class="install-step">Uninstall</h3>
-    <p class="prose" style="margin-top:10px;">Removes the Daemon service, the plugin, and the package. Asks before deleting models, config, and the F8 binding.</p>
+    <p class="prose" style="margin-top:10px;">Removes the Daemon service, the plugin link, and the package. Asks before deleting models, config, and the F8 binding.</p>
     <div class="code-card" style="margin-top:12px;">
       <div class="cc-title">
         uninstall

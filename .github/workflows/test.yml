@@ -42,6 +42,4 @@ jobs:
             qml6-module-qtqml-workerscript \
             libgl1 \
             libegl1
-      # CI is set, so tests/run.sh fails when qmltestrunner is missing
-      # instead of skipping.
       - run: make test-plugin

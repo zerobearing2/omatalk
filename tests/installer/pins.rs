@@ -10,7 +10,7 @@ fn setup_downloads_the_files_the_daemon_loads() {
 #[test]
 fn setup_pins_are_not_read_from_the_environment() {
     for name in [
-        "PLUGIN_REPO",
+        "PLUGIN_SOURCE",
         "MODEL_BASE",
         "MODEL_SHA256",
         "VOICES_SHA256",
@@ -25,7 +25,7 @@ fn setup_pins_are_not_read_from_the_environment() {
 #[test]
 fn setup_ignores_environment_overrides_of_its_pins() {
     let mut fake = Fake::new();
-    for name in ["MODEL_BASE", "PLUGIN_REPO"] {
+    for name in ["MODEL_BASE", "PLUGIN_SOURCE"] {
         fake.set(name, "https://evil.test/x");
     }
     fake.set("MODEL_SHA256", "0".repeat(64));

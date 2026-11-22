@@ -43,14 +43,25 @@ if pgrep -f "[d]aemon.omatalkd" >/dev/null 2>&1; then
 fi
 rm -rf "${XDG_RUNTIME_DIR:-/run/user/$UID}/omatalk"
 rm -f "$HOME/.local/bin/omatalk" "$HOME/.local/bin/omatalkd"
-if command -v omarchy >/dev/null 2>&1; then
-  if [ -d "$PLUGIN_DIR" ]; then
-    omarchy plugin remove zerobearing.omatalk --yes >/dev/null 2>&1
-    rm -rf "$HOME/.config/omarchy/plugins"/.zerobearing.omatalk.bak.*
+has_plugin=0
+if [ -e "$PLUGIN_DIR" ]; then
+  has_plugin=1
+fi
+if [ -L "$PLUGIN_DIR" ]; then
+  has_plugin=1
+fi
+if [ "$has_plugin" -eq 1 ]; then
+  # A link to the packaged plugin, or a curl-era git checkout or copy.
+  # rm -rf removes a link without following it.
+  rm -rf "$PLUGIN_DIR"
+  rm -rf "$HOME/.config/omarchy/plugins"/.zerobearing.omatalk.bak.*
+  if command -v omarchy-shell >/dev/null 2>&1; then
+    if ! omarchy-shell -q shell rescanPlugins; then
+      warn "Could not rescan plugins; reload the bar with: omarchy restart shell"
+    fi
   fi
 fi
-rm -rf "$PLUGIN_DIR"
-msg "Daemon stopped; stray Daemons killed; curl-era files and bar plugin removed"
+msg "Daemon stopped; stray Daemons killed; bar plugin and curl-era files removed"
 
 if [ -d "$OMATALK_HOME" ]; then
   if ! read -r -p "Remove $OMATALK_HOME (models, ~355MB)? [y/N] " answer < "$ASK_FROM"; then
