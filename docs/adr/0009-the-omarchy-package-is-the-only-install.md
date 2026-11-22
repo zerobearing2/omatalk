@@ -16,7 +16,9 @@ Now `omarchy pkg add omatalk-bin && omatalk setup` is the one install, and
 - `omatalk setup` does what pacman cannot do for one user: models, enabling the
   unit, the F8 binding, the bar plugin link, and a welcome speech. `setup.sh` holds
   the model pins. Every step checks whether it is done and skips itself, so a
-  rerun changes nothing and asks nothing. The binary embeds the script, as it
+  rerun changes nothing it already did. Two things repeat: a rerun offers the
+  F8 binding again if it was declined, and it speaks the welcome every time.
+  Setup keeps no state to remember a no. The binary embeds the script, as it
   does `uninstall.sh`.
 - The bar plugin ships in the package at
   `/usr/share/omatalk/omarchy-plugin/zerobearing.omatalk/`, the way voxtype-bin
