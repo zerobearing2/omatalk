@@ -1,12 +1,4 @@
 #!/usr/bin/env bash
-# Dogfood this checkout as the omatalk-bin package: build the release binary,
-# package it with packaging/dev, and install the result with `sudo pacman -U`.
-# pacman owns /usr/bin/omatalk afterward, and its upgrade hook restarts a
-# running Daemon. Models come from an earlier `omatalk setup`; this script
-# downloads nothing. The package version is
-# <latest stable tag>.r<commits since it>.g<short sha>, which sorts above that
-# release and below the next, so `omarchy update` leaves the build alone. To go
-# back sooner: omarchy pkg drop omatalk-bin && omarchy pkg add omatalk-bin
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,7 +12,6 @@ die() {
   exit 1
 }
 
-# The highest vX.Y.Z tag in this clone, compared with pacman's own vercmp.
 latest_stable_tag() {
   local tags
   local tag

@@ -281,7 +281,6 @@ fn read_stdin() -> std::io::Result<Option<String>> {
     Ok(Some(raw))
 }
 
-/// The embedded `setup.sh`: the per-user work the package cannot do.
 fn setup() -> ExitCode {
     exec_script(include_str!("../setup.sh"), "omatalk setup")
 }

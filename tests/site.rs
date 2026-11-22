@@ -1,6 +1,3 @@
-//! public/: the landing page's snippets, voices, and assets, and the
-//! install.sh dispatcher.
-
 mod common;
 
 use std::collections::BTreeSet;
@@ -207,8 +204,6 @@ fn install_commands_match_readme_and_cname() {
         assert!(shown.contains(command.as_str()), "page lacks {command}");
         assert!(readme.contains(command.as_str()), "README lacks {command}");
     }
-    // The one-time migration for curl installs: the dispatcher stays, in the
-    // README and in the page's prose, but not as the install card.
     let migrate = format!("curl -fsSL https://{host}/install.sh | bash");
     assert!(!shown.contains(migrate.as_str()));
     assert!(readme.contains(&migrate));

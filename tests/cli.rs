@@ -23,9 +23,6 @@ fn upgrade_is_not_a_command() {
     assert_eq!(sys.commands(), Vec::<String>::new());
 }
 
-/// Run from a directory that holds no setup.sh, so only the copy embedded in
-/// the binary can be the script. Its first step downloads the pinned model,
-/// which the fake site does not serve: the script stops there.
 #[test]
 fn setup_runs_the_embedded_setup_script() {
     let sys = System::new();

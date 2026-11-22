@@ -1,5 +1,3 @@
-# Sourced by the scripts that read Cargo.toml or setup.sh.
-
 # The [package] version in a Cargo.toml, never a dependency's.
 cargo_version() {
   local manifest="$1"
@@ -22,7 +20,6 @@ cargo_version() {
   printf '%s\n' "$version"
 }
 
-# The value of a NAME="value" pin in setup.sh.
 installer_pin() {
   local script="$1"
   local name="$2"

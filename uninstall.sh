@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Omatalk uninstaller, run by `omatalk uninstall` (embedded in the binary).
-# Stops the Daemon, removes the bar plugin and any curl-era files, asks before
-# it deletes the models, config, and F8 binding, and ends by dropping the
-# omatalk-bin package. It deletes nothing under /usr; pacman does. Prompts read
-# the terminal, not the pipe.
 set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"

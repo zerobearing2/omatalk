@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-# Migration shim for the curl installer. Omatalk installs as the Omarchy
-# package omatalk-bin; this installs it, deletes what the curl installer left
-# in the home directory, and hands over to `omatalk setup`. Models, config,
-# the F8 binding, and the bar plugin stay. Old binaries' `omatalk upgrade` and
-# the site's install.sh both reach this file through releases/latest.
-# Safe to rerun, and a failed `pkg add` changes nothing.
 set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
@@ -15,8 +9,6 @@ msg() {
   printf '\033[1;32m==>\033[0m %s\n' "$1"
 }
 
-# What the curl installer and the v0.5 Python installer put in the home
-# directory. The package owns the binary and the unit now.
 remove_curl_era_files() {
   local stop_status
 

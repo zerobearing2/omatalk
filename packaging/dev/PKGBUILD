@@ -1,9 +1,3 @@
-# Dev build of omatalk-bin from this checkout. scripts/dev-install.sh copies
-# this directory, target/release/omatalk, systemd/omatalk.service, and LICENSE
-# into a temp dir, sets OMATALK_PKGVER, and runs makepkg there. The recipe
-# submitted to omacom/omarchy-pkgs installs the same files from the release
-# tarball instead.
-
 pkgname=omatalk-bin
 pkgver=${OMATALK_PKGVER:?set OMATALK_PKGVER, or run scripts/dev-install.sh}
 pkgrel=1

@@ -1,6 +1,3 @@
-//! A model site, setup.sh pinned to it, and seeds of earlier installs, on top
-//! of the fake machine in common::System.
-
 use std::path::{Path, PathBuf};
 
 use crate::common::{Run, System, read, repo, run, sha256_bytes, write, write_executable};
@@ -18,7 +15,6 @@ pub fn bytes(path: impl AsRef<Path>) -> Vec<u8> {
     std::fs::read(path).unwrap()
 }
 
-/// Stands in for the omatalk binary: status, speak, and setup against FAKE_STATE.
 pub fn launcher_script(release: &str) -> String {
     format!(
         r#"#!/bin/sh
@@ -51,7 +47,6 @@ pub fn installer_pins(script: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-/// The value of setup.sh's `name` pin.
 pub fn pin(name: &str) -> Option<String> {
     installer_pins(&read(repo("setup.sh")))
         .into_iter()
@@ -59,7 +54,6 @@ pub fn pin(name: &str) -> Option<String> {
         .map(|(_, v)| v)
 }
 
-/// The fake machine plus a model site and setup.sh's pins pointed at it.
 pub struct Fake {
     sys: System,
     pins: Vec<(&'static str, String)>,
@@ -119,7 +113,6 @@ impl Fake {
         self.install_home().join("models").join(file)
     }
 
-    /// setup.sh with its download and plugin pins rewritten for the fake site.
     fn pinned_setup(&self) -> PathBuf {
         let mut script = read(repo("setup.sh"));
         let current = installer_pins(&script);
@@ -211,8 +204,6 @@ impl Fake {
         write(self.plugin_dir().join("old.txt"), "legacy copy\n");
     }
 
-    /// What a curl install left: the launcher, the unit, a model, a config, and
-    /// the F8 binding. Returns the config and the bindings file.
     pub fn seed_curl_install(&self) -> (PathBuf, PathBuf) {
         write(self.launcher(), launcher_script("curl-era"));
         write(

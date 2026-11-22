@@ -1,10 +1,6 @@
-//! install.sh, the migration shim: install the package, delete what the curl
-//! installer left, then hand over to `omatalk setup`.
-
 use crate::common::{names, read};
 use crate::fake::*;
 
-/// The omarchy and systemctl calls that change the machine, from the command log.
 fn changes(fake: &Fake) -> Vec<String> {
     fake.commands()
         .into_iter()

@@ -1,5 +1,3 @@
-//! setup.sh's fixed pins: what it downloads, and that nothing overrides it.
-
 use crate::common::repo;
 use crate::fake::*;
 

@@ -133,7 +133,6 @@ fn unit_runs_the_packaged_binary_as_the_daemon() {
     }
 }
 
-/// The `Key = value` lines of an alpm hook, as pairs.
 fn hook(name: &str) -> Vec<(String, String)> {
     read(repo(&format!("packaging/dev/{name}")))
         .lines()
@@ -178,7 +177,6 @@ fn restart_hook_runs_after_an_upgrade_and_never_fails_the_update() {
     assert!(!text.contains("AbortOnFail"));
 }
 
-/// `package-remove --user APP HOME RUNTIME` for a user with no manager running.
 fn package_remove_user(app: &str, tmp: &Path) -> common::Run {
     run(
         Command::new("bash")

@@ -1,8 +1,4 @@
 #!/bin/bash
-# Invoked only by the package's Upgrade/PostTransaction ALPM hook. pacman has
-# just replaced /usr/bin/omatalk, so every Daemon still running is on the old
-# binary. Restart each one that runs, as its own user, never as pacman's root.
-# A failed restart is reported and never fails the update.
 set -u
 
 if [ "$#" -ne 1 ]; then
@@ -23,7 +19,6 @@ while IFS=: read -r account _ user_id _ _ user_home _; do
     continue
   fi
   runtime="/run/user/$user_id"
-  # Offline users have no user manager, so no running Daemon to restart.
   if [[ ! -S $runtime/bus && ! -S $runtime/systemd/private ]]; then
     continue
   fi

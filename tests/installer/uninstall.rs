@@ -1,6 +1,3 @@
-//! uninstall.sh: what it removes, what it keeps unless asked, and the package
-//! it drops last.
-
 use crate::common::write;
 use crate::fake::*;
 

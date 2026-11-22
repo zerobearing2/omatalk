@@ -1,10 +1,6 @@
-//! setup.sh: models, the unit, and the daemon. Each step skips itself when
-//! done already, so a rerun changes nothing.
-
 use crate::common::{names, read, write};
 use crate::fake::*;
 
-/// The calls that change the machine, from the command log.
 fn changes(fake: &Fake) -> Vec<String> {
     fake.commands()
         .into_iter()

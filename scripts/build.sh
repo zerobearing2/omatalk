@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Build the release binary and pack the runtime tarball. Tag is
-# v$(Cargo.toml version). --pack-only packs the binary already in
-# target/release (tests/pack.rs uses it).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -27,8 +24,6 @@ if [ ! -f "$release_dir/omatalk" ]; then
   exit 1
 fi
 
-# Reproducible: bytes depend only on the three files. install.sh is not in
-# this archive; it is a sibling release asset.
 tar --sort=name \
   --mtime=@0 \
   --owner=0 \

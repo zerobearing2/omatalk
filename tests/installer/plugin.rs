@@ -1,5 +1,3 @@
-//! setup.sh and the bar plugin: `omarchy plugin add`, never a copy.
-
 use crate::common::{read, write};
 use crate::fake::*;
 

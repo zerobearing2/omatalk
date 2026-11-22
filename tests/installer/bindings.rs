@@ -1,6 +1,3 @@
-//! The F8 binding in bindings.lua: asked for by setup, offered for removal
-//! on uninstall, and never taken from another command.
-
 use crate::common::{read, write};
 use crate::fake::*;
 
