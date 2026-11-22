@@ -464,6 +464,30 @@ fn config_set_wake_lead_rejects_bad_values_with_the_config_wording() {
 }
 
 #[test]
+fn config_set_and_a_bad_config_file_give_the_same_reason() {
+    for (key, value, toml) in [
+        ("wake_lead_ms", "2001", "2001"),
+        ("wake_lead_ms", "600.0", "600.0"),
+        ("pause_media", "yes", "\"yes\""),
+    ] {
+        let env = config_environment();
+        let set = env.config(&["set", key, value]);
+        write(&env.config, format!("{key} = {toml}\n"));
+        let load = env.config(&["get"]);
+
+        assert_eq!((set.code, load.code), (1, 1), "{key} {value}");
+        let reason = |stderr: &str| {
+            stderr
+                .trim()
+                .split_once(&format!("{key} must be "))
+                .map(|(_, what)| what.to_owned())
+        };
+        assert!(reason(&set.stderr).is_some(), "{}", set.stderr);
+        assert_eq!(reason(&set.stderr), reason(&load.stderr), "{key} {value}");
+    }
+}
+
+#[test]
 fn config_set_keeps_the_file_loadable_for_the_daemon() {
     let env = config_environment();
     write(&env.config, "# mine\nplayer = [\"custom\"]\n");

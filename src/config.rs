@@ -6,6 +6,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use clap::ValueEnum;
 use toml_edit::{DocumentMut, Item, Value};
 
 use crate::exec::Argv;
@@ -64,9 +65,7 @@ pub struct Config {
     /// pactl-compatible. The Daemon appends `get-default-sink`, then
     /// `list sinks short`.
     pub sink_probe: Argv,
-    /// Silence played before speech when the default sink is a suspended
-    /// Bluetooth or HDMI sink. Zero disables it.
-    pub wake_lead: Duration,
+    pub wake_lead: WakeLead,
     /// Pause MPRIS players that are playing when speech starts, and resume
     /// them when it ends.
     pub pause_media: bool,
@@ -89,7 +88,7 @@ impl Config {
             player: argv(&["pw-cat", "-p", "--raw", "--format", "s16"]),
             notify: argv(&["notify-send", "Omatalk"]),
             sink_probe: argv(&["pactl"]),
-            wake_lead: Duration::from_millis(650),
+            wake_lead: WakeLead::DEFAULT,
             pause_media: true,
             media_bus: argv(&["busctl", "--user"]),
         }
@@ -128,11 +127,11 @@ impl Config {
                 "wake_lead_ms" => {
                     config.wake_lead = item
                         .as_integer()
-                        .and_then(wake_lead)
-                        .ok_or_else(|| bad(&wake_lead_what()))?;
+                        .and_then(WakeLead::new)
+                        .ok_or_else(|| bad(WakeLead::RANGE))?;
                 }
                 "pause_media" => {
-                    config.pause_media = item.as_bool().ok_or_else(|| bad(PAUSE_MEDIA_WHAT))?;
+                    config.pause_media = item.as_bool().ok_or_else(|| bad("true or false"))?;
                 }
                 "capture_primary" | "capture_clipboard" | "player" | "notify" | "sink_probe"
                 | "media_bus" => {
@@ -194,28 +193,12 @@ impl Config {
             ("player", argv(&self.player)),
             ("notify", argv(&self.notify)),
             ("sink_probe", argv(&self.sink_probe)),
-            ("wake_lead_ms", (self.wake_lead.as_millis() as u64).into()),
+            ("wake_lead_ms", self.wake_lead.millis().into()),
             ("pause_media", self.pause_media.into()),
             ("media_bus", argv(&self.media_bus)),
         ]
     }
 }
-
-/// Measured on a Bluetooth speaker: 600 ms of lead is clean, 400 ms clips; the 650 default adds margin.
-/// Past two seconds the lead is a delay nobody wants.
-const WAKE_LEAD_MAX_MS: i64 = 2000;
-
-fn wake_lead(ms: i64) -> Option<Duration> {
-    (0..=WAKE_LEAD_MAX_MS)
-        .contains(&ms)
-        .then(|| Duration::from_millis(ms as u64))
-}
-
-fn wake_lead_what() -> String {
-    format!("an integer between 0 and {WAKE_LEAD_MAX_MS}")
-}
-
-const PAUSE_MEDIA_WHAT: &str = "true or false";
 
 /// Utterance speed multiplier, `Speed::MIN` to `Speed::MAX` inclusive.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -257,42 +240,94 @@ impl Speed {
     }
 }
 
+/// Silence played before speech when the default sink is a suspended
+/// Bluetooth or HDMI sink, 0 to `WakeLead::MAX_MS` whole milliseconds. Zero
+/// disables it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct WakeLead(Duration);
+
+impl WakeLead {
+    /// Measured on a Bluetooth speaker: 600 ms of lead is clean, 400 ms clips;
+    /// the 650 default adds margin.
+    const DEFAULT: WakeLead = WakeLead(Duration::from_millis(650));
+    /// Past two seconds the lead is a delay nobody wants.
+    const MAX_MS: i64 = 2000;
+    /// `MAX_MS` as the error texts spell it.
+    const RANGE: &str = "an integer between 0 and 2000";
+
+    /// Accepts whole milliseconds. Error Display is the exact stderr line.
+    pub fn parse(raw: &str) -> Result<WakeLead, SetError> {
+        raw.trim()
+            .parse()
+            .ok()
+            .and_then(WakeLead::new)
+            .ok_or_else(|| SetError::WakeLead(raw.to_owned()))
+    }
+
+    fn new(ms: i64) -> Option<WakeLead> {
+        (0..=Self::MAX_MS)
+            .contains(&ms)
+            .then(|| WakeLead(Duration::from_millis(ms as u64)))
+    }
+
+    pub fn get(self) -> Duration {
+        self.0
+    }
+
+    fn millis(self) -> i64 {
+        self.0.as_millis() as i64
+    }
+}
+
 /// The only lexicon the misaki port carries. Any `lang` string loads as
 /// en-us: a hand-edited `lang = "en-gb"` from v0.5 must not silence every
 /// press, and British text through the US lexicon still reads correctly.
 const LANG: &str = "en-us";
 
-/// One accepted `config set`. Only the user-facing keys are settable; the
-/// command lists are edited in config.toml by hand.
+/// The keys `config set` accepts, in the order help lists them. Only the
+/// user-facing keys are settable; the command lists are edited in config.toml
+/// by hand.
+#[derive(Clone, Copy, Debug, PartialEq, ValueEnum)]
+#[value(rename_all = "snake_case")]
+pub enum SettableKey {
+    Voice,
+    Speed,
+    PauseMedia,
+    WakeLeadMs,
+}
+
+/// One accepted `config set`.
 pub enum Setting {
     Voice(VoiceName),
     Speed(Speed),
-    WakeLead(Duration),
     PauseMedia(bool),
+    WakeLead(WakeLead),
 }
 
 impl Setting {
     /// Parses `config set <key> <value>`; `voice` is checked against the
     /// voices archive via `voices::known`.
-    pub fn parse(models: &Path, key: &str, raw: &str) -> Result<Setting, SetError> {
+    pub fn parse(models: &Path, key: SettableKey, raw: &str) -> Result<Setting, SetError> {
         match key {
-            "voice" => crate::voices::known(models, raw)
+            SettableKey::Voice => crate::voices::known(models, raw)
                 .map(Setting::Voice)
                 .map_err(SetError::Voice),
-            "speed" => Speed::parse(raw).map(Setting::Speed),
-            "wake_lead_ms" => raw
+            SettableKey::Speed => Speed::parse(raw).map(Setting::Speed),
+            SettableKey::PauseMedia => raw
                 .trim()
                 .parse()
-                .ok()
-                .and_then(wake_lead)
-                .map(Setting::WakeLead)
-                .ok_or_else(|| SetError::WakeLead(raw.to_owned())),
-            "pause_media" => match raw.trim() {
-                "true" => Ok(Setting::PauseMedia(true)),
-                "false" => Ok(Setting::PauseMedia(false)),
-                _ => Err(SetError::PauseMedia(raw.to_owned())),
-            },
-            other => Err(SetError::NotSettable(other.to_owned())),
+                .map(Setting::PauseMedia)
+                .map_err(|_| SetError::PauseMedia(raw.to_owned())),
+            SettableKey::WakeLeadMs => WakeLead::parse(raw).map(Setting::WakeLead),
+        }
+    }
+
+    fn key(&self) -> SettableKey {
+        match self {
+            Setting::Voice(_) => SettableKey::Voice,
+            Setting::Speed(_) => SettableKey::Speed,
+            Setting::PauseMedia(_) => SettableKey::PauseMedia,
+            Setting::WakeLead(_) => SettableKey::WakeLeadMs,
         }
     }
 
@@ -304,12 +339,14 @@ impl Setting {
     pub fn write(&self, path: &Path) -> io::Result<()> {
         let path = link_target(path)?;
         let mut doc = read_document(&path)?.unwrap_or_default();
-        let (key, mut value) = match self {
-            Setting::Voice(v) => ("voice", Value::from(v.as_str())),
-            Setting::Speed(s) => ("speed", Value::from(s.as_f64())),
-            Setting::WakeLead(d) => ("wake_lead_ms", Value::from(d.as_millis() as i64)),
-            Setting::PauseMedia(on) => ("pause_media", Value::from(*on)),
+        let mut value = match self {
+            Setting::Voice(v) => Value::from(v.as_str()),
+            Setting::Speed(s) => Value::from(s.as_f64()),
+            Setting::PauseMedia(on) => Value::from(*on),
+            Setting::WakeLead(lead) => Value::from(lead.millis()),
         };
+        let key = self.key().to_possible_value().expect("no skipped keys");
+        let key = key.get_name();
         if let Some(old) = doc.get(key).and_then(Item::as_value) {
             *value.decor_mut() = old.decor().clone();
         }
@@ -369,7 +406,6 @@ pub enum SetError {
     SpeedOutOfRange(String),
     WakeLead(String),
     PauseMedia(String),
-    NotSettable(String),
 }
 
 impl fmt::Display for SetError {
@@ -378,14 +414,8 @@ impl fmt::Display for SetError {
             SetError::Voice(e) => e.fmt(f),
             SetError::SpeedNotNumber(r) => write!(f, "{r}: speed must be a number"),
             SetError::SpeedOutOfRange(r) => write!(f, "{r}: speed must be {}", Speed::RANGE),
-            SetError::WakeLead(r) => write!(f, "{r}: wake_lead_ms must be {}", wake_lead_what()),
-            SetError::PauseMedia(r) => write!(f, "{r}: pause_media must be {PAUSE_MEDIA_WHAT}"),
-            SetError::NotSettable(k) => {
-                write!(
-                    f,
-                    "{k}: not settable via config set (edit config.toml directly)"
-                )
-            }
+            SetError::WakeLead(r) => write!(f, "{r}: wake_lead_ms must be {}", WakeLead::RANGE),
+            SetError::PauseMedia(r) => write!(f, "{r}: pause_media must be true or false"),
         }
     }
 }
@@ -476,7 +506,10 @@ mod tests {
         let dir = TempDir::new("config-typed");
         let path = dir.path().join("config.toml");
         let models = dir.path();
-        for (key, raw) in [("wake_lead_ms", " 350 "), ("pause_media", "false")] {
+        for (key, raw) in [
+            (SettableKey::WakeLeadMs, " 350 "),
+            (SettableKey::PauseMedia, "false"),
+        ] {
             Setting::parse(models, key, raw)
                 .unwrap()
                 .write(&path)
@@ -487,34 +520,8 @@ mod tests {
             "wake_lead_ms = 350\npause_media = false\n"
         );
         let config = Config::load(&path).unwrap();
-        assert_eq!(config.wake_lead, Duration::from_millis(350));
+        assert_eq!(config.wake_lead.get(), Duration::from_millis(350));
         assert!(!config.pause_media);
-    }
-
-    #[test]
-    fn set_errors_match_the_load_wording() {
-        let dir = TempDir::new("config-wording");
-        let path = dir.path().join("config.toml");
-        for (key, raw) in [
-            ("wake_lead_ms", "2001"),
-            ("wake_lead_ms", "-1"),
-            ("wake_lead_ms", "x"),
-            ("pause_media", "yes"),
-        ] {
-            let set = Setting::parse(dir.path(), key, raw)
-                .err()
-                .unwrap()
-                .to_string();
-            fs::write(&path, format!("{key} = {raw:?}\n")).unwrap();
-            let load = Config::load(&path).unwrap_err().to_string();
-            let what = |s: &str| {
-                s.split_once(&format!("{key} must be "))
-                    .unwrap()
-                    .1
-                    .to_owned()
-            };
-            assert_eq!(what(&set), what(&load), "{key} {raw}");
-        }
     }
 
     #[test]
@@ -532,7 +539,10 @@ mod tests {
     fn load_reads_wake_lead_and_sink_probe() {
         let dir = TempDir::new("config-wake");
         let path = dir.path().join("config.toml");
-        assert_eq!(Config::defaults().wake_lead, Duration::from_millis(650));
+        assert_eq!(
+            Config::defaults().wake_lead.get(),
+            Duration::from_millis(650)
+        );
         for ms in [0, 350, 2000] {
             fs::write(
                 &path,
@@ -540,7 +550,7 @@ mod tests {
             )
             .unwrap();
             let config = Config::load(&path).unwrap();
-            assert_eq!(config.wake_lead, Duration::from_millis(ms));
+            assert_eq!(config.wake_lead.get(), Duration::from_millis(ms));
             assert_eq!(config.sink_probe, Argv::new(vec!["probe".into()]).unwrap());
         }
     }

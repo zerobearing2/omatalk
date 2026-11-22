@@ -30,14 +30,14 @@ fn suspended(name: &str, sinks: &str) -> bool {
 
 /// Silence to play before speech, from the config snapshot at press.
 #[derive(Clone, Debug)]
-pub struct WakeLead {
+pub struct WakeProbe {
     /// pactl-compatible (`sink_probe`).
     pub probe: Argv,
     /// Zero disables the probe.
     pub lead: Duration,
 }
 
-impl WakeLead {
+impl WakeProbe {
     /// `lead` when `probe` reports a suspended Bluetooth or HDMI default
     /// sink, else zero. A missing, failing, or slow probe is zero.
     pub fn measure(&self) -> Duration {
