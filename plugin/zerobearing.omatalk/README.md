@@ -29,8 +29,8 @@ omarchy restart shell
 
 ## Update and remove
 
-`omarchy update` updates the plugin with the package. `omatalk uninstall`
-removes the link, the Daemon's files, and the package.
+`omarchy update` updates the plugin with the package.
+`omarchy pkg drop omatalk-bin` removes the package and the plugin link.
 
 ## Development
 

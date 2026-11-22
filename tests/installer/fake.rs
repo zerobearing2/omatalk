@@ -156,10 +156,6 @@ impl Fake {
         self.bash(&repo("install.sh"), answer)
     }
 
-    pub fn uninstall(&self, answer: &str) -> Run {
-        self.bash(&repo("uninstall.sh"), answer)
-    }
-
     pub fn model_requests(&self, file: &str) -> usize {
         let suffix = format!("/models/{file}");
         self.downloads()
@@ -266,15 +262,5 @@ impl Fake {
             "-- keys\no.bind(\"F8\", \"Omatalk\", \"omatalk speak\")\n",
         );
         (config, self.bindings())
-    }
-
-    pub fn seed_bindings(&self) -> PathBuf {
-        write(
-            self.bindings(),
-            "-- Omatalk: F8 speaks selection\n\
-             o.bind(\"F9\", \"Dictate\", \"voxtype\")\n\
-             o.bind(\"F7\", \"Omatalk\", \"omatalk speak\")\n",
-        );
-        self.bindings()
     }
 }

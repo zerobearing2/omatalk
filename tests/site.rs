@@ -194,7 +194,7 @@ fn install_commands_match_readme_and_cname() {
     let host = host();
     let plugin = "omarchy plugin add";
     let install = "omarchy pkg add omatalk-bin && omatalk setup".to_owned();
-    let uninstall = "omatalk uninstall".to_owned();
+    let uninstall = "omarchy pkg drop omatalk-bin".to_owned();
     let cards = copy_cards(&page());
     let shown: BTreeSet<&str> = cards.iter().map(|c| c.trim()).collect();
     let readme = read(repo("README.md"));
@@ -219,7 +219,7 @@ fn install_commands_match_readme_and_cname() {
 /// Old docs said `curl -fsSL https://<host>/uninstall.sh | bash`; without this
 /// stub that pipe would fetch a 404 page and fail silently.
 #[test]
-fn site_uninstall_script_points_at_omatalk_uninstall_and_fails() {
+fn site_uninstall_script_points_at_the_package_drop_and_fails() {
     let script = read(public("uninstall.sh"));
 
     let result = run(
@@ -229,7 +229,7 @@ fn site_uninstall_script_points_at_omatalk_uninstall_and_fails() {
 
     assert_eq!(result.code, 1);
     assert_eq!(result.stdout, "");
-    assert_eq!(result.stderr, "Run: omatalk uninstall\n");
+    assert_eq!(result.stderr, "Run: omarchy pkg drop omatalk-bin\n");
 }
 
 #[test]

@@ -75,8 +75,6 @@ pub enum Cli {
     Config(ConfigCommand),
     /// Download the models and set up the service, F8 binding, and bar plugin
     Setup,
-    /// Remove Omatalk from this machine
-    Uninstall,
     /// Run the Daemon (started by omatalk.service)
     #[command(hide = true)]
     Daemon,
@@ -157,7 +155,6 @@ pub fn run(cli: Cli, paths: &Paths) -> ExitCode {
             }
         }
         Cli::Setup => setup(),
-        Cli::Uninstall => uninstall(),
         Cli::Daemon => match crate::daemon::serve(paths) {
             Ok(never) => match never {},
             Err(e) => fail(e),
@@ -282,12 +279,6 @@ fn read_stdin() -> std::io::Result<Option<String>> {
 
 fn setup() -> ExitCode {
     exec_script(include_str!("../setup.sh"), "omatalk setup")
-}
-
-/// The embedded `uninstall.sh`: no dependency on files under OMATALK_HOME,
-/// which it deletes.
-fn uninstall() -> ExitCode {
-    exec_script(include_str!("../uninstall.sh"), "omatalk uninstall")
 }
 
 /// Replaces this process with `bash -c script`, like the site's
@@ -469,7 +460,6 @@ mod tests {
         assert_eq!(p(&["status"]), Ok(Cli::Status));
         assert_eq!(p(&["daemon"]), Ok(Cli::Daemon));
         assert_eq!(p(&["setup"]), Ok(Cli::Setup));
-        assert_eq!(p(&["uninstall"]), Ok(Cli::Uninstall));
         assert_eq!(
             p(&["config", "get", "--json"]),
             Ok(Cli::Config(ConfigCommand::Get { json: true }))
@@ -513,7 +503,7 @@ mod tests {
             &["frob"][..],
             &["setup", "now"],
             &["upgrade"],
-            &["uninstall", "now"],
+            &["uninstall"],
             &["status", "--follow"],
             &["version", "x"],
             &["config", "set", "speed"],

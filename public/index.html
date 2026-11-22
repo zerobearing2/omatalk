@@ -863,7 +863,7 @@
     <p class="after">Setup downloads the voice (about 355&nbsp;MB), starts the service, asks before it binds F8, and adds the megaphone to your bar.</p>
     <details class="fold">
       <summary>Remove it, or move from the old installer</summary>
-      <p class="note">Run the line below to remove it. It asks before it deletes the voice models, your config, and the F8 binding. Installed Omatalk before it was a package? Run <code class="inline-code">omatalk upgrade</code> once instead.</p>
+      <p class="note">Run the line below to remove it. Your voice models and config stay in your home directory: delete <code class="inline-code">~/.local/share/omatalk</code> and <code class="inline-code">~/.config/omatalk</code>, and the F8 line in <code class="inline-code">~/.config/hypr/bindings.lua</code>, to remove them too. Installed Omatalk before it was a package? Run <code class="inline-code">omatalk upgrade</code> once instead.</p>
     <div class="code-card">
       <div class="cc-title">
         uninstall
@@ -872,7 +872,7 @@
           <span class="copy-label">copy</span>
         </button>
       </div>
-      <pre>omatalk uninstall</pre>
+      <pre>omarchy pkg drop omatalk-bin</pre>
     </div>
     </details>
   </section>

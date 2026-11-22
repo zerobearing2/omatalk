@@ -18,8 +18,7 @@ Now `omarchy pkg add omatalk-bin && omatalk setup` is the one install, and
   the model pins. Every step checks whether it is done and skips itself, so a
   rerun changes nothing it already did. Two things repeat: a rerun offers the
   F8 binding again if it was declined, and it speaks the welcome every time.
-  Setup keeps no state to remember a no. The binary embeds the script, as it
-  does `uninstall.sh`.
+  Setup keeps no state to remember a no. The binary embeds the script.
 - The bar plugin ships in the package at
   `/usr/share/omatalk/omarchy-plugin/zerobearing.omatalk/`, the way voxtype-bin
   and superwhisper-bin ship theirs. Its source moved into this repository under
@@ -36,8 +35,12 @@ Now `omarchy pkg add omatalk-bin && omatalk setup` is the one install, and
   `zerobearing.omatalk`, so a saved bar placement keeps working. The plugin
   calls `/usr/bin/omatalk` only, and `scripts/build.sh` stamps the release
   version into its manifest. This supersedes ADR 0004.
-- `omatalk upgrade` is deleted. `omatalk uninstall` removes the user's state,
-  then runs `omarchy pkg drop omatalk-bin`.
+- `omatalk upgrade` and `omatalk uninstall` are deleted. Uninstalling is
+  `omarchy pkg drop omatalk-bin`, the same as for any package. It leaves the
+  models, config, and F8 line in the user's home, as pacman always does, and
+  the README names them. A second uninstall command next to the OS's own
+  confused more than the cleanup it saved. A curl install that never migrated
+  keeps the `uninstall` built into its own binary.
 - The package ships two alpm hooks. `remove-user-services.hook` stops and
   removes the user unit for every account before removal, and aborts the
   removal if it cannot. It also deletes each user's plugin link, but only a link

@@ -74,17 +74,15 @@ fn setup_never_takes_f8_from_another_command() {
 }
 
 #[test]
-fn setup_rebinds_after_uninstall_leaves_a_comment() {
+fn setup_rebinds_when_only_the_comment_is_left() {
     let fake = Fake::new();
     write(
         fake.bindings(),
-        format!("-- F8 speaks selection (installed via ~/Work/omatalk/install.sh)\n{BIND_LINE}\n"),
+        "-- F8 speaks selection (installed via ~/Work/omatalk/install.sh)\n",
     );
 
-    let uninstalled = fake.uninstall("y\n");
     let resetup = fake.setup("y\n");
 
-    assert_eq!(uninstalled.code, 0, "{}", uninstalled.stderr);
     assert_eq!(resetup.code, 0, "{}", resetup.stderr);
     let bindings = read(fake.bindings());
     assert!(
@@ -92,62 +90,4 @@ fn setup_rebinds_after_uninstall_leaves_a_comment() {
         "{bindings:?}"
     );
     assert_eq!(bindings.matches(BIND_LINE).count(), 1, "{bindings:?}");
-}
-
-#[test]
-fn uninstall_removes_omatalk_bind_on_yes() {
-    let fake = Fake::new();
-    let bindings = fake.seed_bindings();
-
-    let result = fake.uninstall("y\n");
-
-    assert_eq!(result.code, 0, "{}", result.stderr);
-    assert_eq!(
-        read(&bindings),
-        "-- Omatalk: F8 speaks selection\no.bind(\"F9\", \"Dictate\", \"voxtype\")\n"
-    );
-    assert!(fake.commands().iter().any(|l| l == "hyprctl reload"));
-    assert!(
-        result.stdout.contains("Removed the Omatalk binding"),
-        "{}",
-        result.stdout
-    );
-    assert!(
-        !result.stdout.contains("Remove the o.bind line"),
-        "{}",
-        result.stdout
-    );
-}
-
-#[test]
-fn uninstall_keeps_bind_on_no_or_eof() {
-    for answer in ["", "n\n"] {
-        let fake = Fake::new();
-        let bindings = fake.seed_bindings();
-        let before = bytes(&bindings);
-
-        let result = fake.uninstall(answer);
-
-        assert_eq!(result.code, 0, "{answer:?}: {}", result.stderr);
-        assert_eq!(bytes(&bindings), before, "{answer:?}");
-        assert!(
-            result.stdout.contains("Remove the o.bind line"),
-            "{answer:?}"
-        );
-    }
-}
-
-#[test]
-fn uninstall_skips_bind_prompt_without_omatalk_bind() {
-    let fake = Fake::new();
-    write(
-        fake.bindings(),
-        "o.bind(\"F9\", \"Dictate\", \"voxtype\")\n",
-    );
-
-    let result = fake.uninstall("");
-
-    assert_eq!(result.code, 0, "{}", result.stderr);
-    assert!(!format!("{}{}", result.stdout, result.stderr).contains("Omatalk binding"));
-    assert!(!result.stdout.contains("o.bind line"), "{}", result.stdout);
 }
