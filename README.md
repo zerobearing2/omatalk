@@ -40,7 +40,7 @@ while speaking, and red when the Daemon reported an error or the bar lost it for
 more than 3 seconds. Click it to set the voice, speed, media pause, and wake
 lead. Picking a voice speaks a short sample.
 
-![Omatalk's voice and speed config panel](public/images/omatalk-config-panel.png)
+![Omatalk's config panel: voice, speed, and playback](public/images/omatalk-config-panel.png)
 
 From a terminal:
 

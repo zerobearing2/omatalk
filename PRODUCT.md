@@ -69,8 +69,7 @@ an Omarchy package and updates with `omarchy update`.
 
 - Voice clips: `public/audio/voices/*.mp3`, one per voice, same line,
   rendered by the real pipeline.
-- Screenshots: `public/images/omatalk-config-panel.png`,
-  `omatalk-bar-{idle,speaking,unavailable}.png`, `og.png`.
+- Screenshots: `public/images/omatalk-config-panel.png`, `og.png`.
 - Measured: ~0.3 s to first audio; render timing above.
 - No testimonials, user counts, or benchmarks against other TTS tools exist.
   Do not invent them.
