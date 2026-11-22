@@ -3,7 +3,6 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-// Voice, speed, media pause, and wake lead config panel.
 Panel {
   id: root
   moduleName: "zerobearing.omatalk"
@@ -21,7 +20,6 @@ Panel {
 
   readonly property int wakeLeadMax: 2000
   readonly property int wakeLeadStep: 50
-  // Same reason as snapSpeed. Clamped because `config set` rejects past 2000.
   function snapWakeLead(v) {
     var snapped = Math.round(v / wakeLeadStep) * wakeLeadStep
     return Math.max(0, Math.min(wakeLeadMax, snapped))

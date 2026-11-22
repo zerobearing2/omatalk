@@ -205,7 +205,6 @@ impl Config {
 /// Past two seconds the lead is a delay nobody wants.
 const WAKE_LEAD_MAX_MS: i64 = 2000;
 
-/// `None` outside 0 to `WAKE_LEAD_MAX_MS`. Both the file and `config set` check here.
 fn wake_lead(ms: i64) -> Option<Duration> {
     (0..=WAKE_LEAD_MAX_MS)
         .contains(&ms)
