@@ -209,7 +209,22 @@ fn install_commands_match_readme_and_cname() {
     assert!(readme.contains(&migrate));
     assert!(read(public("index.html")).contains(&migrate));
     assert!(public("install.sh").is_file());
-    assert!(!public("uninstall.sh").exists());
+}
+
+/// Old docs said `curl -fsSL https://<host>/uninstall.sh | bash`; without this
+/// stub that pipe would fetch a 404 page and fail silently.
+#[test]
+fn site_uninstall_script_points_at_omatalk_uninstall_and_fails() {
+    let script = read(public("uninstall.sh"));
+
+    let result = run(
+        std::process::Command::new("bash").arg("-c").arg(&script),
+        "",
+    );
+
+    assert_eq!(result.code, 1);
+    assert_eq!(result.stdout, "");
+    assert_eq!(result.stderr, "Run: omatalk uninstall\n");
 }
 
 #[test]
