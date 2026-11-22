@@ -114,7 +114,7 @@ fn defaults() -> serde_json::Value {
 #[test]
 fn copy_buttons_copy_the_visible_snippet() {
     let cards = copy_cards(&page());
-    assert_eq!(cards.len(), 6);
+    assert_eq!(cards.len(), 7);
     for pre in &cards {
         let text = pre.trim();
         assert!(!text.is_empty());
@@ -207,7 +207,12 @@ fn install_commands_match_readme_and_cname() {
     let migrate = format!("curl -fsSL https://{host}/install.sh | bash");
     assert!(!shown.contains(migrate.as_str()));
     assert!(readme.contains(&migrate));
-    assert!(read(public("index.html")).contains(&migrate));
+    let html = read(public("index.html"));
+    assert!(!html.contains("curl"), "the site shows no curl command");
+    assert!(
+        html.contains("omatalk upgrade"),
+        "the site lacks the migration step"
+    );
     assert!(public("install.sh").is_file());
 }
 

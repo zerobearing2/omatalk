@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Omatalk: local TTS for Omarchy</title>
-<meta name="description" content="Select text, press a key, and the machine reads it back. A local, always-warm text-to-speech daemon for Omarchy: the reverse of dictation.">
+<title>Omatalk: fast, local text-to-speech for Omarchy</title>
+<meta name="description" content="Select text, press F8, and hear it. Fast, local text-to-speech for Omarchy: the other half of dictation tools like voxtype, superwhisper, and Hex.">
 <meta name="author" content="Dave Bradford">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#151210" media="(prefers-color-scheme: dark)">
@@ -17,8 +17,8 @@
 <meta property="og:locale" content="en_US">
 <meta property="og:site_name" content="Omatalk">
 <meta property="og:url" content="https://omatalk.zerobearing.com/">
-<meta property="og:title" content="Omatalk: local TTS for Omarchy">
-<meta property="og:description" content="Select text, press a key, and the machine reads it back. Fully local, no cloud, no API key.">
+<meta property="og:title" content="Omatalk: fast, local text-to-speech for Omarchy">
+<meta property="og:description" content="Select text, press F8, and hear it. Runs on your CPU. No cloud, no API key.">
 <meta property="og:image" content="https://omatalk.zerobearing.com/images/og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
@@ -28,8 +28,8 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:site" content="@zerobearing2">
 <meta name="twitter:creator" content="@zerobearing2">
-<meta name="twitter:title" content="Omatalk: local TTS for Omarchy">
-<meta name="twitter:description" content="Select text, press a key, and the machine reads it back. Fully local, no cloud, no API key.">
+<meta name="twitter:title" content="Omatalk: fast, local text-to-speech for Omarchy">
+<meta name="twitter:description" content="Select text, press F8, and hear it. Runs on your CPU. No cloud, no API key.">
 <meta name="twitter:image" content="https://omatalk.zerobearing.com/images/og.png">
 <meta name="twitter:image:alt" content="Omatalk: Select text. Press a key. It talks.">
 
@@ -41,7 +41,7 @@
   "applicationCategory": "MultimediaApplication",
   "operatingSystem": "Linux",
   "url": "https://omatalk.zerobearing.com/",
-  "description": "Select text, press a key, and the machine reads it back. A local, always-warm text-to-speech daemon for Omarchy.",
+  "description": "Select text, press F8, and hear it. Fast, local text-to-speech for Omarchy.",
   "license": "https://opensource.org/license/mit",
   "author": {
     "@type": "Person",
@@ -57,7 +57,7 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@1,400;1,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
     --ink: #eef0ea;
@@ -105,8 +105,9 @@
     --shadow: 0 1px 0 rgba(0,0,0,0.4);
   }
 
+
   * { box-sizing: border-box; }
-  html { color-scheme: light dark; scroll-padding-top: 76px; }
+  html { color-scheme: light dark; scroll-padding-top: 84px; }
   @media (prefers-reduced-motion: no-preference) {
     html { scroll-behavior: smooth; }
   }
@@ -118,15 +119,17 @@
     font-size: 16px;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    caret-color: var(--accent);
+    scrollbar-color: var(--border-strong) var(--ink);
   }
   ::selection { background: var(--accent); color: var(--accent-ink); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
   .mono { font-family: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace; }
-  .voice { font-family: "IBM Plex Serif", Georgia, serif; font-style: italic; }
-
   h1, h2, h3 { text-wrap: balance; margin: 0; }
-
-  a { color: inherit; }
+  p, dd, li { text-wrap: pretty; }
+  p { margin: 0; }
+  a { color: inherit; text-underline-offset: 0.2em; }
 
   .wrap {
     max-width: 920px;
@@ -134,29 +137,11 @@
     padding: 0 clamp(20px, 5vw, 40px);
   }
 
-  .eyebrow {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.78rem;
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--accent);
-    display: flex;
-    align-items: center;
-    gap: 0.6em;
-  }
-  .eyebrow::before {
-    content: "";
-    width: 1.4em;
-    height: 1px;
-    background: var(--accent);
-    opacity: 0.7;
-  }
-
   /* ---------- header ---------- */
   header.top {
     border-bottom: 1px solid var(--border);
-    background: var(--ink);
+    background: color-mix(in srgb, var(--ink) 92%, transparent);
+    backdrop-filter: saturate(1.2) blur(8px);
     position: sticky;
     top: 0;
     z-index: 40;
@@ -165,11 +150,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px clamp(20px, 5vw, 40px);
+    gap: 16px;
+    padding: 16px clamp(20px, 5vw, 40px);
     max-width: 920px;
     margin: 0 auto;
   }
-  .topbar-right { display: flex; align-items: center; gap: 12px; position: relative; }
   .wordmark {
     font-family: "JetBrains Mono", monospace;
     font-weight: 700;
@@ -178,31 +163,20 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    text-decoration: none;
   }
   .wordmark .dot {
     width: 9px; height: 9px; border-radius: 50%;
     background: var(--accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
   }
-  .for-omarchy {
+  .topnav { display: flex; align-items: center; gap: clamp(12px, 2.4vw, 24px); }
+  .topnav a {
     font-family: "JetBrains Mono", monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-    color: var(--muted);
-    border: 1px solid var(--border-strong);
-    border-radius: 999px;
-    padding: 5px 12px;
+    font-size: 0.8rem;
+    color: var(--fg-dim);
     text-decoration: none;
   }
-  .for-omarchy:hover, .for-omarchy:focus-visible {
-    color: var(--accent);
-    border-color: var(--accent);
-    outline: none;
-  }
-  @media (max-width: 560px) {
-    .for-omarchy { display: none; }
-  }
-
+  .topnav a:hover { color: var(--accent); }
   .gh-link {
     display: flex;
     align-items: center;
@@ -215,403 +189,190 @@
     color: var(--fg-dim);
   }
   .gh-link svg { width: 18px; height: 18px; fill: currentColor; }
-  .gh-link:hover, .gh-link:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
+  .gh-link:hover { color: var(--accent); border-color: var(--accent); }
+  @media (max-width: 600px) {
+    .topnav .optional { display: none; }
+  }
 
-  .menu-btn {
-    display: flex;
-    flex-direction: column;
+  /* ---------- keycaps ---------- */
+  .cap {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border: 1px solid var(--border-strong);
-    border-radius: 8px;
-    background: var(--surface);
-    cursor: pointer;
-  }
-  .menu-btn .bar {
-    display: block;
-    width: 15px;
-    height: 1.5px;
-    background: var(--fg-dim);
-    transition: transform 150ms ease, opacity 150ms ease;
-  }
-  .menu-btn:hover .bar { background: var(--accent); }
-  .menu-btn[aria-expanded="true"] .bar:nth-child(1) { transform: translateY(5.5px) rotate(45deg); }
-  .menu-btn[aria-expanded="true"] .bar:nth-child(2) { opacity: 0; }
-  .menu-btn[aria-expanded="true"] .bar:nth-child(3) { transform: translateY(-5.5px) rotate(-45deg); }
-
-  .site-nav {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 200px;
+    min-width: 2.2em;
+    height: 1.2em;
+    padding: 0 0.28em;
+    font: inherit;
+    line-height: 1;
+    color: var(--accent);
     background: var(--surface);
     border: 1px solid var(--border-strong);
-    border-radius: 10px;
-    padding: 8px;
-    box-shadow: 0 24px 60px -30px rgba(0,0,0,0.5);
-    z-index: 30;
+    border-bottom-width: 0.09em;
+    border-radius: 0.18em;
+    box-shadow: 0 0.06em 0.22em -0.04em rgba(0,0,0,0.22);
+    vertical-align: 0.06em;
   }
-  .site-nav[hidden] { display: none; }
-  .site-nav a {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.85rem;
-    color: var(--fg-dim);
-    text-decoration: none;
-    padding: 9px 10px;
-    border-radius: 6px;
-  }
-  .site-nav a:hover, .site-nav a:focus-visible {
-    background: var(--ink-alt);
-    color: var(--fg);
-    outline: none;
-  }
+  .cap.quiet { color: var(--muted); }
+  kbd.cap { font-family: "JetBrains Mono", monospace; font-size: 0.85em; font-weight: 600; }
 
   /* ---------- hero ---------- */
-  .hero { padding: clamp(52px, 9vw, 96px) 0 clamp(40px, 6vw, 64px); }
+  .hero { padding: clamp(36px, 6vw, 64px) 0 clamp(48px, 7vw, 80px); }
   .hero h1 {
     font-family: "JetBrains Mono", monospace;
     font-weight: 800;
-    font-size: clamp(2.4rem, 5.6vw + 0.6rem, 4.6rem);
-    line-height: 1.04;
-    letter-spacing: -0.01em;
-    margin-top: 18px;
+    font-size: clamp(2.5rem, 5.6vw + 0.6rem, 4.6rem);
+    line-height: 1.12;
+    letter-spacing: -0.015em;
   }
-  .hero h1 .accent { color: var(--accent); }
-  .hero .sub {
-    max-width: 62ch;
-    margin-top: 22px;
-    font-size: 1.1rem;
-    color: var(--fg-dim);
-  }
+  .hero h1 .last { color: var(--accent); }
+  .hero h1 kbd.cap { font-size: 1em; font-weight: 800; }
 
-  .key {
-    display: inline-block;
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.82rem;
-    font-weight: 600;
-    padding: 8px 14px;
-    border-radius: 8px;
-    border: 1px solid var(--border-strong);
-    background: var(--surface);
-    box-shadow: var(--shadow);
-  }
-  .key.primary { border-color: var(--accent); color: var(--accent); }
+  .hero { display: flex; flex-direction: column; }
 
-  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-
-  /* ---------- demo terminal ---------- */
-  .demo {
-    margin-top: 48px;
-    border: 1px solid var(--border-strong);
-    border-radius: 12px;
-    overflow: hidden;
-    background: var(--surface);
-    box-shadow: 0 24px 60px -30px rgba(0,0,0,0.5);
-  }
-  .demo-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--border);
-    background: var(--ink-alt);
-  }
-  .demo-bar .traffic { width: 9px; height: 9px; border-radius: 50%; background: var(--border-strong); }
-  .demo-bar .title {
-    margin-left: 8px;
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.72rem;
-    color: var(--muted);
-  }
-  .demo-body { padding: 26px clamp(18px, 4vw, 30px) 22px; }
-  .demo-line {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 1rem;
+  /* the paragraph and its listen button */
+  @property --p { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
+  .listen { margin-top: clamp(26px, 3.4vw, 36px); max-width: 760px; }
+  .passage {
+    max-width: 58ch;
+    font-size: clamp(1.04rem, 0.5vw + 0.95rem, 1.2rem);
     line-height: 1.7;
-  }
-  .demo-line .sel {
-    background: color-mix(in srgb, var(--accent) 22%, transparent);
-    border-radius: 3px;
-    padding: 0 2px;
-  }
-  .demo-line .cursor {
-    display: inline-block;
-    width: 2px;
-    height: 1.1em;
-    background: var(--accent);
-    vertical-align: -0.18em;
-    margin-left: 1px;
-    animation: caret 1s steps(1) infinite;
-  }
-  @keyframes caret { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-
-  .wave-ascii {
-    width: 100%;
-    height: 84px;
-    display: flex;
-    align-items: center;
-    margin-top: 18px;
-    font-size: clamp(1.4rem, 3vw, 1.9rem);
-    line-height: 1;
-    letter-spacing: 1px;
-    color: var(--accent);
-    white-space: pre;
-    overflow: hidden;
-  }
-
-  .demo-foot {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 14px;
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.76rem;
-    color: var(--muted);
-  }
-  #state-label { color: var(--accent); font-weight: 600; }
-
-  /* ---------- bar widget states ---------- */
-  .bar-states {
-    margin: 34px 0 0;
-    padding: 25px clamp(16px, 3vw, 28px) 0;
-    border: 1px solid var(--border-strong);
-    border-radius: 12px;
-    background: var(--surface);
-    overflow: hidden;
-    box-shadow: 0 24px 60px -30px rgba(0,0,0,0.5);
-  }
-  .bar-widget-title {
-    color: var(--accent);
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.9rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .bar-widget-subtitle {
-    margin-top: 5px;
-    color: var(--muted);
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.78rem;
-  }
-  .bar-state-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-top: 24px;
-  }
-  .bar-state {
-    overflow: hidden;
-    border: 1px solid var(--border-strong);
-    border-radius: 10px;
-    background: var(--ink-alt);
-  }
-  .install-step {
-    margin-top: 34px;
-    color: var(--fg);
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.9rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-  .bar-state-head {
-    padding: 13px 15px 10px;
-    color: var(--fg);
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.82rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-  .bar-state.speaking .bar-state-head { color: var(--accent); }
-  .bar-state.unavailable .bar-state-head { color: #ff6178; }
-  .bar-state-image { display: block; width: 100%; height: auto; }
-  .bar-state-copy { padding: 14px 15px 17px; }
-  .bar-state-copy strong {
-    display: block;
     color: var(--fg-dim);
-    font-size: 0.96rem;
-    font-weight: 500;
   }
-  .bar-state-copy span {
-    display: block;
-    margin-top: 4px;
+  .listen-row { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+  .listen-btn {
+    --p: 0%;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 0 20px 0 16px;
+    border-radius: 999px;
+    border: 1px solid var(--accent);
+    background:
+      linear-gradient(to right, color-mix(in srgb, var(--accent) 24%, var(--surface)) var(--p), var(--surface) var(--p));
+    color: var(--fg);
+    font: 600 0.95rem/1 "JetBrains Mono", monospace;
+    cursor: pointer;
+    box-shadow: 0 6px 16px -10px rgba(0,0,0,0.45);
+    transition: --p 260ms linear, transform 90ms ease-out;
+  }
+  .listen-btn:hover { border-width: 1px; box-shadow: 0 8px 18px -10px rgba(0,0,0,0.5); }
+  .listen-btn:active { transform: scale(0.97); }
+  .listen-btn svg { color: var(--accent); width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .listen-btn .icon-play path:first-child { fill: currentColor; }
+  .listen-btn .icon-stop { display: none; fill: currentColor; stroke: none; }
+  .listen-btn.playing .icon-play { display: none; }
+  .listen-btn.playing .icon-stop { display: block; }
+  .listen-time { font-weight: 500; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+  .listen-btn.loading svg { animation: breathe 900ms ease-in-out infinite alternate; }
+  .voice-btn.loading .voice-avatar { animation: breathe 900ms ease-in-out infinite alternate; }
+  @keyframes breathe { from { opacity: 1; } to { opacity: 0.35; } }
+  .listen-meta { font-size: 0.88rem; color: var(--fg-dim); }
+  .play-error { margin-top: 6px; font-size: 0.86rem; color: var(--fg); }
+  .play-error:empty { display: none; }
+
+  .hero .code-card { margin-top: 26px; max-width: 760px; }
+  #start .code-card { max-width: 760px; }
+  .fold { margin-top: 36px; max-width: 760px; border-top: 1px solid var(--border); padding-top: 16px; }
+  .fold summary {
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: var(--fg-dim);
+    list-style-position: outside;
+    width: fit-content;
+  }
+  .fold summary:hover { color: var(--accent); }
+  .fold[open] summary { color: var(--fg); }
+  .fold .note { margin-top: 14px; }
+
+  @media (max-width: 600px) {
+    .hero .code-card.lead { order: 2; }
+    .hero .after { order: 3; }
+    .hero .listen { order: 4; margin-top: 34px; }
+  }
+  .after {
+    max-width: 640px;
+    margin-top: 12px;
+    font-size: 0.92rem;
     color: var(--muted);
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.78rem;
   }
-  .bar-state.speaking .bar-state-copy strong { color: var(--accent); }
-  .bar-state.unavailable .bar-state-copy strong { color: #ff6178; }
-  .bar-states figcaption {
-    margin-top: 24px;
-    padding: 13px 0 15px;
-    border-top: 1px solid var(--border);
-    color: var(--muted);
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.76rem;
-  }
+
   /* ---------- sections ---------- */
-  section { padding: clamp(56px, 8vw, 92px) 0; border-top: 1px solid var(--border); }
+  section { padding: clamp(60px, 8vw, 96px) 0; border-top: 1px solid var(--border); }
   section h2 {
     font-family: "JetBrains Mono", monospace;
     font-weight: 700;
     font-size: clamp(1.6rem, 2.4vw + 0.8rem, 2.3rem);
-    margin-top: 14px;
-    max-width: 20ch;
+    line-height: 1.2;
+    max-width: 30ch;
   }
-
-  .prose { max-width: 66ch; margin-top: 22px; color: var(--fg-dim); font-size: 1.04rem; }
-  .prose p + p { margin-top: 1.1em; }
-  .prose a, .manifest .row .why a {
+  .prose { max-width: 64ch; margin-top: 18px; color: var(--fg-dim); font-size: 1.04rem; }
+  .prose + .prose { margin-top: 14px; }
+  .prose a, .facts a, .foot a {
     color: var(--fg);
     text-decoration: none;
     border-bottom: 1px solid var(--border-strong);
   }
-  .prose a:hover, .prose a:focus-visible,
-  .manifest .row .why a:hover, .manifest .row .why a:focus-visible {
-    color: var(--accent);
-    border-color: var(--accent);
-    outline: none;
-  }
+  .prose a:hover, .facts a:hover { color: var(--accent); border-color: var(--accent); }
+  .note { margin-top: 32px; max-width: 64ch; color: var(--fg-dim); font-size: 0.98rem; }
 
-  blockquote.pull {
-    margin: 34px 0 0;
-    padding-left: 22px;
-    border-left: 2px solid var(--accent-2);
-    font-size: 1.28rem;
-    max-width: 46ch;
-    color: var(--fg);
-  }
-
-  /* ---------- loop list ---------- */
-  ol.loop { list-style: none; margin: 30px 0 0; padding: 0; counter-reset: step; max-width: 68ch; }
-  ol.loop li {
-    counter-increment: step;
-    display: grid;
-    grid-template-columns: 2.6rem 1fr;
-    gap: 6px 16px;
-    padding: 18px 0;
-    border-top: 1px solid var(--border);
-  }
-  ol.loop li:first-child { border-top: none; }
-  ol.loop li::before {
-    content: counter(step, decimal-leading-zero);
+  .inline-code {
     font-family: "JetBrains Mono", monospace;
-    font-weight: 700;
-    color: var(--muted);
-    font-size: 0.95rem;
-    padding-top: 2px;
-  }
-  ol.loop li .step-body { color: var(--fg-dim); }
-  ol.loop li .step-body b { color: var(--fg); font-weight: 600; }
-  ol.loop li .step-body code {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.88em;
+    font-size: 0.9em;
     background: var(--ink-alt);
     border: 1px solid var(--border);
     border-radius: 4px;
-    padding: 0.1em 0.4em;
+    padding: 0.08em 0.38em;
+    white-space: nowrap;
   }
 
-  /* ---------- architecture diagram ---------- */
-  .diagram {
-    margin-top: 40px;
-    border: 1px solid var(--border-strong);
-    border-radius: 12px;
-    background: var(--surface);
-    overflow-x: auto;
-  }
-  .diagram pre {
-    margin: 0;
-    padding: 24px clamp(16px, 3vw, 28px);
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.82rem;
-    line-height: 1.55;
-    color: var(--fg-dim);
-    white-space: pre;
-  }
-  .diagram pre .hi { color: var(--accent); }
-  .diagram pre .hi2 { color: var(--accent-2); }
-
-  /* ---------- stack manifest ---------- */
-  .manifest { margin-top: 34px; display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-  .manifest .row {
-    background: var(--surface);
-    padding: 20px clamp(16px, 3vw, 26px);
+  /* ---------- the pair ---------- */
+  .pair {
+    margin-top: 36px;
     display: grid;
-    grid-template-columns: minmax(0, 15ch) 1fr;
-    gap: 6px 24px;
+    border-top: 1px solid var(--border);
   }
-  .manifest .row .name {
-    font-family: "JetBrains Mono", monospace;
-    font-weight: 600;
-    color: var(--fg);
-    font-size: 0.95rem;
-  }
-  .manifest .row .why { color: var(--muted); font-size: 0.94rem; }
-  #roadmap .manifest .row.shipped {
-    background: color-mix(in srgb, var(--accent-2) 8%, var(--surface));
-    box-shadow: inset 4px 0 0 var(--accent-2);
-  }
-  #roadmap .manifest .row.shipped .name {
-    display: flex;
+  .pair-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 7px;
-    color: var(--accent-2);
+    gap: 4px clamp(18px, 3vw, 30px);
+    padding: 22px 0;
+    border-bottom: 1px solid var(--border);
   }
-  .roadmap-check {
-    display: inline-grid;
-    place-items: center;
-    width: 1.25em;
-    height: 1.25em;
-    border: 1px solid currentColor;
-    border-radius: 4px;
-    font-size: 0.85em;
-    line-height: 1;
-  }
-  .roadmap-status {
-    border: 1px solid color-mix(in srgb, var(--accent-2) 60%, transparent);
-    border-radius: 999px;
-    padding: 2px 7px;
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    line-height: 1.2;
-    text-transform: uppercase;
-  }
-  #roadmap .manifest .row.shipped .why { color: var(--fg-dim); }
-  @media (max-width: 640px) {
-    .manifest .row { grid-template-columns: 1fr; }
-    .bar-state-grid { grid-template-columns: 1fr; }
-    .bar-state-head { padding-bottom: 9px; }
-    .bar-state-copy { padding-bottom: 16px; }
-  }
-
-  /* ---------- voice preview ---------- */
-  .voice-groups { margin-top: 36px; display: grid; gap: 26px; }
-  .voice-group-label {
+  .pair-row .cap { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: clamp(1.7rem, 3vw, 2.3rem); grid-row: span 2; }
+  .pair-row .what {
     font-family: "JetBrains Mono", monospace;
-    font-size: 0.74rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 10px;
+    font-weight: 700;
+    font-size: clamp(1.17rem, 0.6vw + 1rem, 1.3rem);
   }
+  .pair-row .who { color: var(--muted); font-size: 0.98rem; }
+  .pair-row.us .what { color: var(--accent); }
+  .pair-row.us .who { color: var(--fg-dim); }
+
+  /* ---------- voices ---------- */
+  .voice-legend {
+    margin: 30px 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    font-size: 0.86rem;
+    color: var(--muted);
+  }
+  .voice-legend b { font-family: "JetBrains Mono", monospace; font-weight: 600; color: var(--fg-dim); margin-right: 4px; }
   .voice-grid {
+    margin-top: 14px;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 14px 10px;
+  }
+  @media (max-width: 760px) {
+    .voice-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 8px; }
+    .voice-btn { font-size: 0.72rem; padding: 10px 2px 8px; }
+    .voice-name { letter-spacing: -0.03em; }
   }
   .voice-btn {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -622,12 +383,11 @@
     background: var(--surface);
     border: 1px solid var(--border-strong);
     border-radius: 12px;
-    padding: 14px 8px 10px;
+    padding: 10px 6px 8px;
     cursor: pointer;
-    transition: border-color 120ms ease, color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+    transition: border-color 120ms ease, color 120ms ease, transform 120ms ease;
   }
   .voice-btn:hover { border-color: var(--accent); color: var(--fg); transform: translateY(-2px); }
-  .voice-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .voice-avatar {
     position: relative;
     width: 44px;
@@ -635,12 +395,11 @@
     border-radius: 50%;
     background: var(--ink-alt);
     border: 1px solid var(--border);
-    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  .voice-avatar svg { display: block; }
+  .voice-avatar svg { display: block; border-radius: 50%; }
   .voice-avatar::after {
     content: "";
     position: absolute;
@@ -651,7 +410,30 @@
     transform: scale(0.85);
     transition: opacity 150ms ease, transform 150ms ease;
   }
-  .voice-btn.playing { border-color: var(--accent); color: var(--accent); box-shadow: 0 8px 20px -12px color-mix(in srgb, var(--accent) 60%, transparent); }
+  .voice-btn.playing {
+    border-color: var(--accent);
+    color: var(--fg);
+    background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  }
+  .voice-btn.playing .voice-avatar svg { opacity: 0.3; }
+  .voice-btn.playing .voice-avatar::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 1;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    background: var(--accent);
+    transform: translate(-50%, -50%);
+  }
+  .voice-avatar[data-seed^="af_"], .voice-avatar[data-seed^="bf_"] { --av: var(--accent); }
+  .voice-avatar[data-seed^="am_"], .voice-avatar[data-seed^="bm_"] { --av: var(--accent-2); }
+  .voice-avatar .av-face { fill: var(--av); }
+  .voice-avatar .av-hair { fill: color-mix(in srgb, var(--av) 55%, #000); }
+  .voice-avatar .av-feat { fill: var(--accent-ink); }
+  .voice-avatar .av-mouth { fill: none; stroke: var(--accent-ink); stroke-width: 1.5; stroke-linecap: round; }
   .voice-btn.playing .voice-avatar::after {
     opacity: 1;
     transform: scale(1);
@@ -663,53 +445,24 @@
   }
   .voice-name { line-height: 1.3; text-align: center; }
   .voice-tag {
-    font-size: 0.62rem;
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translate(-50%, 50%);
+    font-size: 0.75rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--accent-2);
+    color: var(--accent);
+    background: var(--surface);
     border: 1px solid currentColor;
     border-radius: 4px;
-    padding: 1px 5px;
+    padding: 0 5px;
+    line-height: 1.45;
   }
 
-  /* ---------- config ---------- */
-  .config-grid {
-    margin-top: 30px;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 34px 40px;
-  }
-  .config-grid .code-card { margin-top: 16px; }
-
-  .config-panel-figure {
-    margin: 20px 0 0;
-    padding: 20px;
-    max-width: 320px;
-    border: 1px solid var(--border-strong);
-    border-radius: 12px;
-    background: var(--surface);
-    box-shadow: 0 24px 60px -30px rgba(0,0,0,0.5);
-  }
-  .config-panel-figure img { display: block; width: 100%; height: auto; border-radius: 8px; }
-  .config-panel-figure figcaption {
-    margin-top: 12px;
-    color: var(--muted);
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.78rem;
-  }
-
-  .inline-code {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.92em;
-    background: var(--ink-alt);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 0.1em 0.4em;
-  }
-
-  /* ---------- code card (config file, install commands) ---------- */
+  /* ---------- code card ---------- */
   .code-card {
-    margin-top: 30px;
+    margin-top: 16px;
     border: 1px solid var(--border-strong);
     border-radius: 10px;
     background: var(--surface);
@@ -722,24 +475,25 @@
     gap: 12px;
     font-family: "JetBrains Mono", monospace;
     font-size: 0.72rem;
-    color: var(--muted);
-    padding: 10px 12px 10px 16px;
+    color: var(--fg-dim);
+    padding: 8px 10px 8px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--ink-alt);
   }
   .code-card pre {
     margin: 0;
-    padding: 18px 16px;
+    padding: 16px;
     font-family: "JetBrains Mono", monospace;
     font-size: 0.9rem;
     line-height: 1.7;
-    color: var(--fg-dim);
+    color: var(--fg);
     white-space: pre-wrap;
     word-break: break-word;
     overflow-x: auto;
   }
+  .code-card.lead pre { font-size: clamp(0.92rem, 0.5vw + 0.82rem, 1.05rem); font-weight: 600; padding: 18px 16px; }
   .code-card.nowrap pre { white-space: pre; word-break: normal; }
-  .code-card pre .k { color: var(--accent-2); }
+  .code-card pre .k { color: color-mix(in srgb, var(--accent-2) 82%, var(--fg)); }
   .code-card pre .v { color: var(--accent); }
 
   .copy-btn {
@@ -747,20 +501,110 @@
     align-items: center;
     gap: 5px;
     font-family: "JetBrains Mono", monospace;
-    font-size: 0.7rem;
-    color: var(--muted);
-    background: transparent;
+    font-size: 0.72rem;
+    color: var(--fg-dim);
+    background: var(--surface);
     border: 1px solid var(--border-strong);
     border-radius: 6px;
-    padding: 4px 8px;
+    padding: 4px 9px;
     cursor: pointer;
     flex: 0 0 auto;
     transition: border-color 120ms ease, color 120ms ease;
   }
   .copy-btn:hover { border-color: var(--accent); color: var(--fg); }
-  .copy-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (pointer: coarse) {
+    .copy-btn { min-height: 44px; padding: 6px 12px; }
+  }
   .copy-btn svg { width: 12px; height: 12px; flex: 0 0 auto; }
   .copy-btn.copied { border-color: var(--accent); color: var(--accent); }
+
+  .two-up {
+    margin-top: 28px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 8px 28px;
+  }
+  .two-up .code-card { margin-top: 0; }
+
+  .specs {
+    margin: 22px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .specs li { display: flex; gap: 8px; }
+  .specs b { color: var(--fg-dim); font-weight: 600; }
+
+  /* ---------- roadmap ---------- */
+  .roadmap {
+    margin-top: 36px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 clamp(28px, 5vw, 56px);
+  }
+  .road-head {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--muted);
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .road-list { list-style: none; margin: 0; padding: 0; }
+  .road-list li {
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .road-list b {
+    display: block;
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--fg);
+  }
+  .road-list span { display: block; margin-top: 3px; color: var(--fg-dim); font-size: 0.95rem; }
+  .road-mark {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .road-list li.done .road-mark { stroke: var(--accent); }
+  .road-list li.done .road-mark circle { fill: color-mix(in srgb, var(--accent) 12%, transparent); }
+  @media (max-width: 720px) {
+    .roadmap { grid-template-columns: 1fr; gap: 32px; }
+  }
+
+  /* ---------- facts ---------- */
+  .facts {
+    margin: 36px 0 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 clamp(28px, 5vw, 56px);
+  }
+  .facts div { padding: 22px 0; border-top: 1px solid var(--border); }
+  .facts dt {
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 700;
+    font-size: 1.02rem;
+    color: var(--fg);
+  }
+  .facts dd { margin: 8px 0 0; color: var(--fg-dim); font-size: 0.98rem; }
+  @media (max-width: 640px) {
+    .facts { grid-template-columns: 1fr; }
+  }
 
   footer {
     border-top: 1px solid var(--border);
@@ -775,36 +619,19 @@
     font-size: 0.78rem;
     color: var(--muted);
   }
-  .foot-left {
-    display: grid;
-    gap: 8px;
-  }
+  .foot-left { display: grid; gap: 8px; }
   .foot-links {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 8px 18px;
-    max-width: 22rem;
+    max-width: 24rem;
   }
-  .foot a {
-    color: var(--muted);
-    text-decoration: none;
-    border-bottom: 1px solid var(--border-strong);
-  }
-  .foot a:hover, .foot a:focus-visible {
-    color: var(--accent);
-    border-color: var(--accent);
-    outline: none;
-  }
+  .foot a { color: var(--muted); }
+  .foot a:hover { color: var(--accent); border-color: var(--accent); }
   @media (max-width: 640px) {
-    .foot {
-      flex-direction: column;
-      gap: 16px;
-    }
-    .foot-links {
-      justify-content: flex-start;
-      max-width: none;
-    }
+    .foot { flex-direction: column; gap: 16px; }
+    .foot-links { justify-content: flex-start; max-width: none; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -816,376 +643,254 @@
 
 <header class="top">
   <div class="topbar">
-    <div class="wordmark"><span class="dot"></span>omatalk</div>
-    <div class="topbar-right">
-      <a class="for-omarchy" href="https://omarchy.org" target="_blank" rel="noopener">for Omarchy · Hyprland</a>
+    <a class="wordmark" href="/"><span class="dot"></span>omatalk</a>
+    <nav class="topnav" aria-label="Sections">
+      <a class="optional" href="#voices">Voices</a>
+      <a class="optional" href="#render">Voiceovers</a>
+      <a class="optional" href="#roadmap">Roadmap</a>
+      <a href="#start">Install</a>
       <a class="gh-link" href="https://github.com/zerobearing2/omatalk" target="_blank" rel="noopener" aria-label="Omatalk on GitHub">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.64 0 8.13c0 3.6 2.29 6.65 5.47 7.72.4.08.55-.17.55-.39 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.5-2.69-.96-.09-.23-.48-.96-.82-1.15-.28-.15-.68-.53-.01-.54.63-.01 1.08.58 1.23.83.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .22.15.48.55.39A8.13 8.13 0 0 0 16 8.13C16 3.64 12.42 0 8 0Z"/></svg>
       </a>
-      <button class="menu-btn" id="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Section menu">
-        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
-      </button>
-      <nav class="site-nav" id="site-nav" hidden>
-        <a href="#install">Install</a>
-        <a href="#why">Why</a>
-        <a href="#what">What it does</a>
-        <a href="#config">Config</a>
-        <a href="#voices">Voices</a>
-        <a href="#render">Render</a>
-        <a href="#bar">Bar states</a>
-        <a href="#stack">How it's built</a>
-        <a href="#architecture">Architecture</a>
-        <a href="#roadmap">Roadmap</a>
-        <a href="#credits">Credits</a>
-      </nav>
-    </div>
+    </nav>
   </div>
 </header>
 
 <main class="wrap">
-  <section class="hero" style="border-top:none; padding-top: clamp(48px,8vw,84px);">
-    <div class="eyebrow">the reverse of dictation</div>
-    <h1>Select text.<br>Press a key.<br><span class="accent">It talks.</span></h1>
-    <p class="sub">Omatalk reads your selection out loud through a local neural voice, streamed
-      batch by batch as it's synthesized. No network call, no API key, no cloud
-      round-trip. The model stays warm on your own CPU.</p>
+  <div class="hero">
+    <h1>Select text.<br>Press <kbd class="cap key-hero">F8</kbd><br><span class="last">Hear it.</span></h1>
 
-    <div class="demo">
-      <div class="demo-bar">
-        <span class="traffic"></span><span class="traffic"></span><span class="traffic"></span>
-        <span class="title">~/docs/roadmap.md · primary selection</span>
+    <div class="listen">
+      <p class="passage">Some text is better heard than read. A long changelog, a doc someone dropped in a channel, an email that can wait until you look away. Select it anywhere, press F8, and Omatalk reads it aloud. The voice runs on your own CPU, so nothing leaves the machine. It starts talking about a third of a second after you press the key. Dictation turns your voice into text. This is the other half.</p>
+      <div class="listen-row">
+        <button class="listen-btn" id="listen" type="button" aria-pressed="false" data-src="audio/passage.mp3" data-error="listen-error">
+          <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.2 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+          <svg class="icon-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg>
+          <span class="listen-label">Listen</span>
+          <span class="listen-time" id="listen-time">0:23</span>
+        </button>
+        <span class="listen-meta">In the default voice, rendered by Omatalk.</span>
       </div>
-      <div class="demo-body">
-        <div class="demo-line" id="demo-text">
-          The reverse of dictation<span class="sel">: instead of you talking to the machine, the machine reads back to you.</span><span class="cursor"></span>
-        </div>
-        <div class="wave-ascii mono" id="wave" aria-hidden="true"></div>
-        <div class="demo-foot">
-          <span>state: <span id="state-label" class="mono">idle</span></span>
-          <span class="mono">kokoro-82m · 24kHz · af_heart</span>
-        </div>
-      </div>
+      <p class="play-error" id="listen-error" role="status"></p>
     </div>
-  </section>
 
-  <section id="install">
-    <div class="eyebrow">install</div>
-    <h2>Get it running</h2>
-    <p class="prose" style="margin-top:14px;">Omatalk has two parts: the Daemon, which does the speaking, and the bar plugin, the megaphone and voice panel. The package carries both.</p>
-
-    <p class="prose" style="margin-top:14px;">Run it in a terminal. <code class="inline-code">omarchy pkg add</code> installs the speech Daemon and the <code class="inline-code">omatalk</code> command. <code class="inline-code">omatalk setup</code> downloads the models (about 355MB), enables the service, asks before binding F8, and links the bar plugin from the package. If you added the plugin from the Omarchy Marketplace first, its panel links here: run this, and the packaged plugin replaces it. Updates arrive with <code class="inline-code">omarchy update</code>.</p>
-    <div class="code-card" style="margin-top:12px;">
+    <div class="code-card lead">
       <div class="cc-title">
-        install
+        install on Omarchy
         <button class="copy-btn" type="button">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
           <span class="copy-label">copy</span>
         </button>
       </div>
       <pre>omarchy pkg add omatalk-bin &amp;&amp; omatalk setup</pre>
     </div>
-    <p class="prose" style="margin-top:12px;">Installed with the old curl command? Run <code class="inline-code">curl -fsSL https://omatalk.zerobearing.com/install.sh | bash</code> once more. It installs the package and removes the files the curl installer left, and keeps your models, config, and F8 binding. The packaged plugin replaces the one it left.</p>
+    <p class="after">Setup downloads the voice (about 355&nbsp;MB), starts the service, asks before it binds F8, and adds the megaphone to your bar.</p>
+  </div>
 
-    <h3 class="install-step">Uninstall</h3>
-    <p class="prose" style="margin-top:10px;">Removes the Daemon service, the plugin link, and the package. Asks before deleting models, config, and the F8 binding.</p>
-    <div class="code-card" style="margin-top:12px;">
+  <section id="pair" aria-labelledby="pair-title">
+    <h2 id="pair-title">The other half of voice</h2>
+    <p class="prose">Keep both: voxtype dictates on F9, and Omatalk reads back on F8.</p>
+    <div class="pair">
+      <div class="pair-row">
+        <kbd class="cap quiet">F9</kbd>
+        <span class="what">You talk. It types.</span>
+        <span class="who">Dictation: voxtype, superwhisper, Hex</span>
+      </div>
+      <div class="pair-row us">
+        <kbd class="cap">F8</kbd>
+        <span class="what">You select. It talks.</span>
+        <span class="who">Omatalk: any text in any app, read back in about 0.3&nbsp;s</span>
+      </div>
+    </div>
+    <p class="note">Press F8 again to stop, or select something new and press it to switch. With nothing selected, it reads the clipboard. If F8 is already taken, setup leaves it alone and prints the line to add to <code class="inline-code">~/.config/hypr/bindings.lua</code> with a key of your choice:</p>
+    <div class="code-card">
+      <div class="cc-title">
+        ~/.config/hypr/bindings.lua
+        <button class="copy-btn" type="button">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+          <span class="copy-label">copy</span>
+        </button>
+      </div>
+      <pre>o.bind(<span class="v">"F8"</span>, <span class="v">"Omatalk"</span>, <span class="v">"omatalk speak"</span>)</pre>
+    </div>
+  </section>
+
+  <section id="voices" aria-labelledby="voices-title">
+    <h2 id="voices-title">Hear all 28 voices</h2>
+    <p class="prose">Every clip is the same line, rendered on a CPU by the same pipeline Omatalk runs. American and British English. <code class="inline-code">af_heart</code> is the default.</p>
+
+    <p class="voice-legend"><span><b>af</b> American female</span><span><b>am</b> American male</span><span><b>bf</b> British female</span><span><b>bm</b> British male</span></p>
+    <div class="voice-grid" id="voice-grid">
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play af_alloy sample" data-error="voice-error" data-src="audio/voices/af_alloy.mp3"><span class="voice-avatar" data-seed="af_alloy"></span><span class="voice-name">af_alloy</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play af_aoede sample" data-error="voice-error" data-src="audio/voices/af_aoede.mp3"><span class="voice-avatar" data-seed="af_aoede"></span><span class="voice-name">af_aoede</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play af_bella sample" data-error="voice-error" data-src="audio/voices/af_bella.mp3"><span class="voice-avatar" data-seed="af_bella"></span><span class="voice-name">af_bella</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play af_heart sample" data-error="voice-error" data-src="audio/voices/af_heart.mp3"><span class="voice-avatar" data-seed="af_heart"></span><span class="voice-name">af_heart</span><span class="voice-tag">default</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play af_jessica sample" data-error="voice-error" data-src="audio/voices/af_jessica.mp3"><span class="voice-avatar" data-seed="af_jessica"></span><span class="voice-name">af_jessica</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play af_kore sample" data-error="voice-error" data-src="audio/voices/af_kore.mp3"><span class="voice-avatar" data-seed="af_kore"></span><span class="voice-name">af_kore</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play af_nicole sample" data-error="voice-error" data-src="audio/voices/af_nicole.mp3"><span class="voice-avatar" data-seed="af_nicole"></span><span class="voice-name">af_nicole</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play af_nova sample" data-error="voice-error" data-src="audio/voices/af_nova.mp3"><span class="voice-avatar" data-seed="af_nova"></span><span class="voice-name">af_nova</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play af_river sample" data-error="voice-error" data-src="audio/voices/af_river.mp3"><span class="voice-avatar" data-seed="af_river"></span><span class="voice-name">af_river</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play af_sarah sample" data-error="voice-error" data-src="audio/voices/af_sarah.mp3"><span class="voice-avatar" data-seed="af_sarah"></span><span class="voice-name">af_sarah</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play af_sky sample" data-error="voice-error" data-src="audio/voices/af_sky.mp3"><span class="voice-avatar" data-seed="af_sky"></span><span class="voice-name">af_sky</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play am_adam sample" data-error="voice-error" data-src="audio/voices/am_adam.mp3"><span class="voice-avatar" data-seed="am_adam"></span><span class="voice-name">am_adam</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play am_echo sample" data-error="voice-error" data-src="audio/voices/am_echo.mp3"><span class="voice-avatar" data-seed="am_echo"></span><span class="voice-name">am_echo</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play am_eric sample" data-error="voice-error" data-src="audio/voices/am_eric.mp3"><span class="voice-avatar" data-seed="am_eric"></span><span class="voice-name">am_eric</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play am_fenrir sample" data-error="voice-error" data-src="audio/voices/am_fenrir.mp3"><span class="voice-avatar" data-seed="am_fenrir"></span><span class="voice-name">am_fenrir</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play am_liam sample" data-error="voice-error" data-src="audio/voices/am_liam.mp3"><span class="voice-avatar" data-seed="am_liam"></span><span class="voice-name">am_liam</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play am_michael sample" data-error="voice-error" data-src="audio/voices/am_michael.mp3"><span class="voice-avatar" data-seed="am_michael"></span><span class="voice-name">am_michael</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play am_onyx sample" data-error="voice-error" data-src="audio/voices/am_onyx.mp3"><span class="voice-avatar" data-seed="am_onyx"></span><span class="voice-name">am_onyx</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play am_puck sample" data-error="voice-error" data-src="audio/voices/am_puck.mp3"><span class="voice-avatar" data-seed="am_puck"></span><span class="voice-name">am_puck</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play am_santa sample" data-error="voice-error" data-src="audio/voices/am_santa.mp3"><span class="voice-avatar" data-seed="am_santa"></span><span class="voice-name">am_santa</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play bf_alice sample" data-error="voice-error" data-src="audio/voices/bf_alice.mp3"><span class="voice-avatar" data-seed="bf_alice"></span><span class="voice-name">bf_alice</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play bf_emma sample" data-error="voice-error" data-src="audio/voices/bf_emma.mp3"><span class="voice-avatar" data-seed="bf_emma"></span><span class="voice-name">bf_emma</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play bf_isabella sample" data-error="voice-error" data-src="audio/voices/bf_isabella.mp3"><span class="voice-avatar" data-seed="bf_isabella"></span><span class="voice-name">bf_isabella</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play bf_lily sample" data-error="voice-error" data-src="audio/voices/bf_lily.mp3"><span class="voice-avatar" data-seed="bf_lily"></span><span class="voice-name">bf_lily</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play bm_daniel sample" data-error="voice-error" data-src="audio/voices/bm_daniel.mp3"><span class="voice-avatar" data-seed="bm_daniel"></span><span class="voice-name">bm_daniel</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play bm_fable sample" data-error="voice-error" data-src="audio/voices/bm_fable.mp3"><span class="voice-avatar" data-seed="bm_fable"></span><span class="voice-name">bm_fable</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play bm_george sample" data-error="voice-error" data-src="audio/voices/bm_george.mp3"><span class="voice-avatar" data-seed="bm_george"></span><span class="voice-name">bm_george</span></button>
+      <button class="voice-btn" type="button" aria-pressed="false" aria-label="Play bm_lewis sample" data-error="voice-error" data-src="audio/voices/bm_lewis.mp3"><span class="voice-avatar" data-seed="bm_lewis"></span><span class="voice-name">bm_lewis</span></button>
+    </div>
+    <p class="play-error" id="voice-error" role="status"></p>
+
+    <p class="note">Pick one from the megaphone in the Omarchy bar, or set it in the config file. Every key is optional, and the next press picks up a change. The <a href="https://github.com/zerobearing2/omatalk#config">README</a> lists the rest.</p>
+    <div class="code-card">
+      <div class="cc-title">
+        ~/.config/omatalk/config.toml
+        <button class="copy-btn" type="button">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+          <span class="copy-label">copy</span>
+        </button>
+      </div>
+      <pre><span class="k">voice</span> = <span class="v">"af_heart"</span>
+<span class="k">speed</span> = <span class="v">1.0</span>
+<span class="k">pause_media</span> = <span class="v">true</span></pre>
+    </div>
+  </section>
+
+
+
+
+  <section id="how" aria-labelledby="how-title">
+    <h2 id="how-title">Fast because it stays warm. Private because it stays here.</h2>
+    <dl class="facts">
+      <div>
+        <dt>Always warm</dt>
+        <dd>A small Rust Daemon loads the model at login, so a press never waits for it. Speech streams batch by batch, starting with the first few words.</dd>
+      </div>
+      <div>
+        <dt>On your CPU</dt>
+        <dd><a href="https://huggingface.co/hexgrad/Kokoro-82M" target="_blank" rel="noopener">Kokoro-82M</a> through ONNX Runtime. No network calls at runtime, no API key, no account, no telemetry.</dd>
+      </div>
+      <div>
+        <dt>Made for Omarchy</dt>
+        <dd>It reads the Wayland selection, plays through PipeWire, pauses your music while it speaks, and shows its state in the bar.</dd>
+      </div>
+      <div>
+        <dt>A real package</dt>
+        <dd><code class="inline-code">omatalk-bin</code> installs with <code class="inline-code">omarchy pkg add</code> and updates with <code class="inline-code">omarchy update</code>, bar plugin included.</dd>
+      </div>
+    </dl>
+    <p class="note">The <a href="https://github.com/zerobearing2/omatalk#readme">README</a> covers the config, troubleshooting, and <a href="https://github.com/zerobearing2/omatalk/tree/master/docs/adr">design decisions</a>.</p>
+  </section>
+
+  <section id="render" aria-labelledby="render-title">
+    <h2 id="render-title">Turn a script into a voiceover</h2>
+    <p class="prose"><code class="inline-code">omatalk render</code> writes a whole script to a WAV file for a video, a screencast, or a podcast. It favors quality over speed, and a blank line in the script becomes a pause.</p>
+    <div class="two-up">
+      <div class="code-card nowrap">
+        <div class="cc-title">
+          from a script file
+          <button class="copy-btn" type="button">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+            <span class="copy-label">copy</span>
+          </button>
+        </div>
+        <pre>omatalk render --out talk.wav &lt; script.txt</pre>
+      </div>
+      <div class="code-card">
+        <div class="cc-title">
+          one line, a voice, a speed
+          <button class="copy-btn" type="button">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+            <span class="copy-label">copy</span>
+          </button>
+        </div>
+        <pre>omatalk render --out talk.wav --voice af_bella --speed 0.95 "Welcome to the demo."</pre>
+      </div>
+    </div>
+    <ul class="specs">
+      <li><b>~10 s</b> per minute of audio (Ryzen 7840HS)</li>
+      <li><b>WAV</b> 16-bit mono, 24&nbsp;kHz</li>
+      <li><b>offline</b> works with the Daemon stopped</li>
+    </ul>
+  </section>
+
+  <section id="roadmap" aria-labelledby="roadmap-title">
+    <h2 id="roadmap-title">Shipped, and what's next</h2>
+    <div class="roadmap">
+      <div class="road-col">
+        <h3 class="road-head">Shipped</h3>
+        <ul class="road-list">
+          <li class="done"><svg class="road-mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.8 8.3l2.2 2.2 4.2-4.6"/></svg><div><b>Omarchy package</b><span>Installs with <code class="inline-code">omarchy pkg add</code>, updates with <code class="inline-code">omarchy update</code>.</span></div></li>
+          <li class="done"><svg class="road-mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.8 8.3l2.2 2.2 4.2-4.6"/></svg><div><b>Bar megaphone and panel</b><span>Shows its state at a glance. Voice, speed, media pause, and wake lead are a click away.</span></div></li>
+          <li class="done"><svg class="road-mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.8 8.3l2.2 2.2 4.2-4.6"/></svg><div><b>Media pause</b><span>Music and video pause while it speaks, then resume.</span></div></li>
+        </ul>
+      </div>
+      <div class="road-col">
+        <h3 class="road-head">Next</h3>
+        <ul class="road-list">
+          <li><svg class="road-mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/></svg><div><b>On-screen text</b><span>Shows the text on screen while it speaks and highlights each word as it is read.</span></div></li>
+          <li><svg class="road-mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/></svg><div><b>More languages</b><span>Kokoro has voice packs for nine languages. Omatalk speaks English only so far.</span></div></li>
+          <li><svg class="road-mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/></svg><div><b>A lighter engine</b><span>A smaller voice (Piper or int8) for older machines.</span></div></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="start" aria-labelledby="start-title">
+    <h2 id="start-title">Get it on Omarchy</h2>
+    <p class="prose">One line installs it, and <code class="inline-code">omarchy update</code> keeps it current.</p>
+    <div class="code-card lead">
+      <div class="cc-title">
+        install on Omarchy
+        <button class="copy-btn" type="button">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+          <span class="copy-label">copy</span>
+        </button>
+      </div>
+      <pre>omarchy pkg add omatalk-bin &amp;&amp; omatalk setup</pre>
+    </div>
+    <p class="after">Setup downloads the voice (about 355&nbsp;MB), starts the service, asks before it binds F8, and adds the megaphone to your bar.</p>
+    <details class="fold">
+      <summary>Remove it, or move from the old installer</summary>
+      <p class="note">Run the line below to remove it. It asks before it deletes the voice models, your config, and the F8 binding. Installed Omatalk before it was a package? Run <code class="inline-code">omatalk upgrade</code> once instead.</p>
+    <div class="code-card">
       <div class="cc-title">
         uninstall
         <button class="copy-btn" type="button">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
           <span class="copy-label">copy</span>
         </button>
       </div>
       <pre>omatalk uninstall</pre>
     </div>
+    </details>
   </section>
-
-  <section id="why">
-    <div class="eyebrow">why</div>
-    <h2>Reading isn't always the shape you want text in</h2>
-    <div class="prose">
-      <p>Some text is meant to be listened to, not stared at: a long changelog, a doc
-        someone dropped in a channel, an email that can wait until you're not looking at a
-        screen. Dictation tools like voxtype went one direction: voice into text. Nothing
-        closed the loop back the other way for people living in Hyprland.</p>
-      <p>Cloud TTS solves the "read it to me" problem by shipping your clipboard to someone
-        else's server. That's a real cost for a genuinely small task. Omatalk keeps the
-        whole loop on the machine you're already sitting at: capture, synthesis, playback.</p>
-    </div>
-    <blockquote class="pull voice">"instead of you talking to the machine, the machine reads back to you."</blockquote>
-  </section>
-
-  <section id="what">
-    <div class="eyebrow">what it does</div>
-    <h2>One hotkey, four moves</h2>
-    <ol class="loop">
-      <li><div class="step-body"><b>Highlight text</b> anywhere in Hyprland: a browser tab, a terminal, a GTK app, an editor buffer.</div></li>
-      <li><div class="step-body"><b>Press the Speak Key.</b> Omatalk resolves the <b>Source</b>: the Wayland primary selection first (<code>wl-paste --primary</code>), the clipboard if nothing's selected.</div></li>
-      <li><div class="step-body"><b>The daemon streams it.</b> Text becomes phonemes, packed into batches that start with a few words, and is synthesized through Kokoro-82M. First audio lands before the rest has finished rendering. Music or a video that's playing pauses while it speaks, then picks back up.</div></li>
-      <li><div class="step-body"><b>Press it again to interrupt.</b> The playing <b>Utterance</b> cuts off immediately. Unchanged or empty Selection just stops; a new Selection starts speaking. No queue.</div></li>
-    </ol>
-  </section>
-
-  <section id="config">
-    <div class="eyebrow">config</div>
-    <h2>The whole configuration surface</h2>
-    <p class="prose" style="margin-top:14px;">Click the bar icon for voice, speed, media pause, and Bluetooth wake — it auto-saves, and the next
-      utterance picks it up, no restart needed. <code class="inline-code">omatalk config get/set/voices</code> does the same from a terminal or a
-      script. Everything else is two files, edited by hand.</p>
-
-    <figure class="config-panel-figure">
-      <img src="images/omatalk-config-panel.png" alt="Omatalk's config panel, opened from the bar icon" width="448" height="330" loading="lazy" decoding="async">
-      <figcaption>Voice picker + speed slider. Selecting a voice or releasing the slider saves immediately.</figcaption>
-    </figure>
-
-    <div class="config-grid">
-      <div>
-        <p class="prose" style="margin-top:0; font-size:0.98rem;"><code class="inline-code">~/.config/omatalk/config.toml</code> is
-          entirely optional. Missing the file, Omatalk just runs on defaults. Point <code class="inline-code">voice</code> at any
-          name from the list above, tune <code class="inline-code">speed</code>, save. <code class="inline-code">pause_media</code> pauses
-          music and video while Omatalk speaks; set it to <code class="inline-code">false</code> to let them keep playing.</p>
-        <div class="code-card">
-          <div class="cc-title">
-            ~/.config/omatalk/config.toml
-            <button class="copy-btn" type="button">
-              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
-              <span class="copy-label">copy</span>
-            </button>
-          </div>
-          <pre><span class="k">voice</span> = <span class="v">"af_heart"</span>
-<span class="k">speed</span> = <span class="v">1.0</span>
-<span class="k">pause_media</span> = <span class="v">true</span></pre>
-        </div>
-      </div>
-
-      <div>
-        <p class="prose" style="margin-top:0; font-size:0.98rem;"><span class="key primary mono" style="font-size:0.78rem; padding:3px 9px; margin-right:2px;">F8</span> answers
-          F9: voxtype's dictation key speaks <em>to</em> the machine, F8 speaks back. <code class="inline-code">omatalk setup</code> <em>asks</em> before adding
-          this line to <code class="inline-code">~/.config/hypr/bindings.lua</code>; say no and paste it yourself.</p>
-        <div class="code-card">
-          <div class="cc-title">
-            ~/.config/hypr/bindings.lua
-            <button class="copy-btn" type="button">
-              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
-              <span class="copy-label">copy</span>
-            </button>
-          </div>
-          <pre>o.bind(<span class="v">"F8"</span>, <span class="v">"Omatalk"</span>, <span class="v">"omatalk speak"</span>)</pre>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="voices">
-    <div class="eyebrow">voices</div>
-    <h2>Twenty-eight voices, one config line</h2>
-    <p class="prose" style="margin-top:14px;">Kokoro-82M ships packs across nine languages; Omatalk speaks
-      English only for now: American and British, eleven female and nine male US voices, four and four UK.
-      Set <code class="inline-code">voice = "…"</code>
-      in <code class="inline-code">config.toml</code>
-      to any name below. <code class="inline-code">af_heart</code> is the default. Every clip is the same line, rendered
-      through the pipeline Omatalk actually runs: Kokoro-82M, ONNX Runtime, CPU.</p>
-
-    <div class="voice-groups" id="voice-groups">
-      <div class="voice-group">
-        <div class="voice-group-label">American English · Female</div>
-        <div class="voice-grid">
-          <button class="voice-btn" data-src="audio/voices/af_alloy.mp3"><span class="voice-avatar" data-seed="af_alloy"></span><span class="voice-name">af_alloy</span></button>
-          <button class="voice-btn" data-src="audio/voices/af_aoede.mp3"><span class="voice-avatar" data-seed="af_aoede"></span><span class="voice-name">af_aoede</span></button>
-          <button class="voice-btn" data-src="audio/voices/af_bella.mp3"><span class="voice-avatar" data-seed="af_bella"></span><span class="voice-name">af_bella</span></button>
-          <button class="voice-btn" data-src="audio/voices/af_heart.mp3"><span class="voice-avatar" data-seed="af_heart"></span><span class="voice-name">af_heart</span><span class="voice-tag">default</span></button>
-          <button class="voice-btn" data-src="audio/voices/af_jessica.mp3"><span class="voice-avatar" data-seed="af_jessica"></span><span class="voice-name">af_jessica</span></button>
-          <button class="voice-btn" data-src="audio/voices/af_kore.mp3"><span class="voice-avatar" data-seed="af_kore"></span><span class="voice-name">af_kore</span></button>
-          <button class="voice-btn" data-src="audio/voices/af_nicole.mp3"><span class="voice-avatar" data-seed="af_nicole"></span><span class="voice-name">af_nicole</span></button>
-          <button class="voice-btn" data-src="audio/voices/af_nova.mp3"><span class="voice-avatar" data-seed="af_nova"></span><span class="voice-name">af_nova</span></button>
-          <button class="voice-btn" data-src="audio/voices/af_river.mp3"><span class="voice-avatar" data-seed="af_river"></span><span class="voice-name">af_river</span></button>
-          <button class="voice-btn" data-src="audio/voices/af_sarah.mp3"><span class="voice-avatar" data-seed="af_sarah"></span><span class="voice-name">af_sarah</span></button>
-          <button class="voice-btn" data-src="audio/voices/af_sky.mp3"><span class="voice-avatar" data-seed="af_sky"></span><span class="voice-name">af_sky</span></button>
-        </div>
-      </div>
-      <div class="voice-group">
-        <div class="voice-group-label">American English · Male</div>
-        <div class="voice-grid">
-          <button class="voice-btn" data-src="audio/voices/am_adam.mp3"><span class="voice-avatar" data-seed="am_adam"></span><span class="voice-name">am_adam</span></button>
-          <button class="voice-btn" data-src="audio/voices/am_echo.mp3"><span class="voice-avatar" data-seed="am_echo"></span><span class="voice-name">am_echo</span></button>
-          <button class="voice-btn" data-src="audio/voices/am_eric.mp3"><span class="voice-avatar" data-seed="am_eric"></span><span class="voice-name">am_eric</span></button>
-          <button class="voice-btn" data-src="audio/voices/am_fenrir.mp3"><span class="voice-avatar" data-seed="am_fenrir"></span><span class="voice-name">am_fenrir</span></button>
-          <button class="voice-btn" data-src="audio/voices/am_liam.mp3"><span class="voice-avatar" data-seed="am_liam"></span><span class="voice-name">am_liam</span></button>
-          <button class="voice-btn" data-src="audio/voices/am_michael.mp3"><span class="voice-avatar" data-seed="am_michael"></span><span class="voice-name">am_michael</span></button>
-          <button class="voice-btn" data-src="audio/voices/am_onyx.mp3"><span class="voice-avatar" data-seed="am_onyx"></span><span class="voice-name">am_onyx</span></button>
-          <button class="voice-btn" data-src="audio/voices/am_puck.mp3"><span class="voice-avatar" data-seed="am_puck"></span><span class="voice-name">am_puck</span></button>
-          <button class="voice-btn" data-src="audio/voices/am_santa.mp3"><span class="voice-avatar" data-seed="am_santa"></span><span class="voice-name">am_santa</span></button>
-        </div>
-      </div>
-      <div class="voice-group">
-        <div class="voice-group-label">British English · Female</div>
-        <div class="voice-grid">
-          <button class="voice-btn" data-src="audio/voices/bf_alice.mp3"><span class="voice-avatar" data-seed="bf_alice"></span><span class="voice-name">bf_alice</span></button>
-          <button class="voice-btn" data-src="audio/voices/bf_emma.mp3"><span class="voice-avatar" data-seed="bf_emma"></span><span class="voice-name">bf_emma</span></button>
-          <button class="voice-btn" data-src="audio/voices/bf_isabella.mp3"><span class="voice-avatar" data-seed="bf_isabella"></span><span class="voice-name">bf_isabella</span></button>
-          <button class="voice-btn" data-src="audio/voices/bf_lily.mp3"><span class="voice-avatar" data-seed="bf_lily"></span><span class="voice-name">bf_lily</span></button>
-        </div>
-      </div>
-      <div class="voice-group">
-        <div class="voice-group-label">British English · Male</div>
-        <div class="voice-grid">
-          <button class="voice-btn" data-src="audio/voices/bm_daniel.mp3"><span class="voice-avatar" data-seed="bm_daniel"></span><span class="voice-name">bm_daniel</span></button>
-          <button class="voice-btn" data-src="audio/voices/bm_fable.mp3"><span class="voice-avatar" data-seed="bm_fable"></span><span class="voice-name">bm_fable</span></button>
-          <button class="voice-btn" data-src="audio/voices/bm_george.mp3"><span class="voice-avatar" data-seed="bm_george"></span><span class="voice-name">bm_george</span></button>
-          <button class="voice-btn" data-src="audio/voices/bm_lewis.mp3"><span class="voice-avatar" data-seed="bm_lewis"></span><span class="voice-name">bm_lewis</span></button>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="render">
-    <div class="eyebrow">render</div>
-    <h2>Turn a script into a voiceover</h2>
-    <p class="prose" style="margin-top:14px;">Need narration for a video, a screencast, or a podcast?
-      <code class="inline-code">omatalk render</code> turns a script into a WAV file on your own machine, with one command.
-      It reads the script from stdin, or from the arguments.</p>
-
-    <div class="code-card nowrap">
-      <div class="cc-title">
-        a script file
-        <button class="copy-btn" type="button">
-              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
-              <span class="copy-label">copy</span>
-            </button>
-      </div>
-      <pre>omatalk render --out talk.wav &lt; script.txt</pre>
-    </div>
-    <div class="code-card nowrap" style="margin-top:16px;">
-      <div class="cc-title">
-        one line, with a voice and a speed
-        <button class="copy-btn" type="button">
-              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
-              <span class="copy-label">copy</span>
-            </button>
-      </div>
-      <pre>omatalk render --out talk.wav --voice af_bella --speed 0.95 "Welcome to the demo."</pre>
-    </div>
-
-    <div class="manifest">
-      <div class="row"><div class="name">Pauses</div><div class="why">A blank line in the script adds a longer pause. A single newline does not.</div></div>
-      <div class="row"><div class="name">Voice, speed</div><div class="why"><code class="mono" style="background:none;border:none;padding:0;">--voice</code> takes any name from the list above and defaults to your configured voice. Speed defaults to 1.0, not your configured speed.</div></div>
-      <div class="row"><div class="name">Output</div><div class="why">WAV only: 16-bit mono, 24&nbsp;kHz. For MP3, run <code class="mono" style="background:none;border:none;padding:0;">ffmpeg -i talk.wav talk.mp3</code>.</div></div>
-      <div class="row"><div class="name">Daemon</div><div class="why">Render works with the Daemon stopped. It loads its own copy of the model, so a running Daemon holds its copy on top.</div></div>
-      <div class="row"><div class="name">Time, memory</div><div class="why">About 10 seconds of render time per minute of audio, measured on a Ryzen 7840HS. Peak memory is about 1&nbsp;GiB: 920&nbsp;MiB plus 3&nbsp;MiB per minute of audio. Nothing leaves the machine.</div></div>
-    </div>
-  </section>
-
-  <section id="bar">
-    <div class="eyebrow">bar widget</div>
-    <h2>One icon, three signals</h2>
-    <p class="prose">The megaphone stays in the same place on the Omarchy bar. Its color tells you whether Omatalk is ready, reading your selection, or disconnected. If the Daemon is not installed yet, the same icon stays in the normal bar color and the panel links to these install instructions.</p>
-    <figure class="bar-states">
-      <div class="bar-widget-title">Omatalk bar widget</div>
-      <div class="bar-widget-subtitle">One megaphone glyph. Three useful states.</div>
-      <div class="bar-state-grid">
-        <article class="bar-state idle">
-          <h3 class="bar-state-head">Idle</h3>
-          <img class="bar-state-image" src="images/omatalk-bar-idle.png" alt="Omatalk megaphone in its idle state" width="420" height="155" loading="lazy" decoding="async">
-          <div class="bar-state-copy"><strong>Daemon ready</strong><span>Normal bar color</span></div>
-        </article>
-        <article class="bar-state speaking">
-          <h3 class="bar-state-head">Speaking</h3>
-          <img class="bar-state-image" src="images/omatalk-bar-speaking.png" alt="Omatalk megaphone while speaking" width="420" height="155" loading="lazy" decoding="async">
-          <div class="bar-state-copy"><strong>Reading selection</strong><span>Theme accent</span></div>
-        </article>
-        <article class="bar-state unavailable">
-          <h3 class="bar-state-head">Unavailable</h3>
-          <img class="bar-state-image" src="images/omatalk-bar-unavailable.png" alt="Omatalk megaphone when the daemon is unavailable" width="420" height="155" loading="lazy" decoding="async">
-          <div class="bar-state-copy"><strong>Daemon disconnected</strong><span>Urgent color</span></div>
-        </article>
-      </div>
-      <figcaption>Live bar context, softened around the Omatalk glyph so the state color stays clear.</figcaption>
-    </figure>
-  </section>
-
-  <section id="stack">
-    <div class="eyebrow">how it's built</div>
-    <h2>No cloud in the loop</h2>
-    <div class="manifest">
-      <div class="row"><div class="name">Kokoro-82M</div><div class="why">ONNX Runtime, CPU, using the fp32 export published by <a href="https://github.com/thewh1teagle/kokoro-onnx" target="_blank" rel="noopener">kokoro-onnx</a> by <a href="https://github.com/thewh1teagle" target="_blank" rel="noopener">thewh1teagle</a>. Model and original inference by <a href="https://github.com/hexgrad/kokoro" target="_blank" rel="noopener">hexgrad</a>. Chosen over Piper (fast but audibly robotic) and XTTS/Chatterbox (GPU-sized, restrictive licenses). Near top-of-class naturalness, faster than real time on a mid-range laptop CPU.</div></div>
-      <div class="row"><div class="name">Rust daemon</div><div class="why">One binary that keeps the model warm in memory, so a hotkey press never pays the model load. It turns text into phonemes with a Rust port of misaki, Kokoro's own G2P, and starts speaking after the first few words are synthesized. Talks over a Unix socket: <code class="mono" style="background:none;border:none;padding:0;">speak</code> / <code class="mono" style="background:none;border:none;padding:0;">stop</code> / <code class="mono" style="background:none;border:none;padding:0;">status</code>, plus <code class="mono" style="background:none;border:none;padding:0;">follow</code> so the bar can track state.</div></div>
-      <div class="row"><div class="name">wl-paste --primary</div><div class="why">Reads the Wayland primary selection directly: no synthetic keystrokes, no clipboard mutation, no keyboard-injection daemon.</div></div>
-      <div class="row"><div class="name">PipeWire</div><div class="why"><code class="mono" style="background:none;border:none;padding:0;">pw-cat</code> streams raw PCM straight over stdin as each batch is synthesized &mdash; no staged WAV files, layering over whatever else is playing. One player process per Utterance.</div></div>
-      <div class="row"><div class="name">systemd --user</div><div class="why">Starts the daemon at login and keeps it resident across the session; state and models live under <code class="mono" style="background:none;border:none;padding:0;">~/.local/share/omatalk/</code>.</div></div>
-      <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config: <code class="mono" style="background:none;border:none;padding:0;">omatalk setup</code> asks before adding its one line, and never takes a key that is already bound. F8 sits next to voxtype's F9 dictation key on purpose: F9 speaks you, F8 speaks back.</div></div>
-    </div>
-  </section>
-
-  <section id="architecture">
-    <div class="eyebrow">architecture</div>
-    <h2>A warm daemon behind a socket</h2>
-    <p class="prose" style="margin-top:14px;">One hotkey press is a one-shot client; the daemon holds the model warm from login
-      so nothing pays a cold-load tax mid-sentence.</p>
-    <div class="diagram">
-<pre>┌───────────────────┐   ┌─────────────────┐
-│ bindings.lua (<span class="hi">F8</span>) │──▶│ one-shot client │
-└───────────────────┘   └─────────────────┘
-                                 │
-                                 ▼
-                    Unix socket (<span class="hi2">omatalk.sock</span>)
-                                 │
-                                 ▼
-┌───────────────────────────────────────────┐
-│      omatalk daemon · systemd --user      │
-│ capture:  wl-paste --primary → wl-paste   │
-│ g2p:      misaki (Rust port) → phonemes   │
-│ batches:  short first, then up to 510     │
-│ engine:   <span class="hi">Kokoro-82M</span> · ONNX Runtime · CPU │
-│ player:   pw-cat → PipeWire (streamed)    │
-└───────────────────────────────────────────┘</pre>
-    </div>
-  </section>
-
-  <section id="roadmap">
-    <div class="eyebrow">roadmap</div>
-    <h2>Shipped and next</h2>
-    <p class="prose">The MVP scope stayed narrow on purpose. Five pieces have shipped; the remaining work is next, in roughly the order it will land.</p>
-    <div class="manifest">
-      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Quickshell widget <span class="roadmap-status">shipped</span></div><div class="why">A megaphone status indicator in Omarchy's own shell. It follows the daemon over a Unix socket, uses the theme accent while speaking, and shows the shell urgent color after a 3-second disconnect grace period.</div></div>
-      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Voice + speed panel <span class="roadmap-status">shipped</span></div><div class="why">Click the bar icon for a voice picker and speed slider, both auto-saving to <code class="mono" style="background:none;border:none;padding:0;">config.toml</code> — the next utterance binds the change, no restart. The same surface is scriptable: <code class="mono" style="background:none;border:none;padding:0;">omatalk config get/set/voices</code>.</div></div>
-      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Rust port <span class="roadmap-status">shipped</span></div><div class="why">Omatalk 0.9 is one Rust binary. <code class="mono" style="background:none;border:none;padding:0;">omatalk daemon</code> is the Daemon, and every other command is the CLI. The install no longer needs a Python environment. The socket, <code class="mono" style="background:none;border:none;padding:0;">config.toml</code>, and the bar plugin stay the same.</div></div>
-      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Performance fixes <span class="roadmap-status">shipped</span></div><div class="why">Speech starts about a third of a second after the press. The first batch is a few words, against more than a second when a whole paragraph was synthesized first. The fp32 model is faster on CPU than the half-size fp16 export. A low-resource engine (Piper, int8) for potato-class machines remains open.</div></div>
-      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Media pause <span class="roadmap-status">shipped</span></div><div class="why">Music and video that are playing pause while Omatalk speaks and resume when it stops, the way voxtype pauses them while you dictate. Anything you had already paused stays paused. It works with any player that supports MPRIS, such as browsers, Spotify, and mpv. Set <code class="mono" style="background:none;border:none;padding:0;">pause_media = false</code> to turn it off.</div></div>
-      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Omarchy package <span class="roadmap-status">shipped</span></div><div class="why">Omatalk installs as the <code class="mono" style="background:none;border:none;padding:0;">omatalk-bin</code> package, with Omarchy's own tooling, and <code class="mono" style="background:none;border:none;padding:0;">omarchy update</code> upgrades it. The curl installer is now a one-time migration.</div></div>
-      <div class="row"><div class="name">More languages</div><div class="why">Kokoro-82M ships packs for nine languages. Omatalk speaks English only for now.</div></div>
-    </div>
-  </section>
-
-  <section id="credits">
-    <div class="eyebrow">credits</div>
-    <h2>The voice and the OS</h2>
-    <div class="prose">
-      <p>The neural voice is <a href="https://huggingface.co/hexgrad/Kokoro-82M" target="_blank" rel="noopener">Kokoro-82M</a>
-        by <a href="https://github.com/hexgrad/kokoro" target="_blank" rel="noopener">hexgrad</a>.
-        Omatalk downloads the ONNX export published by <a href="https://github.com/thewh1teagle/kokoro-onnx" target="_blank" rel="noopener">kokoro-onnx</a>
-        by <a href="https://github.com/thewh1teagle" target="_blank" rel="noopener">thewh1teagle</a>,
-        and reads text with a Rust port of <a href="https://github.com/hexgrad/misaki" target="_blank" rel="noopener">misaki</a>, Kokoro's G2P library.</p>
-      <p>Omatalk is built for <a href="https://omarchy.org" target="_blank" rel="noopener">Omarchy</a> by DHH.
-        The bar plugin, the F8/F9 pairing, and the package all sit on that desktop.
-        Source: <a href="https://github.com/omacom/omarchy" target="_blank" rel="noopener">github.com/omacom/omarchy</a>.</p>
-    </div>
-  </section>
-
 </main>
 
 <footer>
   <div class="wrap foot">
     <div class="foot-left">
-      <span>&copy; 2026 <a href="https://zerobearing.com" target="_blank" rel="noopener">Dave Bradford</a></span>
-      <span>Built for <a href="https://omarchy.org" target="_blank" rel="noopener">Omarchy</a></span>
+      <span>&copy; 2026 <a href="https://zerobearing.com" target="_blank" rel="noopener">Dave Bradford</a> · MIT</span>
+      <span>Built for <a href="https://omarchy.org" target="_blank" rel="noopener">Omarchy</a> by DHH</span>
       <span>No telemetry. No network calls at runtime.</span>
     </div>
     <nav class="foot-links" aria-label="Credits">
       <a href="https://github.com/hexgrad/kokoro" target="_blank" rel="noopener">kokoro</a>
       <a href="https://github.com/thewh1teagle/kokoro-onnx" target="_blank" rel="noopener">kokoro-onnx</a>
+      <a href="https://github.com/hexgrad/misaki" target="_blank" rel="noopener">misaki</a>
       <a href="https://github.com/omacom/omarchy" target="_blank" rel="noopener">omarchy</a>
       <a href="https://github.com/zerobearing2/omatalk" target="_blank" rel="noopener">GitHub</a>
-      <span>MIT</span>
     </nav>
   </div>
 </footer>
@@ -1193,103 +898,15 @@
 <script>
 (function () {
   "use strict";
-  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  var wave = document.getElementById("wave");
-  var LEVELS = " ▁▂▃▄▅▆▇█";
-  var cellPx = 20; // approx advance width of one char at the wave's font-size
-  var cols = 40;
-
-  function measure() {
-    var probe = document.createElement("span");
-    probe.className = "mono";
-    probe.style.visibility = "hidden";
-    probe.style.position = "absolute";
-    probe.style.fontSize = getComputedStyle(wave).fontSize;
-    probe.textContent = "█";
-    document.body.appendChild(probe);
-    cellPx = probe.getBoundingClientRect().width || cellPx;
-    document.body.removeChild(probe);
-    cols = Math.max(12, Math.floor(wave.getBoundingClientRect().width / cellPx));
-  }
-  window.addEventListener("resize", measure);
-  measure();
-
-  // state machine: idle -> pressed -> speaking -> idle (loops)
-  var STATES = ["idle", "pressed", "speaking"];
-  var state = "idle";
-  var t0 = performance.now();
-  var stateLabel = document.getElementById("state-label");
-  var selEl = document.querySelector("#demo-text .sel");
-
-  function setState(s) {
-    state = s;
-    t0 = performance.now();
-    stateLabel.textContent = s;
-  }
-
-  function cycle() {
-    var elapsed = performance.now() - t0;
-    if (state === "idle" && elapsed > 1800) setState("pressed");
-    else if (state === "pressed" && elapsed > 260) setState("speaking");
-    else if (state === "speaking" && elapsed > 4200) setState("idle");
-  }
-
-  function draw(now) {
-    var speaking = state === "speaking";
-    var energy = speaking ? 1 : 0.1;
-    var seed = now / 1000;
-    var out = "";
-    for (var i = 0; i < cols; i++) {
-      var n = Math.sin(seed * 3.1 + i * 0.6) * 0.5 + Math.sin(seed * 5.3 + i * 0.21) * 0.3 + Math.sin(i * 1.7) * 0.2;
-      var amp = Math.min(1, Math.abs(n) * energy + 0.03);
-      var idx = Math.round(amp * (LEVELS.length - 1));
-      out += LEVELS[idx];
-    }
-    wave.textContent = out;
-  }
-
-  var lastDraw = 0;
-  function frame(now) {
-    cycle();
-    if (now - lastDraw > 90) { draw(now); lastDraw = now; }
-    if (!reduceMotion) requestAnimationFrame(frame);
-  }
-
-  if (reduceMotion) {
-    setState("speaking");
-    draw(performance.now());
-  } else {
-    requestAnimationFrame(frame);
-  }
-})();
-
-(function () {
-  "use strict";
-  var css = getComputedStyle(document.documentElement);
-  var accent = css.getPropertyValue("--accent").trim();
-  var accent2 = css.getPropertyValue("--accent-2").trim();
-
   function hash(s) {
     var h = 0;
     for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
     return Math.abs(h);
   }
 
-  function shade(hex, amt) {
-    hex = hex.replace("#", "");
-    if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
-    var r = parseInt(hex.substr(0, 2), 16), g = parseInt(hex.substr(2, 2), 16), b = parseInt(hex.substr(4, 2), 16);
-    var f = function (c) { return Math.max(0, Math.min(255, Math.round(c * (1 + amt)))); };
-    return "rgb(" + f(r) + "," + f(g) + "," + f(b) + ")";
-  }
-
   function avatarSvg(seed) {
     var h = hash(seed);
     var female = /^(a|b)f_/.test(seed);
-    var color = female ? accent : accent2;
-    var hairColor = shade(color, -0.4);
-    var feature = "rgba(0,0,0,.55)";
     var cx = 22, cy = 22;
 
     var eyeR = 1.5 + ((h >> 2) % 5) / 10;       // 1.5-1.9
@@ -1298,23 +915,23 @@
     var wide = 3.6 + ((h >> 11) % 4) / 2;       // mouth half-width
 
     var mouth = '<path d="M' + (cx - wide).toFixed(1) + ' 26.5 Q ' + cx + ' ' + (26.5 + smile).toFixed(1) +
-      ' ' + (cx + wide).toFixed(1) + ' 26.5" stroke="' + feature + '" stroke-width="1.4" fill="none" stroke-linecap="round"/>';
-    var eyes = '<circle cx="' + (cx - eyeDx).toFixed(1) + '" cy="19.5" r="' + eyeR.toFixed(1) + '" fill="' + feature + '"/>' +
-      '<circle cx="' + (cx + eyeDx).toFixed(1) + '" cy="19.5" r="' + eyeR.toFixed(1) + '" fill="' + feature + '"/>';
+      ' ' + (cx + wide).toFixed(1) + ' 26.5" class="av-mouth"/>';
+    var eyes = '<circle cx="' + (cx - eyeDx).toFixed(1) + '" cy="19.5" r="' + eyeR.toFixed(1) + '" class="av-feat"/>' +
+      '<circle cx="' + (cx + eyeDx).toFixed(1) + '" cy="19.5" r="' + eyeR.toFixed(1) + '" class="av-feat"/>';
 
-    var face = '<circle cx="' + cx + '" cy="' + cy + '" r="11" fill="' + color + '"/>';
+    var face = '<circle cx="' + cx + '" cy="' + cy + '" r="11" class="av-face"/>';
     var hair = "";
     if (female) {
       var long = (h >> 14) % 2 === 0;
       if (long) {
-        hair = '<path d="M9 16 A13 13 0 0 1 35 16 L34 32 A2.5 2.5 0 0 1 29 32 L29 16.5 L15 16.5 L15 32 A2.5 2.5 0 0 1 10 32 Z" fill="' + hairColor + '"/>';
+        hair = '<path d="M9 16 A13 13 0 0 1 35 16 L34 32 A2.5 2.5 0 0 1 29 32 L29 16.5 L15 16.5 L15 32 A2.5 2.5 0 0 1 10 32 Z" class="av-hair"/>';
       } else {
-        hair = '<path d="M9.5 22 A12.5 12.5 0 0 1 34.5 22 L33.5 26 A11.5 12.5 0 0 0 10.5 26 Z" fill="' + hairColor + '"/>';
+        hair = '<path d="M9.5 22 A12.5 12.5 0 0 1 34.5 22 L33.5 26 A11.5 12.5 0 0 0 10.5 26 Z" class="av-hair"/>';
       }
     } else {
       var part = (h >> 16) % 2 === 0;
-      hair = '<path d="M10.5 19.5 A11.5 11.5 0 0 1 33.5 19.5 L33.5 15.5 A11.5 11.5 0 0 0 10.5 15.5 Z" fill="' + hairColor + '"/>';
-      if (part) hair += '<rect x="20.5" y="11" width="1.6" height="5" fill="' + hairColor + '" transform="rotate(20 21.3 13.5)"/>';
+      hair = '<path d="M10.5 19.5 A11.5 11.5 0 0 1 33.5 19.5 L33.5 15.5 A11.5 11.5 0 0 0 10.5 15.5 Z" class="av-hair"/>';
+      if (part) hair += '<rect x="20.5" y="11" width="1.6" height="5" class="av-hair" transform="rotate(20 21.3 13.5)"/>';
     }
 
     return '<svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">' + face + hair + eyes + mouth + '</svg>';
@@ -1324,55 +941,69 @@
     el.innerHTML = avatarSvg(el.dataset.seed);
   });
 
+  // One player for the paragraph and the voice buttons: starting one stops
+  // the other, and pressing the playing one again stops it.
   var player = new Audio();
   var active = null;
 
+  function setState(btn, state) {
+    btn.classList.toggle("loading", state === "loading");
+    btn.classList.toggle("playing", state === "loading" || state === "playing");
+    btn.setAttribute("aria-pressed", state === "idle" ? "false" : "true");
+  }
+
+  function report(btn, message) {
+    var box = document.getElementById(btn.dataset.error);
+    if (box) box.textContent = message;
+  }
+
   function stop() {
     player.pause();
-    if (active) active.classList.remove("playing");
+    if (active) setState(active, "idle");
     active = null;
+    if (listenTime) showProgress();
   }
 
+  function fail() {
+    var btn = active;
+    stop();
+    if (btn) report(btn, "Couldn't play this clip. Check your connection and try again.");
+  }
+
+  function play(btn) {
+    if (active === btn) { stop(); return; }
+    stop();
+    report(btn, "");
+    active = btn;
+    setState(btn, "loading");
+    player.src = btn.dataset.src;
+    var started = player.play();
+    if (started && started.catch) started.catch(function (e) { if (e.name !== "AbortError") fail(); });
+  }
+
+  player.addEventListener("playing", function () { if (active) setState(active, "playing"); });
+  var listen = document.getElementById("listen");
+  var listenTime = document.getElementById("listen-time");
+  var clipLength = 23;
+
+  function clock(seconds) {
+    seconds = Math.max(0, Math.round(seconds));
+    return Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0");
+  }
+
+  function showProgress() {
+    var playing = active === listen && player.duration;
+    var done = playing ? player.currentTime / player.duration : 0;
+    listen.style.setProperty("--p", (done * 100).toFixed(1) + "%");
+    listenTime.textContent = clock(playing ? player.duration - player.currentTime : clipLength);
+  }
+
+  player.addEventListener("timeupdate", showProgress);
   player.addEventListener("ended", stop);
+  player.addEventListener("error", function () { if (active) fail(); });
 
-  document.querySelectorAll(".voice-btn").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      if (active === btn) { stop(); return; }
-      stop();
-      player.src = btn.dataset.src;
-      player.play();
-      btn.classList.add("playing");
-      active = btn;
-    });
-  });
-})();
-
-(function () {
-  "use strict";
-  var btn = document.getElementById("menu-btn");
-  var nav = document.getElementById("site-nav");
-
-  function close() {
-    nav.hidden = true;
-    btn.setAttribute("aria-expanded", "false");
-  }
-  function open() {
-    nav.hidden = false;
-    btn.setAttribute("aria-expanded", "true");
-  }
-
-  btn.addEventListener("click", function (e) {
-    e.stopPropagation();
-    if (nav.hidden) open(); else close();
-  });
-  nav.addEventListener("click", function (e) {
-    if (e.target.tagName === "A") close();
-  });
-  document.addEventListener("click", function (e) {
-    if (!nav.hidden && !nav.contains(e.target) && e.target !== btn) close();
-  });
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && !nav.hidden) { close(); btn.focus(); }
+  document.querySelectorAll("#listen, .voice-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () { play(btn); });
   });
 })();
 
@@ -1386,8 +1017,10 @@
     ta.style.opacity = "0";
     document.body.appendChild(ta);
     ta.select();
-    try { document.execCommand("copy"); } catch (e) {}
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
     document.body.removeChild(ta);
+    return ok;
   }
 
   document.querySelectorAll(".copy-btn").forEach(function (btn) {
@@ -1397,20 +1030,20 @@
       var pre = card && card.querySelector("pre");
       var text = pre ? pre.textContent.trim() : "";
       if (!text) return;
-      var done = function () {
-        btn.classList.add("copied");
-        var prev = label.textContent;
-        label.textContent = "copied";
+      var show = function (ok) {
+        btn.classList.toggle("copied", ok);
+        label.textContent = ok ? "copied" : "select and copy";
         setTimeout(function () {
           btn.classList.remove("copied");
-          label.textContent = prev;
-        }, 1600);
+          label.textContent = "copy";
+        }, ok ? 1600 : 3200);
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+        navigator.clipboard.writeText(text).then(
+          function () { show(true); },
+          function () { show(fallbackCopy(text)); });
       } else {
-        fallbackCopy(text);
-        done();
+        show(fallbackCopy(text));
       }
     });
   });
