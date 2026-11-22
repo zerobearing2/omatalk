@@ -118,12 +118,12 @@ fn tarball_holds_the_binary_the_unit_and_the_license() {
 }
 
 #[test]
-fn unit_runs_the_launcher_as_the_daemon() {
+fn unit_runs_the_packaged_binary_as_the_daemon() {
     let unit = read(repo("systemd/omatalk.service"));
     let lines: Vec<&str> = unit.lines().collect();
 
     for want in [
-        "ExecStart=%h/.local/bin/omatalk daemon",
+        "ExecStart=/usr/bin/omatalk daemon",
         "Environment=OMATALK_MODELS=%h/.local/share/omatalk/models",
         "Restart=always",
         "RestartSec=500ms",
