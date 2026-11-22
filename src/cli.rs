@@ -93,9 +93,9 @@ pub enum ConfigCommand {
     /// Change one setting
     Set {
         /// Setting to change
-        #[arg(value_parser = ["voice", "speed"])]
+        #[arg(value_parser = ["voice", "speed", "pause_media", "wake_lead_ms"])]
         key: String,
-        /// A voice name, or a speed from 0.5 to 2.0
+        /// A voice name, a speed from 0.5 to 2.0, true or false, or a wake lead in ms from 0 to 2000
         value: String,
     },
     /// List the installed voices
