@@ -1,7 +1,10 @@
-.PHONY: test lint format clean rc release
+.PHONY: test test-plugin lint format clean rc release
 
 test:
 	cargo test --locked
+
+test-plugin:
+	plugin/zerobearing.omatalk/tests/run.sh
 
 lint:
 	cargo fmt --check

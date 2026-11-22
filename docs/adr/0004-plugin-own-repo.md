@@ -1,5 +1,8 @@
 # Plugin lives in its own repository
 
+Superseded by `0009-the-omarchy-package-is-the-only-install.md`: the plugin now
+lives in this repository and ships in the package.
+
 The bar widget is an Omarchy plugin. It is written, tested, and versioned in
 https://github.com/zerobearing2/omarchy-omatalk-plugin. This repository is
 the Daemon, the CLI, and the site.

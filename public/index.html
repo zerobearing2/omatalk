@@ -871,9 +871,9 @@
   <section id="install">
     <div class="eyebrow">install</div>
     <h2>Get it running</h2>
-    <p class="prose" style="margin-top:14px;">Omatalk has two parts: the Daemon, which does the speaking, and the bar plugin, the megaphone and voice panel. One command installs both.</p>
+    <p class="prose" style="margin-top:14px;">Omatalk has two parts: the Daemon, which does the speaking, and the bar plugin, the megaphone and voice panel. The package carries both.</p>
 
-    <p class="prose" style="margin-top:14px;">Run it in a terminal. It installs the speech Daemon and the <code class="inline-code">omatalk</code> command, downloads the models (about 355MB), asks before binding F8, and adds the bar plugin. If you added the plugin from the Omarchy Marketplace first, its panel links here: run this, and it keeps the plugin you have.</p>
+    <p class="prose" style="margin-top:14px;">Run it in a terminal. <code class="inline-code">omarchy pkg add</code> installs the speech Daemon and the <code class="inline-code">omatalk</code> command. <code class="inline-code">omatalk setup</code> downloads the models (about 355MB), enables the service, asks before binding F8, and links the bar plugin from the package. If you added the plugin from the Omarchy Marketplace first, its panel links here: run this, and the packaged plugin replaces it. Updates arrive with <code class="inline-code">omarchy update</code>.</p>
     <div class="code-card" style="margin-top:12px;">
       <div class="cc-title">
         install
@@ -882,24 +882,12 @@
           <span class="copy-label">copy</span>
         </button>
       </div>
-      <pre>curl -fsSL https://omatalk.zerobearing.com/install.sh | bash</pre>
+      <pre>omarchy pkg add omatalk-bin &amp;&amp; omatalk setup</pre>
     </div>
-
-    <h3 class="install-step">Bar plugin only</h3>
-    <p class="prose" style="margin-top:10px;">The installer already adds it. Use this only if that failed or you removed the plugin. The plugin does nothing without the Daemon.</p>
-    <div class="code-card" style="margin-top:12px;">
-      <div class="cc-title">
-        plugin
-        <button class="copy-btn" type="button">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.3"/><path d="M2.5 9.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" stroke-linecap="round"/></svg>
-          <span class="copy-label">copy</span>
-        </button>
-      </div>
-      <pre>omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable</pre>
-    </div>
+    <p class="prose" style="margin-top:12px;">Installed with the old curl command? Run <code class="inline-code">curl -fsSL https://omatalk.zerobearing.com/install.sh | bash</code> once more. It installs the package and removes the files the curl installer left, and keeps your models, config, and F8 binding. The packaged plugin replaces the one it left.</p>
 
     <h3 class="install-step">Uninstall</h3>
-    <p class="prose" style="margin-top:10px;">Removes the Daemon, launcher, and plugin. Asks before deleting models and config. Once installed, <code class="inline-code">omatalk uninstall</code> does the same.</p>
+    <p class="prose" style="margin-top:10px;">Removes the Daemon service, the plugin link, and the package. Asks before deleting models, config, and the F8 binding.</p>
     <div class="code-card" style="margin-top:12px;">
       <div class="cc-title">
         uninstall
@@ -908,7 +896,7 @@
           <span class="copy-label">copy</span>
         </button>
       </div>
-      <pre>curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash</pre>
+      <pre>omatalk uninstall</pre>
     </div>
   </section>
 
@@ -972,7 +960,7 @@
 
       <div>
         <p class="prose" style="margin-top:0; font-size:0.98rem;"><span class="key primary mono" style="font-size:0.78rem; padding:3px 9px; margin-right:2px;">F8</span> answers
-          F9: voxtype's dictation key speaks <em>to</em> the machine, F8 speaks back. The installer <em>asks</em> before adding
+          F9: voxtype's dictation key speaks <em>to</em> the machine, F8 speaks back. <code class="inline-code">omatalk setup</code> <em>asks</em> before adding
           this line to <code class="inline-code">~/.config/hypr/bindings.lua</code>; say no and paste it yourself.</p>
         <div class="code-card">
           <div class="cc-title">
@@ -1124,7 +1112,7 @@
       <div class="row"><div class="name">wl-paste --primary</div><div class="why">Reads the Wayland primary selection directly: no synthetic keystrokes, no clipboard mutation, no keyboard-injection daemon.</div></div>
       <div class="row"><div class="name">PipeWire</div><div class="why"><code class="mono" style="background:none;border:none;padding:0;">pw-cat</code> streams raw PCM straight over stdin as each batch is synthesized &mdash; no staged WAV files, layering over whatever else is playing. One player process per Utterance.</div></div>
       <div class="row"><div class="name">systemd --user</div><div class="why">Starts the daemon at login and keeps it resident across the session; state and models live under <code class="mono" style="background:none;border:none;padding:0;">~/.local/share/omatalk/</code>.</div></div>
-      <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config: the installer asks before adding its one line, and never takes a key that is already bound. F8 sits next to voxtype's F9 dictation key on purpose: F9 speaks you, F8 speaks back.</div></div>
+      <div class="row"><div class="name">Hyprland bindings.lua</div><div class="why">Hotkeys are user-owned config: <code class="mono" style="background:none;border:none;padding:0;">omatalk setup</code> asks before adding its one line, and never takes a key that is already bound. F8 sits next to voxtype's F9 dictation key on purpose: F9 speaks you, F8 speaks back.</div></div>
     </div>
   </section>
 
@@ -1163,7 +1151,7 @@
       <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Rust port <span class="roadmap-status">shipped</span></div><div class="why">Omatalk 0.9 is one Rust binary. <code class="mono" style="background:none;border:none;padding:0;">omatalk daemon</code> is the Daemon, and every other command is the CLI. The install no longer needs a Python environment. The socket, <code class="mono" style="background:none;border:none;padding:0;">config.toml</code>, and the bar plugin stay the same.</div></div>
       <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Performance fixes <span class="roadmap-status">shipped</span></div><div class="why">Speech starts about a third of a second after the press. The first batch is a few words, against more than a second when a whole paragraph was synthesized first. The fp32 model is faster on CPU than the half-size fp16 export. A low-resource engine (Piper, int8) for potato-class machines remains open.</div></div>
       <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Media pause <span class="roadmap-status">shipped</span></div><div class="why">Music and video that are playing pause while Omatalk speaks and resume when it stops, the way voxtype pauses them while you dictate. Anything you had already paused stays paused. It works with any player that supports MPRIS, such as browsers, Spotify, and mpv. Set <code class="mono" style="background:none;border:none;padding:0;">pause_media = false</code> to turn it off.</div></div>
-      <div class="row"><div class="name">Omarchy package</div><div class="why">Publish Omatalk as an Omarchy package, so it installs with Omarchy's own tooling. The curl installer stays until that package ships.</div></div>
+      <div class="row shipped"><div class="name"><span class="roadmap-check" aria-hidden="true">✓</span>Omarchy package <span class="roadmap-status">shipped</span></div><div class="why">Omatalk installs as the <code class="mono" style="background:none;border:none;padding:0;">omatalk-bin</code> package, with Omarchy's own tooling, and <code class="mono" style="background:none;border:none;padding:0;">omarchy update</code> upgrades it. The curl installer is now a one-time migration.</div></div>
       <div class="row"><div class="name">More languages</div><div class="why">Kokoro-82M ships packs for nine languages. Omatalk speaks English only for now.</div></div>
     </div>
   </section>
@@ -1178,7 +1166,7 @@
         by <a href="https://github.com/thewh1teagle" target="_blank" rel="noopener">thewh1teagle</a>,
         and reads text with a Rust port of <a href="https://github.com/hexgrad/misaki" target="_blank" rel="noopener">misaki</a>, Kokoro's G2P library.</p>
       <p>Omatalk is built for <a href="https://omarchy.org" target="_blank" rel="noopener">Omarchy</a> by DHH.
-        The bar plugin, the F8/F9 pairing, and the installer all sit on that desktop.
+        The bar plugin, the F8/F9 pairing, and the package all sit on that desktop.
         Source: <a href="https://github.com/omacom/omarchy" target="_blank" rel="noopener">github.com/omacom/omarchy</a>.</p>
     </div>
   </section>

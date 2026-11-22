@@ -6,12 +6,12 @@ mod common;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use common::{Run, System, chmod, names, read, repo, run, write};
+use common::{Run, System, chmod, copy_plugin, names, read, repo, run, write};
 
 const MANIFEST: &str = "[dependencies.early]\nversion = \"1.0.0\"\n\n\
                         [package]\nname = \"omatalk\"\nversion = \"0.9.0\"\n\n\
                         [dependencies.late]\nversion = \"2.0.0\"\n";
-const INSTALLER: &str = "#!/bin/sh\nRELEASE_TAG=\"v0.9.0\"\nTARBALL_SHA256=\"0\"\n";
+const INSTALLER: &str = "#!/bin/sh\n";
 const GH_LATEST: &str = "gh api repos/zerobearing2/omatalk/releases/latest --jq .tag_name";
 
 /// Everything a refused or failed run must leave alone.
@@ -60,12 +60,12 @@ impl Fixture {
         ] {
             write(fx.work.join(name), std::fs::read(repo(name)).unwrap());
         }
+        copy_plugin(&fx.work);
         chmod(fx.work.join("scripts/release.sh"), 0o755);
         chmod(fx.work.join("scripts/build.sh"), 0o755);
         write(fx.work.join("Cargo.toml"), MANIFEST);
         write(fx.work.join("Cargo.lock"), "# lock\n");
         write(fx.work.join("install.sh"), INSTALLER);
-        write(fx.work.join("uninstall.sh"), "#!/bin/sh\n");
         write(fx.work.join(".gitignore"), "/target\n");
         write(fx.sys.path("state/latest"), "v0.9.0\n");
 
@@ -275,9 +275,7 @@ fn rc_publishes_only_a_tag_and_a_prerelease() {
         fx.show(&format!("{tag}:Cargo.toml")),
         MANIFEST.replace("\"0.9.0\"", "\"0.10.0-rc.1\"").trim()
     );
-    let pin = fx.show(&format!("{tag}:install.sh"));
-    assert!(pin.contains("RELEASE_TAG=\"v0.10.0-rc.1\""), "{pin}");
-    assert!(!pin.contains("TARBALL_SHA256=\"0\""), "{pin}");
+    assert_eq!(fx.show(&format!("{tag}:install.sh")), INSTALLER.trim());
     assert!(fx.show("master:Cargo.toml").contains("version = \"0.9.0\""));
 
     assert_eq!(
@@ -304,10 +302,10 @@ fn rc_publishes_only_a_tag_and_a_prerelease() {
         "omatalk-x86_64.tar.gz",
         "omatalk-x86_64.tar.gz.sha256",
         "install.sh",
-        "uninstall.sh",
     ] {
         assert!(create.contains(&want), "{want} missing from {create:?}");
     }
+    assert!(!create.contains(&"uninstall.sh"), "{create:?}");
     assert!(!create.contains(&"--latest"), "{create:?}");
     assert_eq!(
         fx.calls("gh")
@@ -318,9 +316,12 @@ fn rc_publishes_only_a_tag_and_a_prerelease() {
     );
     assert_eq!(fx.latest(), "v0.9.0");
 
-    assert!(result.stdout.contains(
-        "bash -c \"$(curl -fsSL https://github.com/zerobearing2/omatalk/releases/download/v0.10.0-rc.1/install.sh)\""
-    ), "{}", result.stdout);
+    assert!(
+        result.stdout.contains("local omatalk-bin recipe"),
+        "{}",
+        result.stdout
+    );
+    assert!(!result.stdout.contains("curl"), "{}", result.stdout);
 }
 
 #[test]
@@ -380,10 +381,7 @@ fn stable_publishes_latest_from_the_master_the_last_rc_tested() {
         fx.show("refs/tags/v0.10.0:Cargo.toml"),
         MANIFEST.replace("\"0.9.0\"", "\"0.10.0\"").trim()
     );
-    assert!(
-        fx.show("refs/tags/v0.10.0:install.sh")
-            .contains("RELEASE_TAG=\"v0.10.0\"")
-    );
+    assert_eq!(fx.show("refs/tags/v0.10.0:install.sh"), INSTALLER.trim());
 
     let creates = fx.release_creates();
     let create = words(creates.last().unwrap());

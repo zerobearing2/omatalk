@@ -1,5 +1,3 @@
-//! uninstall.sh: what it removes, and what it keeps unless asked.
-
 use crate::common::write;
 use crate::fake::*;
 
@@ -20,7 +18,7 @@ fn uninstall_on_eof_keeps_models_config_and_bind_and_finishes() {
     assert!(config.is_file());
     assert_eq!(bytes(&bindings), before);
     assert!(
-        result.stdout.contains("Omatalk uninstalled."),
+        result.stdout.contains("Omatalk files removed."),
         "{}",
         result.stdout
     );
@@ -32,11 +30,14 @@ fn uninstall_on_eof_keeps_models_config_and_bind_and_finishes() {
 }
 
 #[test]
-fn uninstall_removes_a_rust_install_and_its_models() {
+fn uninstall_removes_a_curl_era_install_and_its_models() {
     let mut fake = Fake::new();
     fake.set("FAKE_STRAY_STATUS", "0");
     write(fake.launcher(), launcher_script("installed"));
-    write(fake.installed_unit(), unit());
+    write(
+        fake.installed_unit(),
+        "[Service]\nExecStart=%h/.local/bin/omatalk daemon\n",
+    );
     write(fake.model(FP32), "fake model");
 
     let result = fake.uninstall("y\n");
@@ -66,6 +67,58 @@ fn uninstall_removes_a_rust_install_and_its_models() {
     assert!(patterns.iter().any(matches), "{patterns:?}");
 }
 
+#[test]
+fn uninstall_ends_by_dropping_the_package_and_deletes_nothing_under_usr() {
+    let fake = Fake::new();
+    write(fake.model(FP32), "fake model");
+
+    let result = fake.uninstall("y\n");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    let commands = fake.commands();
+    assert_eq!(commands.last().unwrap(), "omarchy pkg drop omatalk-bin");
+    assert!(
+        commands
+            .iter()
+            .any(|l| l == "omarchy pkg present omatalk-bin"),
+        "{commands:?}"
+    );
+    assert!(fake.path("usr/bin/omatalk").is_file());
+}
+
+#[test]
+fn uninstall_without_the_package_has_nothing_to_drop() {
+    let mut fake = Fake::new();
+    write(fake.launcher(), launcher_script("curl-era"));
+    fake.set("FAKE_PKG_ABSENT", "omatalk-bin");
+
+    let result = fake.uninstall("");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(!fake.launcher().exists());
+    assert!(!fake.logged("omarchy pkg drop"));
+    assert!(
+        result.stdout.contains("nothing to drop"),
+        "{}",
+        result.stdout
+    );
+}
+
+#[test]
+fn uninstall_without_omarchy_names_the_pacman_command() {
+    let mut fake = Fake::new();
+    fake.without_omarchy();
+
+    let result = fake.uninstall("");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(
+        result.stdout.contains("sudo pacman -Rns omatalk-bin"),
+        "{}",
+        result.stdout
+    );
+}
+
 /// `omatalk uninstall` runs the script as `bash -c <script>`, so its own argv
 /// holds the whole text. A pattern given to `pkill -f` that matches that text
 /// makes the script kill itself.
@@ -86,4 +139,51 @@ fn uninstall_script_text_does_not_match_its_own_pkill_patterns() {
             "uninstall.sh text matches its own pkill pattern {pattern:?}"
         );
     }
+}
+
+#[test]
+fn uninstall_leaves_the_packaged_plugin_link_and_the_service_to_the_package_hook() {
+    let fake = Fake::new();
+    std::fs::create_dir_all(fake.plugin_dir().parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(fake.plugin_source(), fake.plugin_dir()).unwrap();
+
+    let result = fake.uninstall("");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(fake.plugin_dir().is_symlink());
+    assert!(!fake.logged("omarchy-shell"));
+    assert!(!fake.logged("systemctl --user disable"));
+    assert!(!fake.logged("systemctl --user stop"));
+    assert!(fake.logged("omarchy pkg drop omatalk-bin"));
+}
+
+#[test]
+fn uninstall_keeps_a_plugin_checkout_and_names_it() {
+    let fake = Fake::new();
+    fake.seed_checkout_plugin();
+
+    let result = fake.uninstall("");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(fake.plugin_dir().join("old.txt").is_file());
+    assert!(
+        result
+            .stdout
+            .contains(&fake.plugin_dir().display().to_string()),
+        "{}",
+        result.stdout
+    );
+}
+
+#[test]
+fn uninstall_keeps_a_users_own_unit_override() {
+    let fake = Fake::new();
+    let unit = "[Service]\nExecStart=/usr/bin/omatalk daemon\nNice=5\n";
+    write(fake.installed_unit(), unit);
+
+    let result = fake.uninstall("");
+
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert_eq!(crate::common::read(fake.installed_unit()), unit);
+    assert!(!fake.logged("systemctl --user disable"));
 }

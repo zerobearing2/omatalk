@@ -1,6 +1,3 @@
-//! public/: the landing page's snippets, voices, and assets, and the
-//! install.sh / uninstall.sh dispatchers.
-
 mod common;
 
 use std::collections::BTreeSet;
@@ -117,7 +114,7 @@ fn defaults() -> serde_json::Value {
 #[test]
 fn copy_buttons_copy_the_visible_snippet() {
     let cards = copy_cards(&page());
-    assert_eq!(cards.len(), 7);
+    assert_eq!(cards.len(), 6);
     for pre in &cards {
         let text = pre.trim();
         assert!(!text.is_empty());
@@ -195,20 +192,39 @@ fn voice_buttons_match_clips_and_default() {
 #[test]
 fn install_commands_match_readme_and_cname() {
     let host = host();
-    let plugin =
-        "omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable"
-            .to_owned();
-    let install = format!("curl -fsSL https://{host}/install.sh | bash");
-    let uninstall = format!("curl -fsSL https://{host}/uninstall.sh | bash");
+    let plugin = "omarchy plugin add";
+    let install = "omarchy pkg add omatalk-bin && omatalk setup".to_owned();
+    let uninstall = "omatalk uninstall".to_owned();
     let cards = copy_cards(&page());
     let shown: BTreeSet<&str> = cards.iter().map(|c| c.trim()).collect();
     let readme = read(repo("README.md"));
-    for command in [&plugin, &install, &uninstall] {
+    for command in [&install, &uninstall] {
         assert!(shown.contains(command.as_str()), "page lacks {command}");
         assert!(readme.contains(command.as_str()), "README lacks {command}");
     }
+    assert!(!read(public("index.html")).contains(plugin));
+    assert!(!readme.contains(plugin));
+    let migrate = format!("curl -fsSL https://{host}/install.sh | bash");
+    assert!(!shown.contains(migrate.as_str()));
+    assert!(readme.contains(&migrate));
+    assert!(read(public("index.html")).contains(&migrate));
     assert!(public("install.sh").is_file());
-    assert!(public("uninstall.sh").is_file());
+}
+
+/// Old docs said `curl -fsSL https://<host>/uninstall.sh | bash`; without this
+/// stub that pipe would fetch a 404 page and fail silently.
+#[test]
+fn site_uninstall_script_points_at_omatalk_uninstall_and_fails() {
+    let script = read(public("uninstall.sh"));
+
+    let result = run(
+        std::process::Command::new("bash").arg("-c").arg(&script),
+        "",
+    );
+
+    assert_eq!(result.code, 1);
+    assert_eq!(result.stdout, "");
+    assert_eq!(result.stderr, "Run: omatalk uninstall\n");
 }
 
 #[test]
@@ -240,26 +256,24 @@ fn named_assets_exist() {
 
 #[test]
 fn dispatcher_fetches_the_latest_release_by_default() {
-    for script in ["install.sh", "uninstall.sh"] {
-        let sys = System::new();
-        let latest = format!("zerobearing2/omatalk/releases/latest/download/{script}");
-        write(sys.site(&latest), format!("echo ran latest {script}\n"));
+    let sys = System::new();
+    let latest = "zerobearing2/omatalk/releases/latest/download/install.sh";
+    write(sys.site(latest), "echo ran latest install.sh\n");
 
-        let result = run(sys.command("bash").arg(public(script)), "");
+    let result = run(sys.command("bash").arg(public("install.sh")), "");
 
-        assert_eq!(result.code, 0, "{script}: {}", result.stderr);
-        assert!(
-            result.stdout.contains(&format!("ran latest {script}")),
-            "{script}: {}",
-            result.stdout
-        );
-        let downloads = sys.downloads();
-        assert_eq!(downloads.len(), 1, "{downloads:?}");
-        assert!(
-            downloads[0].ends_with(&format!(" https://github.com/{latest}")),
-            "{downloads:?}"
-        );
-    }
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    assert!(
+        result.stdout.contains("ran latest install.sh"),
+        "{}",
+        result.stdout
+    );
+    let downloads = sys.downloads();
+    assert_eq!(downloads.len(), 1, "{downloads:?}");
+    assert!(
+        downloads[0].ends_with(&format!(" https://github.com/{latest}")),
+        "{downloads:?}"
+    );
 }
 
 /// The lines of the top-level job `name` in pages.yml, up to the next job.

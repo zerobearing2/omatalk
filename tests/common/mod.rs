@@ -22,6 +22,22 @@ pub fn repo(rel: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(rel)
 }
 
+pub fn copy_plugin(root: &Path) {
+    fn copy_dir(from: &Path, to: &Path) {
+        std::fs::create_dir_all(to).unwrap();
+        for entry in std::fs::read_dir(from).unwrap() {
+            let entry = entry.unwrap();
+            let dest = to.join(entry.file_name());
+            if entry.file_type().unwrap().is_dir() {
+                copy_dir(&entry.path(), &dest);
+            } else {
+                std::fs::copy(entry.path(), dest).unwrap();
+            }
+        }
+    }
+    copy_dir(&repo("plugin"), &root.join("plugin"));
+}
+
 pub fn read(path: impl AsRef<Path>) -> String {
     let path = path.as_ref();
     std::fs::read_to_string(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))

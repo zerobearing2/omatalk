@@ -1,0 +1,11 @@
+.qmltest
+*.qmlc
+*.jsc
+*~
+*.swp
+.DS_Store
+.idea/
+.vscode/
+
+# Local markdown issue tracker (see docs/agents/issue-tracker.md)
+.scratch/

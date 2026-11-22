@@ -6,10 +6,10 @@
 #   VERSION=x.y.z scripts/release.sh stable  publishes vX.Y.Z, as latest only
 #                                            when it is higher than the current latest
 #
-# On release-X.Y.x, VERSION must be X.Y.z. The version change, the install.sh
-# pin, and the release commit exist only in a temporary worktree. The commit is
-# tagged, and only the tag is pushed. A stable release requires that the
-# highest RC was built from this exact HEAD.
+# On release-X.Y.x, VERSION must be X.Y.z. The version change and the release
+# commit exist only in a temporary worktree. The commit is tagged, and only the
+# tag is pushed. A stable release requires that the highest RC was built from
+# this exact HEAD. install.sh is a tracked file uploaded beside the tarball.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -224,13 +224,13 @@ cargo test --locked
 make lint
 scripts/build.sh
 
-for asset in "$TARBALL" "$TARBALL.sha256" install.sh uninstall.sh; do
+for asset in "$TARBALL" "$TARBALL.sha256"; do
   if [ ! -f "$asset" ]; then
     die "missing $asset after build"
   fi
 done
 
-git add Cargo.toml Cargo.lock install.sh
+git add Cargo.toml Cargo.lock
 git commit --quiet -m "Release $tag"
 git tag "$tag"
 tag_created=1
@@ -251,7 +251,7 @@ fi
 
 if ! gh release create "$tag" --repo "$REPO" --verify-tag --title "$tag" \
   --generate-notes "${notes_args[@]}" "${channel[@]}" \
-  "$TARBALL" "$TARBALL.sha256" install.sh uninstall.sh; then
+  "$TARBALL" "$TARBALL.sha256" install.sh; then
   echo "$tag is pushed but its GitHub Release was not created." >&2
   echo "Retry the gh release create, or delete the tag: git push origin :refs/tags/$tag" >&2
   exit 1
@@ -274,6 +274,5 @@ fi
 
 echo "Released $tag"
 if [ "$mode" = rc ]; then
-  echo "Install it with:"
-  printf 'bash -c "$(curl -fsSL https://github.com/%s/releases/download/%s/install.sh)"\n' "$REPO" "$tag"
+  echo "Test it with a local omatalk-bin recipe; see Release in AGENTS.md."
 fi

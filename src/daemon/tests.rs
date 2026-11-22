@@ -594,7 +594,6 @@ fn bind_refuses_while_a_live_daemon_answers_and_replaces_a_stale_socket() {
         socket: dir.path().join("nested/omatalk.sock"),
         config: dir.path().join("config.toml"),
         models: dir.path().to_owned(),
-        site: String::new(),
         fake_engine: true,
     };
     let live = bind(&paths).unwrap();

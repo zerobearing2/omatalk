@@ -114,7 +114,7 @@ require_libs() {
 require_models() {
   local pin file
   for pin in MODEL_FILE VOICES_FILE; do
-    file=$(installer_pin "$REPO/install.sh" "$pin")
+    file=$(installer_pin "$REPO/setup.sh" "$pin")
     if [ ! -f "$MODELS/$file" ]; then
       die "missing $MODELS/$file"
     fi

@@ -2,55 +2,58 @@ mod common;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use common::{FAKES, System, TempDir, omatalk, read, run, write, write_voices_archive};
 
 const FAKE_VOICES: [&str; 4] = ["af_heart", "af_bella", "am_test", "bf_other"];
 
-const SITE_BASE: &str = "https://omatalk.test";
-
-/// A fake machine whose site serves an install.sh that records
-/// `$UPGRADE_VALUE` into `$UPGRADE_MARKER`.
-fn upgrade_site() -> System {
-    let mut sys = System::new();
-    write(
-        sys.site("install.sh"),
-        "#!/bin/sh\nprintf '%s' \"$UPGRADE_VALUE\" > \"$UPGRADE_MARKER\"\n",
-    );
-    sys.set("SITE_BASE", SITE_BASE);
-    sys.set("UPGRADE_MARKER", sys.path("upgrade-marker"));
-    sys
-}
-
 #[test]
-fn upgrade_fetches_installer_over_https_without_connecting_to_daemon() {
-    let mut sys = upgrade_site();
-    sys.set("UPGRADE_VALUE", "inherited");
+fn upgrade_is_not_a_command() {
+    let sys = System::new();
 
     let result = run(omatalk(["upgrade"]).envs(sys.env()), "");
 
-    assert_eq!(result.code, 0, "{}", result.stderr);
-    assert_eq!(read(sys.path("upgrade-marker")), "inherited");
-    let downloads = sys.downloads();
-    assert_eq!(downloads.len(), 1, "{downloads:?}");
-    for flag in ["--proto =https", "--proto-redir =https", "--tlsv1.2"] {
-        assert!(
-            downloads[0].contains(flag),
-            "{flag:?} missing: {downloads:?}"
-        );
-    }
-    let url = downloads[0].rsplit_once(' ').unwrap().1;
+    assert_eq!(result.code, 2);
     assert!(
-        url.starts_with(&format!("{SITE_BASE}/install.sh?ts=")),
-        "{downloads:?}"
+        result.stderr.starts_with("error: ") && result.stderr.contains("Usage: omatalk "),
+        "{}",
+        result.stderr
     );
+    assert_eq!(sys.commands(), Vec::<String>::new());
 }
 
 #[test]
-fn upgrade_rejects_extra_arguments() {
-    let sys = upgrade_site();
+fn setup_runs_the_embedded_setup_script() {
+    let sys = System::new();
+    let elsewhere = TempDir::new("cli");
 
-    let result = run(omatalk(["upgrade", "now"]).envs(sys.env()), "");
+    let result = run(
+        Command::new(common::OMATALK)
+            .arg("setup")
+            .current_dir(elsewhere.path())
+            .envs(sys.env())
+            .env("OMATALK_BIN", "/usr/bin/true"),
+        "",
+    );
+
+    assert_ne!(result.code, 0);
+    let downloads = sys.downloads();
+    assert_eq!(downloads.len(), 1, "{downloads:?}");
+    assert!(
+        downloads[0].ends_with(
+            " https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx"
+        ),
+        "{downloads:?}"
+    );
+    assert!(!sys.logged("systemctl"));
+}
+
+#[test]
+fn setup_rejects_extra_arguments() {
+    let sys = System::new();
+
+    let result = run(omatalk(["setup", "now"]).envs(sys.env()), "");
 
     assert_eq!(result.code, 2);
     assert!(
@@ -76,15 +79,15 @@ fn uninstall_runs_the_embedded_uninstaller() {
     let result = run(omatalk(["uninstall"]).envs(sys.env()), "y\n");
 
     assert_eq!(result.code, 0, "{}", result.stderr);
-    assert!(sys.logged("systemctl --user disable --now omatalk.service"));
     assert!(!sys.home(".local/bin/omatalk").exists());
     assert!(!sys.install_home().exists());
     assert_eq!(common::names(sys.path("tmp")), Vec::<String>::new());
     assert!(
-        result.stdout.contains("Omatalk uninstalled."),
+        result.stdout.contains("Omatalk files removed."),
         "{}",
         result.stdout
     );
+    assert!(sys.logged("omarchy pkg drop omatalk-bin"));
 }
 
 #[test]

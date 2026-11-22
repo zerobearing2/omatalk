@@ -1,35 +1,27 @@
-//! The F8 binding in bindings.lua: asked for on install, offered for removal
-//! on uninstall, and never taken from another command.
-
 use crate::common::{read, write};
 use crate::fake::*;
 
 #[test]
-fn install_does_not_bind_f8_on_eof_or_decline() {
+fn setup_does_not_bind_f8_on_eof_or_decline() {
     for answer in ["", "n\n"] {
         let fake = Fake::new();
-        fake.publish(release("new"));
 
-        let result = fake.install(answer);
+        let result = fake.setup(answer);
 
         assert_eq!(result.code, 0, "{answer:?}: {}", result.stderr);
         assert!(!fake.bindings().exists(), "{answer:?}");
         assert!(result.stdout.contains("To bind F8"), "{answer:?}");
-        assert!(
-            fake.commands().iter().any(|l| l == PLUGIN_ADD_CMD),
-            "{answer:?}"
-        );
+        assert!(fake.logged(RESCAN_CMD), "{answer:?}");
         assert!(!fake.logged("hyprctl"), "{answer:?}");
     }
 }
 
 #[test]
-fn install_binds_f8_on_yes_or_enter() {
+fn setup_binds_f8_on_yes_or_enter() {
     for answer in ["y\n", "\n"] {
         let fake = Fake::new();
-        fake.publish(release("new"));
 
-        let result = fake.install(answer);
+        let result = fake.setup(answer);
 
         assert_eq!(result.code, 0, "{answer:?}: {}", result.stderr);
         assert_eq!(
@@ -42,21 +34,17 @@ fn install_binds_f8_on_yes_or_enter() {
             fake.commands().iter().any(|l| l == "hyprctl reload"),
             "{answer:?}"
         );
-        assert!(
-            fake.commands().iter().any(|l| l == PLUGIN_ADD_CMD),
-            "{answer:?}"
-        );
+        assert!(fake.logged(RESCAN_CMD), "{answer:?}");
     }
 }
 
 #[test]
-fn install_reasks_after_decline() {
+fn setup_reasks_after_decline() {
     let fake = Fake::new();
-    fake.publish(release("new"));
     write(fake.bindings(), "-- mine\n");
 
-    let first = fake.install("n\n");
-    let second = fake.install("y\n");
+    let first = fake.setup("n\n");
+    let second = fake.setup("y\n");
 
     assert_eq!(first.code, 0, "{}", first.stderr);
     assert_eq!(second.code, 0, "{}", second.stderr);
@@ -64,16 +52,15 @@ fn install_reasks_after_decline() {
 }
 
 #[test]
-fn install_never_takes_f8_from_another_command() {
+fn setup_never_takes_f8_from_another_command() {
     let fake = Fake::new();
-    fake.publish(release("new"));
     write(
         fake.bindings(),
         "o.bind(\"F8\", \"Other\", \"other thing\")\n",
     );
     let before = bytes(fake.bindings());
 
-    let result = fake.install("y\n");
+    let result = fake.setup("y\n");
 
     assert_eq!(result.code, 0, "{}", result.stderr);
     assert_eq!(bytes(fake.bindings()), before);
@@ -87,19 +74,18 @@ fn install_never_takes_f8_from_another_command() {
 }
 
 #[test]
-fn install_rebinds_after_uninstall_leaves_a_comment() {
+fn setup_rebinds_after_uninstall_leaves_a_comment() {
     let fake = Fake::new();
-    fake.publish(release("new"));
     write(
         fake.bindings(),
         format!("-- F8 speaks selection (installed via ~/Work/omatalk/install.sh)\n{BIND_LINE}\n"),
     );
 
     let uninstalled = fake.uninstall("y\n");
-    let reinstalled = fake.install("y\n");
+    let resetup = fake.setup("y\n");
 
     assert_eq!(uninstalled.code, 0, "{}", uninstalled.stderr);
-    assert_eq!(reinstalled.code, 0, "{}", reinstalled.stderr);
+    assert_eq!(resetup.code, 0, "{}", resetup.stderr);
     let bindings = read(fake.bindings());
     assert!(
         bindings.ends_with(&format!("\n{BIND_LINE}\n")),

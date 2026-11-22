@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+printf 'omarchy-shell %s\n' "$*" >> "$FAKE_LOG"
+exit "${FAKE_RESCAN_STATUS:-0}"

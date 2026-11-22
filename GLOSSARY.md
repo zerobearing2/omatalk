@@ -64,27 +64,37 @@ has no Stream and no Interrupt: it favors quality over latency, packs each
 paragraph on its own, and writes the file only when all of it succeeds.
 _Avoid_: export, record
 
+**Package**:
+`omatalk-bin`, the Omarchy package that is the only install. pacman owns
+`/usr/bin/omatalk` and the systemd user unit. Installed with
+`omarchy pkg add omatalk-bin`, upgraded by `omarchy update`.
+_Avoid_: installer (that was the curl script), release (a tag and its tarball)
+
+**Setup**:
+`omatalk setup`: the per-user work the Package cannot do. It fetches the
+models, enables the unit, asks before it binds F8, and links the bar plugin.
+Every step skips itself when done, so it is safe to rerun.
+_Avoid_: install (the package install is `omarchy pkg add`)
+
 **Wake lead**:
 Silence played before speech when the default sink is a suspended Bluetooth or
 HDMI sink, so the device can unmute. Set by `wake_lead_ms`.
 
-The Omarchy bar widget (megaphone, setup and config panel) lives in
-https://github.com/zerobearing2/omarchy-omatalk-plugin, released on its own.
-See `docs/adr/0004-plugin-own-repo.md`. Installed means `~/.local/bin/omatalk`
-exists. Do not use `command -v omatalk` as the only probe.
+The Omarchy bar widget (megaphone and config panel) lives in
+`plugin/zerobearing.omatalk/` and ships inside the Package at
+`/usr/share/omatalk/omarchy-plugin/zerobearing.omatalk/`. Setup links it into
+`~/.config/omarchy/plugins/`. It calls `/usr/bin/omatalk` only. See
+`docs/adr/0009-the-omarchy-package-is-the-only-install.md`.
 
 ## Bar states
 
-- Not installed: normal color, tooltip "Omatalk is not installed". No socket
-  follow, no unavailable.
-- Installed and follow connected: idle or speaking.
-- Installed and follow failed past a three-second grace, or Daemon `error`:
-  unavailable (urgent).
+- Follow connected: idle or speaking.
+- Follow failed past a three-second grace, or Daemon `error`: unavailable
+  (urgent).
 
 ## Panel states
 
-- Not installed: setup. It links to the site install page, and the user runs
-  the install command in a terminal. Plugin version comes from the plugin's
-  `manifest.json`. No `omatalk config`, `version`, or preview `speak`.
-- Installed: voice, speed, plugin version, and Daemon version
-  (`omatalk version`). Config CLI uses `~/.local/bin/omatalk`.
+Voice, speed, and the Daemon version (`omatalk version`). The plugin ships with
+the Daemon, so there is one version. Config CLI uses `/usr/bin/omatalk`. While
+the bar is unavailable, the panel notes that changes apply once the Daemon
+starts.

@@ -6,19 +6,24 @@ and hear it read back. Speech runs on your CPU with
 at runtime. Hear every voice on the [project site](https://omatalk.zerobearing.com).
 
 ```sh
-curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
+omarchy pkg add omatalk-bin && omatalk setup
 ```
 
-The command installs the Daemon, which does the speaking, and the bar plugin,
-which is the megaphone and voice panel. It adds missing packages with
-`omarchy pkg add`, downloads the models (about 355MB), and asks before it binds
-F8. If F8 is taken, it prints a command to paste instead. A plugin you already
-added from the Omarchy Marketplace stays as it is.
+The package installs the Daemon, which does the speaking, and its systemd
+unit. `omatalk setup` does the rest for your user: it downloads the models
+(about 355MB), enables the service, asks before it binds F8, and adds the bar
+plugin, which is the megaphone and voice panel. The package carries the plugin
+and `omatalk setup` links it into `~/.config/omarchy/plugins/`, replacing a
+copy you added from the Omarchy Marketplace. If F8 is taken, it prints a
+command to paste instead. `omatalk setup` is safe to run again.
 
-If the plugin add failed, run this. The plugin does nothing without the Daemon.
+Installed with the old curl command? Run
+`curl -fsSL https://omatalk.zerobearing.com/install.sh | bash` once more, or
+`omatalk upgrade`. Either installs the package, removes the files the curl
+installer left, and keeps your models, config, and F8 binding.
 
 ```sh
-omarchy plugin add https://github.com/zerobearing2/omarchy-omatalk-plugin.git --enable
+curl -fsSL https://omatalk.zerobearing.com/install.sh | bash
 ```
 
 ## Use it
@@ -46,6 +51,7 @@ omatalk speak --voice af_bella "hi" # speak once in a voice, default unchanged
 omatalk stop                        # cut off the current speech
 omatalk status                      # idle | speaking | error
 omatalk version                     # print the installed release
+omatalk setup                       # models, service, F8, bar plugin (safe to rerun)
 omatalk config get [--json]         # print the effective config
 omatalk config set voice af_bella   # set the voice
 omatalk config set speed 1.25       # set the speed (0.5-2.0)
@@ -144,20 +150,18 @@ monitor.bluez.rules = [
 
 ## Upgrade and uninstall
 
-`omatalk upgrade` installs the latest release. Upgrades never touch
-`config.toml`. `omarchy plugin update zerobearing.omatalk` updates the bar
-plugin, which releases on its own.
+`omarchy update` upgrades the package and restarts a running Daemon on the new
+binary. The bar plugin updates with the package, so it always matches the
+Daemon. Upgrades never touch `config.toml`.
 
-`omatalk uninstall` removes the Daemon, its systemd unit, and the bar plugin.
-It asks before it deletes the models, your config, and the F8 binding. If the
-`omatalk` command is already gone, run:
+`omatalk uninstall` removes any files the curl installer left. It asks before
+it deletes the models, your config, and the F8 binding, then runs
+`omarchy pkg drop omatalk-bin`. That drop stops and disables the service and
+removes the bar plugin link, and alone it keeps your models and config.
 
-```sh
-curl -fsSL https://omatalk.zerobearing.com/uninstall.sh | bash
-```
-
-`omarchy plugin remove zerobearing.omatalk` removes only the megaphone. The
-Daemon, models, and config stay, and F8 still speaks.
+`omarchy plugin disable zerobearing.omatalk` hides only the megaphone. The
+Daemon, models, and config stay, and F8 still speaks. `omatalk setup` leaves a
+disabled plugin alone once it is linked.
 
 ## Troubleshooting
 
@@ -176,12 +180,13 @@ and the megaphone stays red, run `omarchy restart shell`.
 **The Daemon exits at startup with a library error.** Run
 `omarchy pkg present onnxruntime-cpu espeak-ng`. The Daemon and `omatalk render`
 load `libonnxruntime.so.1` and `libespeak-ng.so.1`. To use another onnxruntime
-build, set `ORT_DYLIB_PATH` to its library in the unit's environment.
+build, set `ORT_DYLIB_PATH` to its library with `systemctl --user edit
+omatalk.service`.
 
 ## More
 
 [Domain language](GLOSSARY.md), [design decisions](docs/adr/),
-[bar plugin](https://github.com/zerobearing2/omarchy-omatalk-plugin), and the
+[bar plugin](plugin/zerobearing.omatalk/README.md), and the
 [contributor guide](AGENTS.md).
 
 The voice is [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) by

@@ -6,9 +6,19 @@ case "$*" in
     rm -f "$FAKE_STATE/ready"
     exit "${FAKE_STOP_STATUS:-0}"
     ;;
-  --user\ start*)
+  --user\ start* | --user\ restart*)
     if [ "${FAKE_DAEMON_DOWN:-0}" != 1 ]; then
       touch "$FAKE_STATE/ready"
     fi
+    ;;
+  --user\ enable*)
+    touch "$FAKE_STATE/enabled"
+    ;;
+  --user\ disable*)
+    rm -f "$FAKE_STATE/enabled" "$FAKE_STATE/ready"
+    exit "${FAKE_STOP_STATUS:-0}"
+    ;;
+  --user\ is-enabled*)
+    test -f "$FAKE_STATE/enabled"
     ;;
 esac

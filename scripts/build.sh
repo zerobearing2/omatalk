@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Build the release binary, pack the runtime tarball, and write RELEASE_TAG
-# + TARBALL_SHA256 into install.sh. Tag is v$(Cargo.toml version).
-# --pack-only packs the binary already in target/release and leaves
-# install.sh alone (tests/pack.rs uses it).
+# Build the release binary and pack the runtime tarball. Tag is
+# v$(Cargo.toml version). --pack-only packs the binary already in
+# target/release (tests/pack.rs uses it).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,7 +15,8 @@ if [ "${1:-}" = "--pack-only" ]; then
   pack_only=1
 fi
 
-tag="v$(cargo_version Cargo.toml)"
+version="$(cargo_version Cargo.toml)"
+tag="v$version"
 
 if [ "$pack_only" -eq 0 ]; then
   cargo build --release --locked
@@ -28,8 +28,13 @@ if [ ! -f "$release_dir/omatalk" ]; then
   exit 1
 fi
 
-# Reproducible: bytes depend only on the three files. install.sh and
-# uninstall.sh are not in this archive; they are sibling release assets.
+stage="$(mktemp -d)"
+trap 'rm -rf "$stage"' EXIT
+stage_plugin "$ROOT" "$stage/omarchy-plugin" "$version"
+
+# Reproducible: bytes depend only on the binary, the unit, LICENSE, and the
+# staged plugin. install.sh is not in this archive; it is a sibling release
+# asset.
 tar --sort=name \
   --mtime=@0 \
   --owner=0 \
@@ -41,6 +46,7 @@ tar --sort=name \
   -C "$release_dir" omatalk \
   -C "$ROOT/systemd" omatalk.service \
   -C "$ROOT" LICENSE \
+  -C "$stage" omarchy-plugin \
   | gzip -n > "$TARBALL"
 
 sha256sum "$TARBALL" > "$TARBALL.sha256"
@@ -52,36 +58,4 @@ if [ "$pack_only" -eq 1 ]; then
   exit 0
 fi
 
-rewritten="$(mktemp)"
-trap 'rm -f "$rewritten"' EXIT
-
-wrote_tag=0
-wrote_digest=0
-while IFS= read -r line; do
-  case "$line" in
-    RELEASE_TAG=*)
-      printf 'RELEASE_TAG="%s"\n' "$tag"
-      wrote_tag=1
-      ;;
-    TARBALL_SHA256=*)
-      printf 'TARBALL_SHA256="%s"\n' "$digest"
-      wrote_digest=1
-      ;;
-    *)
-      printf '%s\n' "$line"
-      ;;
-  esac
-done < install.sh > "$rewritten"
-
-if [ "$wrote_tag" -ne 1 ]; then
-  echo "install.sh has no RELEASE_TAG= line to rewrite" >&2
-  exit 1
-fi
-if [ "$wrote_digest" -ne 1 ]; then
-  echo "install.sh has no TARBALL_SHA256= line to rewrite" >&2
-  exit 1
-fi
-
-mv "$rewritten" install.sh
-chmod +x install.sh
 printf 'built %s %s\n' "$tag" "$digest"

@@ -1,30 +1,20 @@
-//! A release site, install.sh pinned to it, and seeds of earlier installs,
-//! on top of the fake machine in common::System.
-
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-use crate::common::{Run, System, TempDir, chmod, read, repo, run, sha256, sha256_bytes, write};
+use crate::common::{Run, System, read, repo, run, sha256_bytes, write, write_executable};
 
 pub use omatalk::speech::kokoro::MODEL_FILE as FP32;
 pub use omatalk::voices::VOICES_FILE as VOICES;
 
-pub const PLUGIN_ADD_CMD: &str =
-    "omarchy plugin add https://example.test/omarchy-omatalk-plugin.git --enable --yes";
-pub const TARBALL: &str = "omatalk-x86_64.tar.gz";
+pub const RESCAN_CMD: &str = "omarchy-shell -q shell rescanPlugins";
+pub const ENABLE_CMD: &str = "omarchy plugin enable zerobearing.omatalk";
 pub const FP16: &str = "kokoro-v1.0.fp16.onnx";
 pub const SITE_URL: &str = "https://release.test";
 pub const BIND_LINE: &str = r#"o.bind("F8", "Omatalk", "omatalk speak")"#;
-
-pub fn unit() -> Vec<u8> {
-    std::fs::read(repo("systemd/omatalk.service")).unwrap()
-}
 
 pub fn bytes(path: impl AsRef<Path>) -> Vec<u8> {
     std::fs::read(path).unwrap()
 }
 
-/// Stands in for the omatalk binary: status and speak against FAKE_STATE.
 pub fn launcher_script(release: &str) -> String {
     format!(
         r#"#!/bin/sh
@@ -35,17 +25,10 @@ case "${{1:-}}" in
     printf '%s\n' "$*" >> "$FAKE_STATE/speech"
     exit "${{FAKE_SPEAK_STATUS:-0}}"
     ;;
+  setup) printf 'setup\n' >> "$FAKE_STATE/setup-calls" ;;
 esac
 "#
     )
-}
-
-pub fn release(name: &str) -> Vec<(&'static str, Vec<u8>)> {
-    vec![
-        ("omatalk", launcher_script(name).into_bytes()),
-        ("omatalk.service", unit()),
-        ("LICENSE", b"MIT\n".to_vec()),
-    ]
 }
 
 /// The `NAME="value"` lines of an installer script.
@@ -64,15 +47,13 @@ pub fn installer_pins(script: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-/// The value of install.sh's `name` pin.
 pub fn pin(name: &str) -> Option<String> {
-    installer_pins(&read(repo("install.sh")))
+    installer_pins(&read(repo("setup.sh")))
         .into_iter()
         .find(|(k, _)| k == name)
         .map(|(_, v)| v)
 }
 
-/// The fake machine plus a release site and install.sh's pins pointed at it.
 pub struct Fake {
     sys: System,
     pins: Vec<(&'static str, String)>,
@@ -93,20 +74,23 @@ impl std::ops::DerefMut for Fake {
 
 impl Fake {
     pub fn new() -> Fake {
-        let sys = System::new();
+        let mut sys = System::new();
+        write_executable(sys.path("usr/bin/omatalk"), &launcher_script("package"));
+        sys.set("OMATALK_BIN", sys.path("usr/bin/omatalk"));
         let model = b"fake model";
         let voices = b"fake voices";
         write(sys.site("models").join(FP32), model);
         write(sys.site("models").join(VOICES), voices);
+        let plugin_source = sys.path("usr/share/omatalk/omarchy-plugin/zerobearing.omatalk");
+        write(
+            plugin_source.join("manifest.json"),
+            "{\"id\": \"zerobearing.omatalk\"}\n",
+        );
         let pins = vec![
-            ("RELEASE_BASE", SITE_URL.to_owned()),
             ("MODEL_BASE", format!("{SITE_URL}/models")),
             ("MODEL_SHA256", sha256_bytes(model)),
             ("VOICES_SHA256", sha256_bytes(voices)),
-            (
-                "PLUGIN_REPO",
-                "https://example.test/omarchy-omatalk-plugin.git".to_owned(),
-            ),
+            ("PLUGIN_SOURCE", plugin_source.display().to_string()),
         ];
         Fake { sys, pins }
     }
@@ -117,6 +101,10 @@ impl Fake {
 
     pub fn installed_unit(&self) -> PathBuf {
         self.home(".config/systemd/user/omatalk.service")
+    }
+
+    pub fn plugin_source(&self) -> PathBuf {
+        self.path("usr/share/omatalk/omarchy-plugin/zerobearing.omatalk")
     }
 
     pub fn plugin_dir(&self) -> PathBuf {
@@ -131,50 +119,33 @@ impl Fake {
         self.install_home().join("models").join(file)
     }
 
-    /// The release tarball at the site: `omatalk/<name>` file entries only.
-    pub fn publish(&self, files: Vec<(&str, Vec<u8>)>) {
-        let staging = TempDir::new("release");
-        let mut members = Vec::new();
-        for (name, content) in files {
-            let path = staging.path().join("omatalk").join(name);
-            write(&path, content);
-            chmod(&path, if name == "omatalk" { 0o755 } else { 0o644 });
-            members.push(format!("omatalk/{name}"));
-        }
-        let status = Command::new("tar")
-            .arg("-czf")
-            .arg(self.site(TARBALL))
-            .arg("-C")
-            .arg(staging.path())
-            .args(members)
-            .status()
-            .unwrap();
-        assert!(status.success(), "tar failed");
-    }
-
-    /// install.sh with its pins rewritten for the fake site.
-    fn pinned_installer(&self, tarball_sha: &str) -> PathBuf {
-        let mut script = read(repo("install.sh"));
+    fn pinned_setup(&self) -> PathBuf {
+        let mut script = read(repo("setup.sh"));
         let current = installer_pins(&script);
-        let pins = self
-            .pins
-            .iter()
-            .map(|(k, v)| (*k, v.as_str()))
-            .chain([("TARBALL_SHA256", tarball_sha)]);
-        for (name, value) in pins {
+        for name in [
+            "MODEL_BASE",
+            "MODEL_SHA256",
+            "VOICES_SHA256",
+            "PLUGIN_SOURCE",
+        ] {
+            let (_, value) = self.pins.iter().find(|(k, _)| *k == name).unwrap();
             let (_, old) = current
                 .iter()
                 .find(|(k, _)| k == name)
-                .unwrap_or_else(|| panic!("install.sh has no {name}= pin"));
+                .unwrap_or_else(|| panic!("setup.sh has no {name}= pin"));
             script = script.replacen(
                 &format!("{name}=\"{old}\""),
                 &format!("{name}=\"{value}\""),
                 1,
             );
         }
-        let path = self.path("install.sh");
+        let path = self.path("setup.sh");
         write(&path, script);
         path
+    }
+
+    pub fn setup(&self, answer: &str) -> Run {
+        self.bash(&self.pinned_setup(), answer)
     }
 
     pub fn bash(&self, script: &Path, answer: &str) -> Run {
@@ -182,11 +153,7 @@ impl Fake {
     }
 
     pub fn install(&self, answer: &str) -> Run {
-        self.install_with_sha(answer, &sha256(self.site(TARBALL)))
-    }
-
-    pub fn install_with_sha(&self, answer: &str, tarball_sha: &str) -> Run {
-        self.bash(&self.pinned_installer(tarball_sha), answer)
+        self.bash(&repo("install.sh"), answer)
     }
 
     pub fn uninstall(&self, answer: &str) -> Run {
@@ -213,6 +180,7 @@ impl Fake {
     pub fn without_omarchy(&mut self) {
         let fake_bin = self.path("bin");
         std::fs::remove_file(fake_bin.join("omarchy")).unwrap();
+        std::fs::remove_file(fake_bin.join("omarchy-shell")).unwrap();
         let tools = [
             "tar",
             "sha256sum",
@@ -228,6 +196,10 @@ impl Fake {
             "date",
             "bash",
             "touch",
+            "seq",
+            "ln",
+            "readlink",
+            "dirname",
         ];
         for tool in tools {
             let found = std::env::split_paths(&std::env::var_os("PATH").unwrap())
@@ -240,12 +212,30 @@ impl Fake {
         self.set("PATH", fake_bin);
     }
 
-    pub fn seed_copy_plugin(&self) {
+    pub fn seed_checkout_plugin(&self) {
+        std::fs::create_dir_all(self.plugin_dir().join(".git")).unwrap();
         write(
             self.plugin_dir().join("manifest.json"),
             "{\"id\": \"zerobearing.omatalk\"}\n",
         );
-        write(self.plugin_dir().join("old.txt"), "legacy copy\n");
+        write(self.plugin_dir().join("old.txt"), "curl-era checkout\n");
+    }
+
+    pub fn plugin_enabled(&self) -> bool {
+        self.path("state/plugin-enabled").exists()
+    }
+
+    pub fn seed_curl_install(&self) -> (PathBuf, PathBuf) {
+        write(self.launcher(), launcher_script("curl-era"));
+        write(
+            self.installed_unit(),
+            "[Service]\nExecStart=%h/.local/bin/omatalk daemon\n",
+        );
+        write(self.model(FP32), "fake model");
+        let config = self.home(".config/omatalk/config.toml");
+        write(&config, "voice = \"bf_emma\"\nspeed = 1.25\n");
+        write(self.bindings(), format!("-- keys\n{BIND_LINE}\n"));
+        (config, self.bindings())
     }
 
     /// A v0.5.1 install: venv, source, fp16 model, launcher copied from the venv.
@@ -256,6 +246,8 @@ impl Fake {
             "#!/venv/bin/python\n",
         );
         write(install_home.join("src/daemon/omatalkd.py"), "old daemon\n");
+        write(install_home.join("omatalk-src.tar.gz"), "old source\n");
+        write(install_home.join("omatalk-src.tar.gz.sha256"), "old sum\n");
         write(self.model(FP16), "fp16 model");
         write(self.model(VOICES), "fake voices");
         write(self.launcher(), "#!/venv/bin/python\n");
