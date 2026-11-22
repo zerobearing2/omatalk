@@ -222,6 +222,27 @@ fn restart_hook_runs_after_an_upgrade_and_never_fails_the_update() {
     assert!(!text.contains("AbortOnFail"));
 }
 
+/// alpm runs hooks in filename order, and try-restart must see the new unit
+/// that systemd's user daemon-reload hook loads.
+#[test]
+fn restart_hook_is_installed_to_run_after_the_user_daemon_reload() {
+    let pkgbuild = read(repo("packaging/dev/PKGBUILD"));
+    let installed = pkgbuild
+        .split_whitespace()
+        .find_map(|word| {
+            let word = word.trim_matches('"');
+            let name = word.strip_prefix("${pkgdir}/usr/share/libalpm/hooks/")?;
+            name.ends_with("-restart-user-services.hook")
+                .then_some(name)
+        })
+        .expect("PKGBUILD installs the restart hook");
+
+    assert!(
+        installed > "30-systemd-daemon-reload-user.hook",
+        "{installed}"
+    );
+}
+
 fn package_remove_user(app: &str, tmp: &Path) -> common::Run {
     run(
         Command::new("bash")

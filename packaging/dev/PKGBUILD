@@ -52,5 +52,5 @@ package() {
     install -Dm644 "${srcdir}/remove-user-services.hook" \
         "${pkgdir}/usr/share/libalpm/hooks/30-omatalk-remove-user-services.hook"
     install -Dm644 "${srcdir}/restart-user-services.hook" \
-        "${pkgdir}/usr/share/libalpm/hooks/30-omatalk-restart-user-services.hook"
+        "${pkgdir}/usr/share/libalpm/hooks/35-omatalk-restart-user-services.hook"
 }
