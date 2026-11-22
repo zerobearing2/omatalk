@@ -492,8 +492,11 @@ fn config_set_keeps_the_file_loadable_for_the_daemon() {
     let env = config_environment();
     write(&env.config, "# mine\nplayer = [\"custom\"]\n");
 
-    env.config(&["set", "wake_lead_ms", "400"]);
-    env.config(&["set", "pause_media", "false"]);
+    let lead = env.config(&["set", "wake_lead_ms", "400"]);
+    let pause = env.config(&["set", "pause_media", "false"]);
+
+    assert_eq!(lead.code, 0, "{}", lead.stderr);
+    assert_eq!(pause.code, 0, "{}", pause.stderr);
 
     let text = read(&env.config);
     assert!(
