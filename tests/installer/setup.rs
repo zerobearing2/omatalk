@@ -1,7 +1,7 @@
 use crate::common::{names, read, write};
 use crate::fake::*;
 
-fn changes(fake: &Fake) -> Vec<String> {
+fn mutating_commands(fake: &Fake) -> Vec<String> {
     fake.commands()
         .into_iter()
         .filter(|l| {
@@ -47,7 +47,7 @@ fn setup_twice_changes_nothing_and_asks_nothing() {
     let config = fake.home(".config/omatalk/config.toml");
     write(&config, "voice = \"bf_emma\"\nspeed = 1.25\n");
     assert_eq!(fake.setup("y\n").code, 0);
-    let before = changes(&fake);
+    let before = mutating_commands(&fake);
     let config_before = bytes(&config);
     let bindings_before = bytes(fake.bindings());
     let model_before = bytes(fake.model(FP32));
@@ -55,7 +55,7 @@ fn setup_twice_changes_nothing_and_asks_nothing() {
     let second = fake.setup("");
 
     assert_eq!(second.code, 0, "{}", second.stderr);
-    assert_eq!(changes(&fake), before, "{:?}", fake.commands());
+    assert_eq!(mutating_commands(&fake), before, "{:?}", fake.commands());
     assert_eq!(bytes(&config), config_before);
     assert_eq!(bytes(fake.bindings()), bindings_before);
     assert_eq!(bytes(fake.model(FP32)), model_before);

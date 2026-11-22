@@ -137,7 +137,7 @@ step_curl_era() {
     "$OMATALK_HOME/omatalk-src.tar.gz.sha256"
 }
 
-step_restart_daemon() {
+step_start_daemon() {
   if "$OMATALK_BIN" status >/dev/null 2>&1; then
     return
   fi
@@ -285,7 +285,7 @@ fi
 step_models
 step_curl_era
 step_enable
-step_restart_daemon
+step_start_daemon
 step_binding
 step_wait
 step_plugin
