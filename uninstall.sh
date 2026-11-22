@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Omatalk uninstaller: stops and removes the unit and the omatalk binary,
-# and optionally the models and config. The bar plugin is removed with
-# `omarchy plugin remove`. Safe to run via curl | bash (prompts read
-# the terminal, not the pipe).
+# Omatalk uninstaller, run by `omatalk uninstall` (embedded in the binary).
+# Stops the Daemon, removes the bar plugin and any curl-era files, asks before
+# it deletes the models, config, and F8 binding, and ends by dropping the
+# omatalk-bin package. It deletes nothing under /usr; pacman does. Prompts read
+# the terminal, not the pipe.
 set -euo pipefail
 
 OMATALK_HOME="${OMATALK_HOME:-$HOME/.local/share/omatalk}"
@@ -54,7 +55,7 @@ if command -v omarchy >/dev/null 2>&1; then
   fi
 fi
 rm -rf "$PLUGIN_DIR"
-msg "Daemon stopped and removed; stray Daemons killed; launcher and bar plugin removed"
+msg "Daemon stopped; stray Daemons killed; curl-era files and bar plugin removed"
 
 if [ -d "$OMATALK_HOME" ]; then
   if ! read -r -p "Remove $OMATALK_HOME (models, ~355MB)? [y/N] " answer < "$ASK_FROM"; then
@@ -97,4 +98,15 @@ if [ -f "$bindings" ]; then
   fi
 fi
 
-msg "Omatalk uninstalled.$bind_note"
+msg "Omatalk files removed.$bind_note"
+
+if ! command -v omarchy >/dev/null 2>&1; then
+  warn "omarchy not found; remove the package with: sudo pacman -Rns omatalk-bin"
+  exit 0
+fi
+if ! omarchy pkg present omatalk-bin; then
+  msg "The omatalk-bin package is not installed; nothing to drop"
+  exit 0
+fi
+msg "Dropping the omatalk-bin package"
+exec omarchy pkg drop omatalk-bin

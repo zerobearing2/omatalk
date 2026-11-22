@@ -87,10 +87,11 @@ fn uninstall_runs_the_embedded_uninstaller() {
     assert!(!sys.install_home().exists());
     assert_eq!(common::names(sys.path("tmp")), Vec::<String>::new());
     assert!(
-        result.stdout.contains("Omatalk uninstalled."),
+        result.stdout.contains("Omatalk files removed."),
         "{}",
         result.stdout
     );
+    assert!(sys.logged("omarchy pkg drop omatalk-bin"));
 }
 
 #[test]

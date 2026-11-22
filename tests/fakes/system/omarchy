@@ -1,10 +1,25 @@
 #!/bin/sh
+# Logs every call. Every package is present unless it is named in
+# FAKE_PKG_ABSENT (space separated), so `pkg present` answers per package.
+# FAKE_PKG_ADD_FAIL=1 makes `pkg add` fail. FAKE_PLUGIN_ADD_FAIL,
+# FAKE_PLUGIN_UPDATE_FAIL, and FAKE_PLUGIN_REMOVE_FAIL do the same for the
+# plugin commands. `plugin add` leaves a git checkout.
 set -eu
 printf 'omarchy %s\n' "$*" >> "$FAKE_LOG"
 plugin_dir="$HOME/.config/omarchy/plugins/zerobearing.omatalk"
 case "${1:-} ${2:-}" in
   "pkg present")
-    exit "${FAKE_PKG_PRESENT_STATUS:-0}"
+    shift 2
+    for pkg in "$@"; do
+      case " ${FAKE_PKG_ABSENT:-} " in
+        *" $pkg "*)
+          exit 1
+          ;;
+      esac
+    done
+    ;;
+  "pkg add")
+    exit "${FAKE_PKG_ADD_FAIL:-0}"
     ;;
   "plugin add")
     if [ "${FAKE_PLUGIN_ADD_FAIL:-0}" = 1 ]; then
