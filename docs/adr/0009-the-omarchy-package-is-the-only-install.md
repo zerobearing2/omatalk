@@ -52,9 +52,9 @@ Considered and rejected:
   in the hot process for a job pacman already has a hook for.
 
 Consequences: a dev build is a package too. `scripts/dev-install.sh` builds
-`packaging/dev` at `<latest stable>.r<commits>.g<sha>`, which sorts above that
-release and below the next, so `omarchy update` leaves it alone until a newer
-release ships. The bar plugin finds `/usr/bin/omatalk` first and
+`packaging/dev` at `<newest tag>.r<commits>.g<sha>`, which sorts above that
+tag and below the next RC or release, so `omarchy update` leaves it alone until
+one ships. The bar plugin finds `/usr/bin/omatalk` first and
 `~/.local/bin/omatalk` second until the shim retires, in a plugin release of its
 own. The Daemon's version is not on the socket, so after an upgrade the check is
 that `readlink /proc/<MainPID>/exe` is `/usr/bin/omatalk` without `(deleted)`.

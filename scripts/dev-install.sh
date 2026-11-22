@@ -12,21 +12,19 @@ die() {
   exit 1
 }
 
-latest_stable_tag() {
-  local tags
+newest_tag_version() {
   local tag
+  local version
   local best=""
-  tags="$(git tag --list 'v*')"
   while IFS= read -r tag; do
-    if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    if [[ ! "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)(-rc\.([0-9]+))?$ ]]; then
       continue
     fi
-    if [ -z "$best" ]; then
-      best="$tag"
-    elif [ "$(vercmp "${tag#v}" "${best#v}")" -gt 0 ]; then
-      best="$tag"
+    version="${BASH_REMATCH[1]}${BASH_REMATCH[3]:+rc${BASH_REMATCH[3]}}"
+    if [ -z "$best" ] || [ "$(vercmp "$version" "${best#* }")" -gt 0 ]; then
+      best="$tag $version"
     fi
-  done <<< "$tags"
+  done <<< "$(git tag --list 'v*')"
   printf '%s\n' "$best"
 }
 
@@ -43,13 +41,15 @@ for pin in MODEL_FILE VOICES_FILE; do
   fi
 done
 
-tag="$(latest_stable_tag)"
-if [ -z "$tag" ]; then
-  die "no vX.Y.Z tag in this clone; run: git fetch --tags. Nothing was changed"
+newest="$(newest_tag_version)"
+if [ -z "$newest" ]; then
+  die "no vX.Y.Z or vX.Y.Z-rc.N tag in this clone; run: git fetch --tags. Nothing was changed"
 fi
-pkgver="${tag#v}.r$(git rev-list --count "$tag..HEAD").g$(git rev-parse --short HEAD)"
-if [ "$(vercmp "$pkgver" "${tag#v}")" -ne 1 ]; then
-  die "$pkgver does not sort above ${tag#v}; nothing was changed"
+tag="${newest% *}"
+base="${newest#* }"
+pkgver="$base.r$(git rev-list --count "$tag..HEAD").g$(git rev-parse --short HEAD)"
+if [ "$(vercmp "$pkgver" "$base")" -ne 1 ]; then
+  die "$pkgver does not sort above $base; nothing was changed"
 fi
 
 cargo build --release --locked

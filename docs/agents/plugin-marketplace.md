@@ -21,7 +21,8 @@ and [VERIFICATION.md](https://github.com/omacom/omarchy-plugin-marketplace/blob/
   The plugin downloads, runs, displays, and copies no install command. Review
   closed #4712 over an installer in the plugin, and #8407's review objected to
   a `curl | bash` in the panel.
-- The plugin calls the `omatalk` CLI once `~/.local/bin/omatalk` exists.
+- The plugin calls the `omatalk` CLI once `/usr/bin/omatalk` (or a curl-era
+  `~/.local/bin/omatalk`) exists.
 - The baseline scanner flags `curl | bash` in the plugin README, and `git fetch`
   followed by running scripts, including maintainer-only release scripts.
 - The plugin never ships or runs an installer. Its `tests/run.sh` fails if

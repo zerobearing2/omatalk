@@ -27,7 +27,7 @@ selected text. Use the terms in `GLOSSARY.md`. The Omarchy package
   (`package-remove`, `package-restart`). The recipe in omacom/omarchy-pkgs
   carries the same hooks. A hook change lands in both.
 - `scripts/dev-install.sh` dogfoods this checkout: it builds `packaging/dev` as
-  `omatalk-bin` at `<latest stable>.r<commits>.g<sha>` and runs
+  `omatalk-bin` at `<newest tag>.r<commits>.g<sha>` and runs
   `sudo pacman -U` on it. It needs models from an earlier `omatalk setup`.
   `omarchy pkg drop omatalk-bin && omarchy pkg add omatalk-bin` goes back.
 - `scripts/build.sh` runs from `scripts/release.sh`. Keep both build scripts

@@ -315,9 +315,12 @@ fn rc_publishes_only_a_tag_and_a_prerelease() {
     );
     assert_eq!(fx.latest(), "v0.9.0");
 
-    assert!(result.stdout.contains(
-        "bash -c \"$(curl -fsSL https://github.com/zerobearing2/omatalk/releases/download/v0.10.0-rc.1/install.sh)\""
-    ), "{}", result.stdout);
+    assert!(
+        result.stdout.contains("local omatalk-bin recipe"),
+        "{}",
+        result.stdout
+    );
+    assert!(!result.stdout.contains("curl"), "{}", result.stdout);
 }
 
 #[test]

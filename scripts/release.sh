@@ -269,6 +269,5 @@ fi
 
 echo "Released $tag"
 if [ "$mode" = rc ]; then
-  echo "Install it with:"
-  printf 'bash -c "$(curl -fsSL https://github.com/%s/releases/download/%s/install.sh)"\n' "$REPO" "$tag"
+  echo "Test it with a local omatalk-bin recipe; see Release in AGENTS.md."
 fi
